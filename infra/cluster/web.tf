@@ -12,6 +12,12 @@ variable "web_image_tag" {
   default = null
 }
 
+# Public hostname allowed to open the game WebSocket (see socket_proxy.py).
+variable "public_hostname" {
+  type    = string
+  default = ""
+}
+
 resource "kubernetes_deployment_v1" "web" {
   count = var.web_enabled ? 1 : 0
   metadata {
@@ -51,6 +57,10 @@ resource "kubernetes_deployment_v1" "web" {
           env {
             name  = "MODE"
             value = "proxy"
+          }
+          env {
+            name  = "ALLOWED_ORIGINS"
+            value = var.public_hostname
           }
           port { container_port = 8765 }
           resources {

@@ -1,0 +1,115 @@
+name: CI
+
+# Validate and test on every push/PR with GitHub-hosted runners (no lab credentials).
+# Deployment to the Raspberry Pi is manual (workflow_dispatch) and runs on a
+# self-hosted runner on the same LAN as the Pi, authenticated to Azure with OIDC.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Publish images and deploy to the Raspberry Pi
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  validate:
+    name: Validate configuration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.17.1
+          terraform_wrapper: false
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.19.0
+      - name: Install Ansible
+        run: python3 -m pip install 'ansible-core>=2.20,<2.21'
+      - name: Validate Terraform, Ansible, Python and Helm
+        run: bash scripts/validate.sh
+
+  build-and-test:
+    name: Build and test containers
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Fetch verified upstream revisions
+        run: python3 scripts/fetch-sources.py
+      - name: Build native test images
+        run: python3 scripts/build-images.py --tag "$GITHUB_SHA" --platform linux/amd64
+      - name: Verify registration, login, shared room and socket proxy
+        run: python3 scripts/test-containers.py --tag "$GITHUB_SHA"
+
+  deploy:
+    name: Deploy to Raspberry Pi
+    needs: build-and-test
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      inputs.deploy &&
+      github.ref == 'refs/heads/main'
+    # Trusted Mac on the Pi's LAN. Never use a self-hosted runner for pull requests.
+    runs-on: [self-hosted, macOS, clubpenguin-lab]
+    environment: clubpenguin-lab # add required reviewers in repo Settings → Environments
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      id-token: write # OIDC token for Azure; no stored secrets
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      PUBLIC_HOSTNAME: ${{ vars.PUBLIC_HOSTNAME }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          clean: true
+      - name: Require the public hostname
+        run: test -n "$PUBLIC_HOSTNAME" || { echo "Set the PUBLIC_HOSTNAME repository variable"; exit 1; }
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Verify Pi and build ARM64 release
+        run: |
+          set -euo pipefail
+          python3 scripts/tunnel.py start
+          (cd ansible && ansible-playbook preflight.yml)
+          python3 scripts/fetch-sources.py
+          python3 scripts/build-images.py --tag "$GITHUB_SHA" --platform linux/arm64
+          python3 scripts/test-containers.py --tag "$GITHUB_SHA"
+      - name: Publish images
+        run: python3 scripts/publish-images.py --tag "$GITHUB_SHA"
+      - name: Terraform plan and apply
+        run: |
+          set -euo pipefail
+          terraform -chdir=infra/cluster init -input=false -backend-config=backend.hcl.example
+          terraform -chdir=infra/cluster plan -input=false \
+            -var=game_enabled=true -var=web_enabled=true -var=cloudflared_enabled=true \
+            -var="public_hostname=$PUBLIC_HOSTNAME" \
+            -var="image_tag=$GITHUB_SHA" -var="web_image_tag=$GITHUB_SHA" \
+            -out=deploy.tfplan
+          terraform -chdir=infra/cluster apply -input=false deploy.tfplan
+      - name: Smoke test and backup
+        run: |
+          set -euo pipefail
+          kubectl --kubeconfig "$HOME/.kube/clubpenguin-pi.yaml" \
+            -n clubpenguin exec -i deploy/dash -- python - < scripts/game-smoke.py
+          python3 scripts/backup.py

@@ -17,6 +17,10 @@ parameters:
   - name: deploymentPool
     type: string
     default: Default
+  - name: publicHostname
+    displayName: Public hostname allowed for the game WebSocket (required when deploying)
+    type: string
+    default: ''
 
 stages:
   - stage: Validate
@@ -98,6 +102,7 @@ stages:
                         inlineScript: |
                           set -euo pipefail
                           umask 077
+                          test -n "${{ parameters.publicHostname }}" || { echo "Set the publicHostname parameter"; exit 1; }
                           export ARM_USE_OIDC=true
                           export ARM_CLIENT_ID="$servicePrincipalId"
                           export ARM_TENANT_ID="$tenantId"
@@ -106,7 +111,8 @@ stages:
                           python3 scripts/publish-images.py --tag "$(Build.SourceVersion)"
                           terraform -chdir=infra/cluster init -input=false -backend-config=backend.hcl.example
                           terraform -chdir=infra/cluster plan -input=false \
-                            -var=game_enabled=true -var=web_enabled=true \
+                            -var=game_enabled=true -var=web_enabled=true -var=cloudflared_enabled=true \
+                            -var="public_hostname=${{ parameters.publicHostname }}" \
                             -var="image_tag=$(Build.SourceVersion)" \
                             -var="web_image_tag=$(Build.SourceVersion)" -out=deploy.tfplan
                           terraform -chdir=infra/cluster apply -input=false deploy.tfplan

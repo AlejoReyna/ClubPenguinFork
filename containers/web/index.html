@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#0a2f5c">
+<meta name="theme-color" content="#00529b">
 <meta name="description" content="Glaciar: mundo privado de Club Penguin (AS2) jugable desde tu teléfono.">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -12,200 +12,62 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icons/icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-<title>Glaciar · Club Penguin</title>
+<title>Club Penguin · Glaciar</title>
 <style>
-  :root{
-    --ice-0:#eaf5ff;              /* texto principal sobre oscuro */
-    --ice-1:#9fc5e0;              /* texto secundario */
-    --deep-1:#0b3a66;             /* cielo alto */
-    --deep-2:#082540;             /* cielo bajo */
-    --card:#0d3357;               /* superficie de tarjeta */
-    --line:#ffffff1f;             /* bordes sutiles */
-    --accent:#3fb7f5;             /* cian glaciar */
-    --accent-deep:#1a7fc0;
-    --sun:#ffd44e;                /* amarillo Club Penguin */
-    --danger:#ff8a7a;
-    --radius:18px;
-  }
+  /* El fondo IMITA el borde del SWF: el contenedor desaparece y solo queda el juego. */
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html{touch-action:manipulation}
-  html,body{width:100%;height:100%;margin:0;overflow:hidden;background:var(--deep-2);color:var(--ice-0);font:16px/1.4 system-ui,-apple-system,sans-serif}
+  html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#00529b;color:#fff;font:16px system-ui,sans-serif}
   body{position:fixed;inset:0;overscroll-behavior:none}
-  main{position:fixed;inset:0;width:100%;height:100%;height:100dvh}
-
-  /* ---- Cielo y nieve (fondo decorado del letterbox) ---- */
-  .sky{position:fixed;inset:0;z-index:0;background:linear-gradient(180deg,var(--deep-1) 0%,var(--deep-2) 58%,#071c31 100%)}
-  .glow{position:fixed;z-index:0;left:50%;top:38%;width:140vmin;height:140vmin;transform:translate(-50%,-50%);
-        background:radial-gradient(closest-side,#1d5c8f55,#1d5c8f00 70%);pointer-events:none}
-  .snow{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.5;
-        background-image:
-          radial-gradient(2.2px at 18px 30px,var(--ice-0) 99%,transparent),
-          radial-gradient(3.4px at 120px 190px,#ffffff 99%,transparent),
-          radial-gradient(1.6px at 260px 90px,#cfe6f7 99%,transparent);
-        background-size:340px 340px, 520px 520px, 260px 260px;
-        animation:nieva 38s linear infinite}
-  @keyframes nieva{
-    from{background-position:0 0,0 0,0 0}
-    to{background-position:0 340px,0 520px,0 260px}
-  }
-  @media (prefers-reduced-motion:reduce){.snow{animation:none}}
-
-  /* ---- Lobby ---- */
-  .lobby{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;
-         gap:20px;padding:calc(20px + env(safe-area-inset-top)) 20px calc(20px + env(safe-area-inset-bottom));overflow:auto;
-         -webkit-user-select:none;user-select:none}
-  body.game-in .lobby{display:none}
-  .brand{text-align:center}
-  .brand svg{width:96px;height:112px;display:block;margin:0 auto 10px;filter:drop-shadow(0 10px 18px #0006)}
-  .brand h1{margin:0;font-size:34px;letter-spacing:-.5px;text-shadow:0 3px 12px #0007}
-  .brand h1 .frío{color:var(--accent)}
-  .brand p{margin:6px 0 0;color:var(--ice-1);font-size:14px}
-
-  .card{width:min(92vw,380px);background:linear-gradient(180deg,#ffffff14,#ffffff06),var(--card);
-        border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;box-shadow:0 18px 40px #0006}
-  .server{display:flex;align-items:center;gap:12px}
-  .dot{width:10px;height:10px;border-radius:50%;background:var(--sun);flex:0 0 auto;box-shadow:0 0 0 3px #ffd44e33;transition:background .3s}
-  body.serv-ok .dot{background:#5fe3a1;box-shadow:0 0 0 3px #5fe3a133}
-  .server b{font-size:17px}
-  .server small{display:block;color:var(--ice-1);font-size:12.5px}
-  .hint{margin:12px 0 0;color:var(--ice-1);font-size:12.5px;line-height:1.45}
-
-  .cta{min-height:56px;width:min(92vw,380px);display:flex;align-items:center;justify-content:center;gap:10px;border:0;border-radius:16px;
-       font-size:18px;font-weight:800;color:#06263f;background:linear-gradient(180deg,#ffe58a,var(--sun) 55%,#f2b93b);
-       box-shadow:0 6px 0 #b98d18,0 14px 30px #0007;cursor:pointer;transition:transform .08s,box-shadow .08s}
-  .cta:active{transform:translateY(4px);box-shadow:0 2px 0 #b98d18,0 8px 18px #0007}
-  .cta[disabled]{filter:grayscale(.4) brightness(.8);pointer-events:none}
-  .cta:focus-visible,.link:focus-visible,.bar button:focus-visible{outline:3px solid #ffdf70;outline-offset:3px}
-
-  .links{display:flex;gap:18px;align-items:center}
-  .link{color:var(--ice-0);background:none;border:1px solid var(--line);border-radius:12px;padding:11px 16px;font:inherit;font-size:14px;
-        text-decoration:none;min-height:44px;display:flex;align-items:center}
-  .instala{color:var(--ice-1);font-size:12.5px;text-align:center;max-width:320px}
-  .instala code{font-size:12px;background:#ffffff14;padding:2px 7px;border-radius:7px}
-
-  /* ---- Barra inferior durante el juego ---- */
-  .bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom));z-index:30;display:none;
-       gap:10px;transition:opacity .25s}
-  body.game-in .bar{display:flex}
-  body.game-in.quiet .bar{opacity:0;pointer-events:none}
-  body.game-in.quiet .bar:focus-within{opacity:1;pointer-events:auto}
-  .bar button{min-height:46px;min-width:52px;padding:0 18px;border:1px solid var(--line);border-radius:14px;background:#063354e8;color:var(--ice-0);
-              font:inherit;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 4px 14px #0006}
-
-  /* ---- Cápsula de estado ---- */
-  #estado{position:fixed;top:calc(12px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:40;max-width:88vw;
-          margin:0;padding:10px 16px;border-radius:12px;background:#063354e0;text-align:center;font-size:14px;opacity:0;transition:opacity .25s;
-          pointer-events:none}
-  #estado.on{opacity:1}
-
-  /* ---- Overlay de conexión / rotación ---- */
-  .overlay{position:fixed;inset:0;z-index:50;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;
-           background:linear-gradient(180deg,#0b3a66f2,#082540f5);padding:24px;text-align:center}
-  .overlay.on{display:flex}
-  .overlay .disc{width:64px;height:64px;border-radius:50%;border:4px solid #ffffff2b;border-top-color:var(--accent);animation:gira 1s linear infinite}
-  @keyframes gira{to{transform:rotate(1turn)}}
-  #conecta h2{margin:0;font-size:22px}
-  #conecta .tip{color:var(--ice-1);font-size:14px;min-height:2.8em;max-width:300px}
-  #conecta .error{display:none;flex-direction:column;gap:14px;align-items:center}
-  #conecta.fallo .error{display:flex}
-  #conecta.fallo .disc,#conecta.fallo .tip{display:none}
-  #conecta .error p{margin:0;color:var(--danger);font-size:15px;max-width:320px}
-  #conecta .error button{min-height:48px;padding:0 22px;border:0;border-radius:12px;background:var(--sun);font:inherit;font-weight:700;cursor:pointer}
-
-  #rota{background:#06263fe8}
-  #rota .pinguino{width:88px;height:100px;animation:giraloguino 2.4s ease-in-out infinite}
-  @keyframes giraloguino{0%,20%{transform:rotate(0)}55%,100%{transform:rotate(90deg)}}
-  #rota p{margin:0;font-size:18px;font-weight:700}
-  #rota small{color:var(--ice-1);font-size:13px}
-
-  /* ---- El mundo Flash ---- */
   #game{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
         width:min(100vw,158.333333dvh);height:min(100dvh,63.157895vw)}
   /* Oculta el marco del SWF de 760 × 480, incluido el suavizado del borde. */
   ruffle-player{display:block;width:100%;height:100%;clip-path:inset(1.25% .789474% round .526316% / .833334%)}
+
+  /* Solo avisos mínimos: nada de interfaz propia. */
+  #estado{position:fixed;top:calc(12px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:40;max-width:88vw;
+          margin:0;padding:9px 15px;border-radius:11px;background:#063354c9;text-align:center;font-size:14px;opacity:0;transition:opacity .25s;
+          pointer-events:none}
+  #estado.on{opacity:1}
+
+  .bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom));z-index:30;display:none;gap:9px;
+       transition:opacity .25s}
+  body.listo .bar{display:flex}
+  body.quiet .bar{opacity:0;pointer-events:none}
+  body.quiet .bar:focus-within{opacity:1;pointer-events:auto}
+  .bar button{min-height:42px;min-width:48px;padding:0 15px;border:1px solid #ffffff2e;border-radius:12px;background:#063354c9;color:#fff;
+              font:inherit;font-size:13.5px;cursor:pointer}
+
+  .overlay{position:fixed;inset:0;z-index:50;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+           background:#00529bd9;text-align:center}
+  .overlay.on{display:flex}
+  #rota .avion{width:72px;height:64px;animation:gira-aviso 2.4s ease-in-out infinite;border-radius:14px;border:3px solid #ffffffb0}
+  @keyframes gira-aviso{0%,20%{transform:rotate(0)}55%,100%{transform:rotate(90deg)}}
+  #rota p{margin:0;font-size:17px;font-weight:700;text-shadow:0 2px 8px #0006}
 </style>
 </head>
 <body>
-<div class="sky" aria-hidden="true"></div><div class="glow" aria-hidden="true"></div><div class="snow" aria-hidden="true"></div>
-
-<!-- ============ LOBBY ============ -->
-<section class="lobby" aria-label="Lobby de Glaciar">
-  <div class="brand">
-    <svg viewBox="0 0 120 140" role="img" aria-label="Pingüino de Glaciar">
-      <ellipse cx="60" cy="80" rx="40" ry="50" fill="#16222e"/>
-      <ellipse cx="60" cy="94" rx="28" ry="36" fill="#f4fbff"/>
-      <circle cx="47" cy="56" r="10" fill="#fff"/><circle cx="73" cy="56" r="10" fill="#fff"/>
-      <circle cx="49" cy="58" r="4.4" fill="#10202e"/><circle cx="71" cy="58" r="4.4" fill="#10202e"/>
-      <path d="M53 70 Q60 76 67 70 Q62 82 60 82 Q58 82 53 70Z" fill="#ffb531"/>
-      <path d="M40 122 q8 10 18 5 t2 -9 z" fill="#ffb531"/>
-      <path d="M62 122 q8 10 18 5 t2 -9 z" fill="#ffb531"/>
-      <path d="M20 76 q-9 18 7 27 q5 -13 3 -27z" fill="#16222e"/>
-      <path d="M100 76 q9 18 -7 27 q-5 -13 -3 -27z" fill="#16222e"/>
-    </svg>
-    <h1>Glaciar<span class="frío"> ·</span> club</h1>
-    <p>Mundo privado · un solo servidor · tú y tus amigos</p>
-  </div>
-
-  <div class="card" role="status">
-    <div class="server">
-      <span class="dot" aria-hidden="true"></span>
-      <div><b>Glaciar</b><small id="serv-estado">Comprobando…</small></div>
-    </div>
-    <p class="hint">Toca el suelo para caminar. La barra de chat queda dentro del juego, como siempre.</p>
-  </div>
-
-  <button class="cta" id="iniciar" type="button">▶ Entrar al glaciar</button>
-
-  <nav class="links" aria-label="Acciones del lobby">
-    <a class="link" href="/register.html">🐧 Crear un pingüino</a>
-    <button class="link" id="fullscreen-lobby" type="button" hidden>⛶ Pantalla completa</button>
-  </nav>
-
-  <p class="instala">📱 Añade <code>Glaciar</code> a tu pantalla de inicio desde Compartir
-     para jugar sin barras del navegador.</p>
-</section>
-
-<!-- ============ BARRA DE JUEGO ============ -->
-<nav class="bar" aria-label="Controles del juego">
-  <button id="salir" type="button">Salir</button>
+<nav class="bar" aria-label="Controles">
+  <button id="salir" type="button" hidden>Salir</button>
   <button id="fullscreen" type="button" aria-label="Pantalla completa">⛶</button>
 </nav>
+<p id="estado" role="status" class="on">Cargando el glaciar…</p>
 
-<p id="estado" role="status"></p>
-
-<!-- ============ OVERLAY DE CONEXIÓN ============ -->
-<div class="overlay" id="conecta" role="dialog" aria-live="polite" aria-label="Conectando">
-  <div class="disc" aria-hidden="true"></div>
-  <h2>Conectando al glaciar…</h2>
-  <p class="tip" id="tip">Toca el suelo para caminar.</p>
-  <div class="error">
-    <p id="error-texto">No se pudo cargar el juego.</p>
-    <button type="button" onclick="location.reload()">Recargar</button>
-  </div>
-</div>
-
-<!-- ============ OVERLAY DE ROTACIÓN ============ -->
 <div class="overlay" id="rota" role="dialog" aria-label="Gira tu teléfono">
-  <svg class="pinguino" viewBox="0 0 120 140" aria-hidden="true">
-    <ellipse cx="60" cy="80" rx="40" ry="50" fill="#eaf5ff"/>
-    <circle cx="47" cy="56" r="10" fill="#0d3357"/><circle cx="73" cy="56" r="10" fill="#0d3357"/>
-    <path d="M53 70 Q60 76 67 70 Q62 82 60 82 Q58 82 53 70Z" fill="#ffb531"/>
-  </svg>
-  <p>Gira tu pingüino 🐧</p>
-  <small>El mundo se juega en horizontal.</small>
+  <div class="avion" aria-hidden="true"></div>
+  <p>Gira el teléfono y el juego se ve entero</p>
 </div>
 
-<main aria-label="Glaciar · juego"><div id="game"></div></main>
+<main aria-label="Club Penguin · Glaciar"><div id="game"></div></main>
 <script src="/ruffle/ruffle.js" defer></script>
 <script>
-  // ---------- Configuración de Ruffle (idéntica a la original) ----------
   window.RufflePlayer = window.RufflePlayer || {};
   const socketBase = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}`;
   window.RufflePlayer.config = {
     autoplay: 'on', allowScriptAccess: true, unmuteOverlay: 'hidden',
     splashScreen: false, preloader: false,
     allowFullscreen: true, scale: 'showAll', forceScale: true, letterbox: 'off',
-    backgroundColor: '#082540',
+    backgroundColor: '#00529b',
     urlRewriteRules: [[/^http:\/\/localhost(?::\d+)?\//, location.origin + '/']],
     socketProxy: [
       {host: location.hostname, port: 6112, proxyUrl: socketBase + '/socket/login'},
@@ -213,67 +75,56 @@
     ]
   };
 
-  const $ = id => document.getElementById(id);
-  let player = null;
-  let enJuego = false;
-
-  function estado(texto, persistente = true) {
-    const el = $('estado');
-    el.textContent = texto;
-    el.classList.toggle('on', !!texto && persistente);
-  }
-
-  // ---------- Servicio worker (PWA) ----------
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   }
 
-  // ---------- Salud del servidor en el lobby ----------
-  (async () => {
+  const estado = texto => {
+    const el = document.getElementById('estado');
+    el.textContent = texto;
+    el.classList.toggle('on', !!texto);
+  };
+
+  // Carga el juego a la primera, sin lobby: el cliente ES la interfaz.
+  window.addEventListener('load', async () => {
     try {
-      const r = await fetch('/healthz', {cache: 'no-store'});
-      if (r.ok) {
-        document.body.classList.add('serv-ok');
-        $('serv-estado').textContent = 'Abierto · listo para entrar';
-        return;
-      }
-    } catch (e) {}
-    $('serv-estado').textContent = 'Sin contacto con el servidor';
-  })();
+      const player = window.RufflePlayer.newest().createPlayer();
+      player.id = 'penguin-player';
+      document.getElementById('game').appendChild(player);
+      await player.ruffle().load({
+        url: new URL('/media/boots.swf', location.href).href,
+        parameters: {lang: 'es', base: location.origin + '/'}
+      });
+      estado('');
+      document.body.classList.add('listo');          // revela la barra discreta
+      document.getElementById('salir').hidden = false;
+    } catch (error) {
+      console.error(error);
+      estado('No se pudo cargar el juego. Recarga la página (desliza para actualizar).');
+    }
+  });
 
-  // ---------- Consejos rotativos del overlay ----------
-  const tips = [
-    'Toca el suelo para caminar.',
-    'El chat del juego acepta emojis: pruébalos con amigos.',
-    'Añade Glaciar a tu inicio: sin barras de navegador.',
-    'Un solo servidor: Glaciar. Trata bien a los pingüinos.',
-    'Los iglús se decoran desde la casa del pingüino.'
-  ];
-  let tipIndex = 0;
-  setInterval(() => { $('tip').textContent = tips[++tipIndex % tips.length]; }, 3000);
+  // Pantalla completa: la primera interacción es suficiente permiso.
+  document.addEventListener('pointerdown', () => {
+    if (!document.fullscreenElement && document.fullscreenEnabled) {
+      document.documentElement.requestFullscreen?.({navigationUI: 'hide'}).catch(() => {});
+    }
+  }, {once: true, passive: true});
 
-  // ---------- Pantalla completa ----------
-  const fsBotones = [$('fullscreen'), $('fullscreen-lobby')];
-  async function toggleFullscreen() {
+  const fsBoton = document.getElementById('fullscreen');
+  fsBoton.addEventListener('click', async () => {
     try {
       if (document.fullscreenElement) await document.exitFullscreen();
       else await document.documentElement.requestFullscreen({navigationUI: 'hide'});
     } catch (e) {
-      // En iPhone fullscreen lo cubre el modo standalone de la PWA.
-      estado('La pantalla completa no está disponible aquí.', true);
-      setTimeout(() => estado(''), 2500);
+      estado('La pantalla completa no está disponible aquí.');
+      setTimeout(() => estado(''), 2200);
     }
-  }
-  fsBotones.forEach(b => b.addEventListener('click', toggleFullscreen));
-  document.addEventListener('fullscreenchange', () => {
-    fsBotones.forEach(b => b.textContent = document.fullscreenElement ? 'Salir de pantalla' : '⛶');
   });
-  $('fullscreen-lobby').hidden = !document.fullscreenEnabled;
 
-  // ---------- Autohide de la barra ----------
+  // Barra que se esconde sola mientras juegas.
   let quieto;
   function despertar() {
-    if (!enJuego) return;
     document.body.classList.remove('quiet');
     clearTimeout(quieto);
     quieto = setTimeout(() => document.body.classList.add('quiet'), 2500);
@@ -281,54 +132,21 @@
   for (const tipo of ['pointerdown', 'pointermove', 'keydown']) {
     document.addEventListener(tipo, despertar, {passive: true, capture: true});
   }
+  despertar();
 
-  // ---------- Overlay de girar teléfono ----------
+  // Aviso de rotación: solo en móvil y solo en vertical.
   const vertical = matchMedia('(orientation: portrait)');
   const tactil = matchMedia('(pointer: coarse)');
-  function revisarRotacion() {
-    // En móvil en vertical se pide girar; en escritorio nunca se molesta.
-    $('rota').classList.toggle('on', enJuego && tactil.matches && vertical.matches);
-  }
+  const revisar = () => document.getElementById('rota')
+    .classList.toggle('on', vertical.matches && tactil.matches);
+  vertical.addEventListener?.('change', revisar);
+  revisar();
 
-  // ---------- Arranque del juego ----------
-  $('iniciar').addEventListener('click', async() => {
-    navigator.vibrate?.(8);
-    $('iniciar').disabled = true;
-    $('conecta').classList.add('on');
-    $('conecta').classList.remove('fallo');
-    estado('Buscando el glaciar…');
-    // El fullscreen solo se permite dentro del gesto del usuario.
-    if (!document.fullscreenElement && document.fullscreenEnabled) {
-      document.documentElement.requestFullscreen?.({navigationUI: 'hide'}).catch(e => {});
-    }
-    try {
-      player = window.RufflePlayer.newest().createPlayer();
-      player.id = 'penguin-player';
-      $('game').appendChild(player);
-      await player.ruffle().load({
-        url: new URL('/media/boots.swf', location.href).href,
-        parameters: {lang: 'es', base: location.origin + '/'}
-      });
-      estado('');
-      $('conecta').classList.remove('on');
-      enJuego = true;
-      document.body.classList.add('game-in');
-      revisarRotacion();
-      despertar();
-    } catch (e) {
-      console.error(e);
-      $('error-texto').textContent = 'No se pudo cargar el juego. Revisa tu conexión e inténtalo de nuevo.';
-      $('conecta').classList.add('fallo');
-      $('iniciar').disabled = false;
-      estado('');
-    }
-  });
+  document.getElementById('salir').addEventListener('click', () => location.reload());
 
-  // Salir: recarga limpia al lobby (sesión persiste dentro del SWF mientras dura la partida).
-  $('salir').addEventListener('click', () => { navigator.vibrate?.(6); location.reload(); });
-
-  // Enganche heredado del captcha del registro (lo mantiene el cliente Flash).
+  // Enganche heredado del captcha del registro.
   window.grecaptchaSubmit = () => {
+    const player = document.getElementById('penguin-player');
     if (player && typeof player.finishedCaptcha === 'function') player.finishedCaptcha('houdini');
   };
 </script>
