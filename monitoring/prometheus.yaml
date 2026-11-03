@@ -1,0 +1,75 @@
+# One replica and short retention for a Raspberry Pi with microSD storage.
+server:
+  fullnameOverride: prometheus
+  retention: 48h
+  retentionSize: 3GB
+  persistentVolume:
+    enabled: true
+    storageClass: local-path
+    size: 5Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 384Mi
+    limits:
+      cpu: 750m
+      memory: 1Gi
+  global:
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    evaluation_interval: 30s
+
+configmapReload:
+  prometheus:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 24Mi
+      limits:
+        cpu: 100m
+        memory: 64Mi
+
+alertmanager:
+  enabled: false
+prometheus-pushgateway:
+  enabled: false
+
+kube-state-metrics:
+  namespaces: clubpenguin,monitoring-lab
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 192Mi
+
+prometheus-node-exporter:
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 200m
+      memory: 96Mi
+
+serverFiles:
+  alerting_rules.yml:
+    groups:
+      - name: raspberry-lab
+        rules:
+          - alert: RaspberryLowDiskSpace
+            expr: node_filesystem_avail_bytes{mountpoint="/",fstype!="rootfs"} / node_filesystem_size_bytes{mountpoint="/",fstype!="rootfs"} < 0.20
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: Less than 20 percent free storage on the Raspberry
+          - alert: LabDeploymentUnavailable
+            expr: kube_deployment_spec_replicas{namespace="clubpenguin"} - kube_deployment_status_replicas_available{namespace="clubpenguin"} > 0
+            for: 2m
+            labels:
+              severity: warning
+            annotations:
+              summary: A Club Penguin deployment is unavailable
+

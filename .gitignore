@@ -1,0 +1,15 @@
+.DS_Store
+.local/
+vendor/
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+!*.tfvars.example
+*.retry
+__pycache__/
+.env
+*.pem
+*.key
+

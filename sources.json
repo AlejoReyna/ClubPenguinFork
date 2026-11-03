@@ -1,0 +1,14 @@
+{
+  "houdini": {
+    "url": "https://github.com/solero/houdini.git",
+    "revision": "36eaa5cbd342d743c40a8c47fe140abc710eb069"
+  },
+  "dash": {
+    "url": "https://github.com/solero/dash.git",
+    "revision": "89ccac34883088f176c594ae55e0e93a29dac265"
+  },
+  "legacy-media": {
+    "url": "https://git.solero.me/solero/legacy-media.git",
+    "revision": "b3a86b70689a38fdf8773c250aa576551acb65b8"
+  }
+}

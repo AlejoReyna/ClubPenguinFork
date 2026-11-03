@@ -1,0 +1,36 @@
+---
+- name: Configure the lab operator without changing system services
+  hosts: raspberry
+  gather_facts: true
+  tasks:
+    - name: Create the operator directory
+      ansible.builtin.file:
+        path: "{{ ansible_facts.user_dir }}/clubpenguin-lab"
+        state: directory
+        mode: '0700'
+
+    - name: Install a read-only status helper
+      ansible.builtin.copy:
+        dest: "{{ ansible_facts.user_dir }}/clubpenguin-lab/status.sh"
+        mode: '0750'
+        content: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          export KUBECONFIG="$HOME/.kube/config"
+          kubectl get nodes
+          kubectl -n clubpenguin get pods,pvc
+          kubectl -n monitoring-lab get pods,pvc
+          kubectl top nodes
+          df -h /
+
+    - name: Record the lab configuration
+      ansible.builtin.copy:
+        dest: "{{ ansible_facts.user_dir }}/clubpenguin-lab/README.txt"
+        mode: '0640'
+        content: |
+          Club Penguin AS2, mundo Glaciar.
+          Estado: bash ~/clubpenguin-lab/status.sh
+          Kubernetes ya estaba instalado; Ansible no lo reinstala.
+          Aplicaciones administradas por Terraform desde el Mac.
+          Antes de apagar, ejecutar scripts/backup.py desde el Mac.
+          Luego apagar ordenadamente: sudo shutdown -h now

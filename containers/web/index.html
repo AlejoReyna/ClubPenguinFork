@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Club Penguin · Glaciar</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#00529b;color:#fff;font:16px system-ui,sans-serif}
+  main{position:fixed;inset:0;width:100%;height:100%;height:100dvh}
+  #game{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:min(100vw,158.333333vh);height:min(100vh,63.157895vw);width:min(100vw,158.333333dvh);height:min(100dvh,63.157895vw)}
+  /* Oculta el marco del SWF de 760 × 480, incluido el suavizado del borde. */
+  ruffle-player{display:block;width:100%;height:100%;clip-path:inset(1.25% .789474% round .526316% / .833334%)}
+  .toolbar{position:fixed;top:12px;right:12px;z-index:2;display:flex;gap:8px;transition:opacity .2s}
+  .toolbar a,.toolbar button{padding:10px 14px;border:1px solid #ffffff40;border-radius:7px;background:#063354e8;color:#fff;font:inherit;text-decoration:none;cursor:pointer;box-shadow:0 2px 8px #0003}
+  .toolbar a:hover,.toolbar button:hover{background:#075386}
+  .toolbar a:focus-visible,.toolbar button:focus-visible{outline:3px solid #ffdf70;outline-offset:3px}
+  body.controls-hidden .toolbar{opacity:0;pointer-events:none}
+  body.controls-hidden .toolbar:focus-within{opacity:1;pointer-events:auto}
+  #status{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:3;max-width:90vw;margin:0;padding:10px 16px;border-radius:7px;background:#063354e8;text-align:center}
+  #status:empty{display:none}
+</style>
+<main aria-label="Club Penguin · Glaciar"><div id="game"></div></main>
+<nav class="toolbar" aria-label="Controles del juego">
+  <a href="/register.html">Crear un pingüino</a>
+  <button id="fullscreen" type="button">Pantalla completa</button>
+</nav>
+<p id="status" role="status">Cargando el juego…</p>
+<script>
+  window.RufflePlayer = window.RufflePlayer || {};
+  const socketBase = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}`;
+  window.RufflePlayer.config = {
+    autoplay: 'on', allowScriptAccess: true, unmuteOverlay: 'hidden',
+    splashScreen: false, preloader: false,
+    allowFullscreen: true, scale: 'showAll', forceScale: true, letterbox: 'off',
+    backgroundColor: '#00529b',
+    urlRewriteRules: [[/^http:\/\/localhost(?::\d+)?\//, location.origin + '/']],
+    socketProxy: [
+      {host: location.hostname, port: 6112, proxyUrl: socketBase + '/socket/login'},
+      {host: location.hostname, port: 9876, proxyUrl: socketBase + '/socket/world'}
+    ]
+  };
+  const fullscreenButton = document.getElementById('fullscreen');
+  fullscreenButton.hidden = !document.fullscreenEnabled;
+  fullscreenButton.addEventListener('click', async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await document.documentElement.requestFullscreen({navigationUI: 'hide'});
+    } catch (error) {
+      document.getElementById('status').textContent = 'No se pudo activar la pantalla completa. Inténtalo nuevamente.';
+    }
+  });
+  document.addEventListener('fullscreenchange', () => {
+    fullscreenButton.textContent = document.fullscreenElement ? 'Salir de pantalla completa' : 'Pantalla completa';
+  });
+  let controlsTimeout;
+  function showControls() {
+    document.body.classList.remove('controls-hidden');
+    clearTimeout(controlsTimeout);
+    controlsTimeout = setTimeout(() => document.body.classList.add('controls-hidden'), 2500);
+  }
+  document.addEventListener('pointermove', showControls, {passive: true, capture: true});
+  document.addEventListener('pointerdown', showControls, {passive: true, capture: true});
+  document.addEventListener('keydown', showControls, {capture: true});
+  showControls();
+  let player;
+  window.grecaptchaSubmit = () => {
+    if (player && typeof player.finishedCaptcha === 'function') player.finishedCaptcha('houdini');
+  };
+  window.addEventListener('load', async () => {
+    player = window.RufflePlayer.newest().createPlayer();
+    player.id = 'penguin-player';
+    document.getElementById('game').appendChild(player);
+    try {
+      await player.ruffle().load({
+        url: new URL('/media/boots.swf', location.href).href,
+        parameters: {lang: 'es', base: location.origin + '/'}
+      });
+      document.getElementById('status').textContent = '';
+    } catch (error) {
+      document.getElementById('status').textContent = 'No se pudo cargar el juego. Recarga la página para intentarlo de nuevo.';
+      console.error(error);
+    }
+  });
+</script>
+<script src="/ruffle/ruffle.js"></script>
+</html>

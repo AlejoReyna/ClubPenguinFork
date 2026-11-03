@@ -1,0 +1,60 @@
+fullnameOverride: grafana-lab
+replicas: 1
+deploymentStrategy:
+  type: Recreate
+admin:
+  existingSecret: grafana-admin
+  userKey: admin-user
+  passwordKey: admin-password
+service:
+  type: ClusterIP
+persistence:
+  enabled: true
+  type: pvc
+  storageClassName: local-path
+  size: 1Gi
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 384Mi
+initChownData:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 16Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+grafana.ini:
+  users:
+    allow_sign_up: false
+  analytics:
+    reporting_enabled: false
+    check_for_updates: false
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        uid: prometheus-lab
+        type: prometheus
+        access: proxy
+        url: http://prometheus
+        isDefault: true
+        editable: false
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: default
+        orgId: 1
+        folder: Club Penguin Lab
+        type: file
+        disableDeletion: false
+        editable: false
+        options:
+          path: /var/lib/grafana/dashboards/default
+

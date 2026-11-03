@@ -1,0 +1,5 @@
+game_enabled = true
+web_enabled  = true
+cloudflared_enabled = true
+image_tag     = "lab-002"
+web_image_tag = "lab-006"

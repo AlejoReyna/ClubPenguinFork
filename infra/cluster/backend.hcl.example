@@ -1,0 +1,6 @@
+resource_group_name  = "rg-tfstate"
+storage_account_name = "sttfstate2188627882"
+container_name       = "tfstate-clubpenguin"
+key                  = "cluster.tfstate"
+use_azuread_auth     = true
+

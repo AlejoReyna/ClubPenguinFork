@@ -1,0 +1,69 @@
+{
+  "uid": "clubpenguin-lab",
+  "title": "Raspberry Pi · Club Penguin Lab",
+  "schemaVersion": 39,
+  "version": 2,
+  "editable": false,
+  "tags": ["raspberry", "clubpenguin", "devops"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": {"from": "now-1h", "to": "now"},
+  "panels": [
+    {
+      "id": 1, "type": "timeseries", "title": "CPU del Raspberry (%)",
+      "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus-lab"},
+      "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100}},
+      "targets": [{"refId": "A", "expr": "100 * (1 - avg by(instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])))", "legendFormat": "CPU"}]
+    },
+    {
+      "id": 2, "type": "timeseries", "title": "Memoria utilizada (%)",
+      "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus-lab"},
+      "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100}},
+      "targets": [{"refId": "A", "expr": "100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)", "legendFormat": "RAM"}]
+    },
+    {
+      "id": 3, "type": "timeseries", "title": "Espacio libre en microSD",
+      "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus-lab"},
+      "fieldConfig": {"defaults": {"unit": "bytes", "min": 0}},
+      "targets": [{"refId": "A", "expr": "node_filesystem_avail_bytes{mountpoint=\"/\",fstype!=\"rootfs\"}", "legendFormat": "Disponible"}]
+    },
+    {
+      "id": 4, "type": "timeseries", "title": "Pods disponibles por aplicación",
+      "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus-lab"},
+      "fieldConfig": {"defaults": {"min": 0, "decimals": 0}},
+      "targets": [{"refId": "A", "expr": "kube_deployment_status_replicas_available{namespace=\"clubpenguin\"}", "legendFormat": "{{deployment}}"}]
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "Reinicios de contenedores",
+      "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus-lab"},
+      "fieldConfig": {"defaults": {"min": 0, "decimals": 0}},
+      "targets": [{"refId": "A", "expr": "sum by(pod) (kube_pod_container_status_restarts_total{namespace=\"clubpenguin\"})", "legendFormat": "{{pod}}"}]
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "Memoria por aplicación",
+      "gridPos": {"x": 12, "y": 16, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus-lab"},
+      "fieldConfig": {"defaults": {"unit": "bytes", "min": 0}},
+      "targets": [{"refId": "A", "expr": "sum by(pod) (container_memory_working_set_bytes{namespace=\"clubpenguin\",container!=\"\",container!=\"POD\"})", "legendFormat": "{{pod}}"}]
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "Jugadores conectados",
+      "gridPos": {"x": 0, "y": 24, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus-lab"},
+      "fieldConfig": {"defaults": {"min": 0, "decimals": 0}},
+      "targets": [{"refId": "A", "expr": "clubpenguin_players", "legendFormat": "{{world}}"}]
+    },
+    {
+      "id": 8, "type": "stat", "title": "Fuente de población disponible",
+      "gridPos": {"x": 12, "y": 24, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus-lab"},
+      "fieldConfig": {"defaults": {"min": 0, "max": 1, "decimals": 0}},
+      "targets": [{"refId": "A", "expr": "clubpenguin_redis_up", "legendFormat": "Redis"}]
+    }
+  ]
+}

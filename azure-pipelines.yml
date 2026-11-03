@@ -1,0 +1,115 @@
+# CI uses hosted Linux with no lab credentials. Optional CD uses a trusted Mac
+# agent on the same LAN as the Pi and a federated Azure service connection.
+trigger:
+  branches:
+    include: [main]
+pr:
+  branches:
+    include: [main]
+
+parameters:
+  - name: deploy
+    type: boolean
+    default: false
+  - name: azureServiceConnection
+    type: string
+    default: clubpenguin-azure
+  - name: deploymentPool
+    type: string
+    default: Default
+
+stages:
+  - stage: Validate
+    jobs:
+      - job: Configuration
+        pool:
+          vmImage: ubuntu-24.04
+        steps:
+          - checkout: self
+          - bash: |
+              set -euo pipefail
+              tools_dir="$(Pipeline.Workspace)/lab-tools"
+              mkdir -p "$tools_dir"
+              cd "$tools_dir"
+              curl -fsSLO https://releases.hashicorp.com/terraform/1.17.1/terraform_1.17.1_linux_amd64.zip
+              curl -fsSLO https://releases.hashicorp.com/terraform/1.17.1/terraform_1.17.1_SHA256SUMS
+              sha256sum --check --ignore-missing terraform_1.17.1_SHA256SUMS
+              unzip -o terraform_1.17.1_linux_amd64.zip
+              curl -fsSLO https://get.helm.sh/helm-v3.19.0-linux-amd64.tar.gz
+              curl -fsSLO https://get.helm.sh/helm-v3.19.0-linux-amd64.tar.gz.sha256sum
+              sha256sum --check helm-v3.19.0-linux-amd64.tar.gz.sha256sum
+              tar -xzf helm-v3.19.0-linux-amd64.tar.gz
+              mv linux-amd64/helm "$tools_dir/helm"
+              python3 -m venv "$tools_dir/ansible"
+              "$tools_dir/ansible/bin/pip" install 'ansible-core>=2.20,<2.21'
+              echo "##vso[task.prependpath]$tools_dir"
+              echo "##vso[task.prependpath]$tools_dir/ansible/bin"
+            displayName: Install pinned validation tools
+          - bash: bash scripts/validate.sh
+            displayName: Validate Terraform, Ansible, Python and Helm
+
+  - stage: BuildAndTest
+    dependsOn: Validate
+    jobs:
+      - job: Backend
+        pool:
+          vmImage: ubuntu-24.04
+        steps:
+          - checkout: self
+          - bash: python3 scripts/fetch-sources.py
+            displayName: Fetch verified upstream revisions
+          - bash: python3 scripts/build-images.py --tag "$(Build.SourceVersion)" --platform linux/amd64
+            displayName: Build native test images
+          - bash: python3 scripts/test-containers.py --tag "$(Build.SourceVersion)"
+            displayName: Verify registration, login, shared room and socket proxy
+
+  - ${{ if eq(parameters.deploy, true) }}:
+      - stage: DeployPi
+        dependsOn: BuildAndTest
+        condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+        jobs:
+          - deployment: Raspberry
+            environment: clubpenguin-lab
+            pool:
+              name: ${{ parameters.deploymentPool }}
+              demands:
+                - Agent.OS -equals Darwin
+            strategy:
+              runOnce:
+                deploy:
+                  steps:
+                    - checkout: self
+                      clean: true
+                    - bash: |
+                        set -euo pipefail
+                        python3 scripts/tunnel.py start
+                        (cd ansible && ansible-playbook preflight.yml)
+                        python3 scripts/fetch-sources.py
+                        python3 scripts/build-images.py --tag "$(Build.SourceVersion)" --platform linux/arm64
+                        python3 scripts/test-containers.py --tag "$(Build.SourceVersion)"
+                      displayName: Verify Pi and build ARM64 release
+                    - task: AzureCLI@2
+                      displayName: Publish images, deploy and verify backup
+                      inputs:
+                        azureSubscription: ${{ parameters.azureServiceConnection }}
+                        scriptType: bash
+                        scriptLocation: inlineScript
+                        addSpnToEnvironment: true
+                        inlineScript: |
+                          set -euo pipefail
+                          umask 077
+                          export ARM_USE_OIDC=true
+                          export ARM_CLIENT_ID="$servicePrincipalId"
+                          export ARM_TENANT_ID="$tenantId"
+                          export ARM_OIDC_TOKEN="$idToken"
+                          export ARM_SUBSCRIPTION_ID="$(az account show --query id -o tsv)"
+                          python3 scripts/publish-images.py --tag "$(Build.SourceVersion)"
+                          terraform -chdir=infra/cluster init -input=false -backend-config=backend.hcl.example
+                          terraform -chdir=infra/cluster plan -input=false \
+                            -var=game_enabled=true -var=web_enabled=true \
+                            -var="image_tag=$(Build.SourceVersion)" \
+                            -var="web_image_tag=$(Build.SourceVersion)" -out=deploy.tfplan
+                          terraform -chdir=infra/cluster apply -input=false deploy.tfplan
+                          kubectl --kubeconfig "$HOME/.kube/clubpenguin-pi.yaml" \
+                            -n clubpenguin exec -i deploy/dash -- python - < scripts/game-smoke.py
+                          python3 scripts/backup.py

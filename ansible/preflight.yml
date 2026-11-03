@@ -1,0 +1,56 @@
+---
+- name: Verify the Raspberry before deploying the lab
+  hosts: raspberry
+  gather_facts: true
+  vars:
+    minimum_free_bytes: 21474836480
+  tasks:
+    - name: Require ARM64 Linux and enough memory
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.system == 'Linux'
+          - ansible_facts.architecture == 'aarch64'
+          - ansible_facts.memtotal_mb >= 7000
+        fail_msg: This lab requires an ARM64 Raspberry Pi with 8 GB of RAM.
+
+    - name: Require at least 20 GiB free on the root filesystem
+      ansible.builtin.assert:
+        that:
+          - item.size_available >= minimum_free_bytes | int
+        fail_msg: Free up storage before deploying images and persistent volumes.
+      loop: "{{ ansible_facts.mounts | selectattr('mount', 'equalto', '/') | list }}"
+      loop_control:
+        label: "{{ item.mount }}"
+
+    - name: Check the existing K3s service
+      ansible.builtin.command: systemctl is-active k3s
+      changed_when: false
+
+    - name: Wait for the existing Kubernetes node to be ready
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - "{{ ansible_facts.user_dir }}/.kube/config"
+          - wait
+          - --for=condition=Ready
+          - node
+          - --all
+          - --timeout=30s
+      changed_when: false
+
+    - name: Show current node usage
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - "{{ ansible_facts.user_dir }}/.kube/config"
+          - top
+          - nodes
+      changed_when: false
+      register: node_usage
+
+    - name: Report node usage
+      ansible.builtin.debug:
+        var: node_usage.stdout_lines
+
