@@ -32,6 +32,9 @@ async def journey(accounts):
         assert not any('puffle conectar' in str(f.args) for f in guest_frames), 'pairing code leaked'
         for conn in (a, b):
             await read(conn, 0.1)
+        # Pairing uses the real chat handler too. Respect its 500 ms cooldown;
+        # a fast CI host otherwise sends the first normal line too early.
+        await asyncio.sleep(0.55)
 
         class Answer:
             def __init__(self, text):
