@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      deploy:
+        description: Apply reviewed image updates after CI (main only)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -56,7 +61,8 @@ jobs:
     name: Deploy tested image updates to the Pi
     needs: build-and-test
     if: >-
-      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy)) &&
       vars.CP_AUTO_DEPLOY_ENABLED == 'true'
     runs-on: [self-hosted, macOS, ARM64, clubpenguin-lab]
     environment: clubpenguin-lab

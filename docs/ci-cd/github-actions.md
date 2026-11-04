@@ -4,7 +4,8 @@ El workflow `.github/workflows/ci.yml` se ejecuta en PR y pushes a `main`.
 Ambos validan y prueban en Ubuntu hospedado, sin credenciales del laboratorio.
 La integración usa Houdini desechable, red Docker interna y proveedor simulado.
 Un push a `main` que pase CI puede actualizar imágenes automáticamente; una
-ejecución manual solo hace CI. El despliegue permanece deshabilitado mientras la
+ejecución manual hace CI y permite solicitar `deploy=true` únicamente en `main`.
+El despliegue permanece deshabilitado mientras la
 variable de repositorio `CP_AUTO_DEPLOY_ENABLED` no sea exactamente `true`.
 
 ## Qué hace el despliegue

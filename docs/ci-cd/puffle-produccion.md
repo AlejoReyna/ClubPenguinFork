@@ -84,3 +84,6 @@ Prometheus incorpora reglas del puffle sin reemplazar las alertas existentes.
 El workflow de respaldo diario queda controlado por `CP_BACKUP_ENABLED`; requiere
 runner disponible, su environment de backup y OIDC. El despliegue automático
 continúa limitado a cambios de imágenes y metadatos de release.
+La primera ejecución controlada puede iniciarse con `gh workflow run ci.yml
+--ref main -f deploy=true`, después de pasar CI y habilitar explícitamente
+`CP_AUTO_DEPLOY_ENABLED`. Conserva la misma compuerta, SHA-256 y verificación.

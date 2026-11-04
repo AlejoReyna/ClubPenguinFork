@@ -11,7 +11,7 @@ serverFiles:
       - name: puffle-availability
         rules:
           - alert: PuffleBrokerUnavailable
-            expr: kube_deployment_status_replicas_available{namespace="clubpenguin",deployment="puffle"} < 1
+            expr: (kube_deployment_status_replicas_available{namespace="clubpenguin",deployment="puffle"} < 1) and on(namespace,deployment) (kube_deployment_spec_replicas{namespace="clubpenguin",deployment="puffle"} > 0)
             for: 2m
             labels:
               severity: warning
