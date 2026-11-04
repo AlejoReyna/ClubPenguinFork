@@ -6,8 +6,9 @@ el broker privado con una réplica y un PVC de hashes de emparejamiento. La opci
 `puffle_enabled` controla la función. La base de datos del juego no cambia de imagen.
 
 El fondo personalizado 19155 ya está registrado en la base de producción. Sus
-SWF de tarjeta e icono viven en `containers/web/custom-clothing` y se superponen
-a los medios originales al construir la web. La prueba de contenedores verifica
+SWF de tarjeta e icono viven en `containers/web/custom-clothing`; los catálogos
+actualizados están en `containers/web/custom-media`. Se superponen a los medios
+originales al construir la web. La prueba de contenedores verifica
 ambos archivos por hash. El despliegue conserva la base existente; recuperar el
 registro del ítem depende del respaldo, no de reconstruir la imagen web.
 
