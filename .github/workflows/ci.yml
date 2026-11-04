@@ -79,6 +79,7 @@ jobs:
       BUILD_SOURCEBRANCH: ${{ github.ref }}
       PLAN_RUN_ID: run-${{ github.run_id }}-${{ github.run_attempt }}
       CP_NODE_NAME: ${{ vars.CP_NODE_NAME }}
+      CP_PROXY_EXTRA_HOSTS: ${{ vars.CP_PROXY_EXTRA_HOSTS }}
       TF_VAR_bots_enabled: 'true'
       TF_VAR_bots_replicas: '1'
       TF_VAR_bots_provider_mode: ${{ vars.CP_BOTS_PROVIDER_MODE }}

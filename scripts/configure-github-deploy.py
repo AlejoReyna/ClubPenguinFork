@@ -20,6 +20,14 @@ def run(command, data=None):
     return json.loads(result.stdout) if result.stdout.strip() else None
 
 
+def oidc_subject_prefix(customization):
+    """Subject prefix GitHub actually presents (immutable owner@id/repo@id when enabled)."""
+    customization = customization or {}
+    if customization.get('use_immutable_subject') and customization.get('sub_claim_prefix'):
+        return customization['sub_claim_prefix']
+    return f'repo:{REPO}'
+
+
 def main():
     cfg = lablib.load_config('plan')
     run(['gh', 'api', '-X', 'PUT', f'repos/{REPO}/actions/permissions/fork-pr-contributor-approval',
@@ -34,11 +42,13 @@ def main():
     principals = run(['az', 'ad', 'sp', 'list', '--filter', f"appId eq '{client}'", '-o', 'json'])
     principal = principals[0] if principals else run(['az', 'ad', 'sp', 'create', '--id', client, '-o', 'json'])
     federations = run(['az', 'ad', 'app', 'federated-credential', 'list', '--id', client, '-o', 'json'])
+    prefix = oidc_subject_prefix(run(['gh', 'api', f'repos/{REPO}/actions/oidc/customization/sub']))
     for environment in ('clubpenguin-lab', 'clubpenguin-backup'):
-        subject = f'repo:{REPO}:environment:{environment}'
+        subject = f'{prefix}:environment:{environment}'
         if not any(f['subject'] == subject for f in federations):
+            suffix = '' if prefix == f'repo:{REPO}' else '-immutable'
             run(['az', 'ad', 'app', 'federated-credential', 'create', '--id', client, '--parameters',
-                 json.dumps({'name': 'github-' + environment, 'issuer': 'https://token.actions.githubusercontent.com',
+                 json.dumps({'name': 'github-' + environment + suffix, 'issuer': 'https://token.actions.githubusercontent.com',
                              'subject': subject, 'audiences': ['api://AzureADTokenExchange']}), '-o', 'json'])
         endpoint = f'repos/{REPO}/environments/{environment}'
         run(['gh', 'api', '-X', 'PUT', endpoint, '--input', '-'],
@@ -64,6 +74,11 @@ def main():
                 'get', 'deployment', 'bots', '-o', 'json'])
     bot = next(c for c in live['spec']['template']['spec']['containers'] if c['name'] == 'bots')
     values['CP_BOTS_PROVIDER_MODE'] = next(e['value'] for e in bot['env'] if e['name'] == 'BOTS_PROVIDER_MODE')
+    proxy = run(['kubectl', '--kubeconfig', cfg['CP_KUBECONFIG'], '--context', 'default', '-n', 'clubpenguin',
+                 'get', 'deployment', 'web', '-o', 'json'])
+    origins = next(e['value'] for c in proxy['spec']['template']['spec']['containers'] for e in c.get('env', [])
+                   if e['name'] == 'ALLOWED_ORIGINS')
+    values['CP_PROXY_EXTRA_HOSTS'] = ','.join(h for h in origins.split(',') if h and h != cfg['CP_PUBLIC_HOSTNAME'])
     for key, value in values.items():
         run(['gh', 'variable', 'set', key, '--repo', REPO, '--body', value])
     run(['gh', 'api', '-X', 'PUT', f'repos/{REPO}/branches/main/protection', '--input', '-'], {

@@ -147,6 +147,7 @@ def cmd_plan(args):
     values.update({
         **puffle_settings(manifest, cfg),
         'puffle_allowed_players': [int(x) for x in cfg['CP_PUFFLE_ALLOWED_PLAYERS'].split(',') if x],
+        'proxy_extra_hosts': [x for x in cfg['CP_PROXY_EXTRA_HOSTS'].split(',') if x],
         'public_hostname': cfg['CP_PUBLIC_HOSTNAME'], 'kubeconfig_path': cfg['CP_KUBECONFIG'], 'lan_cidr': cfg['CP_LAN_CIDR'],
         'cloud_state': {'resource_group_name': cfg['CP_STATE_RESOURCE_GROUP'],
                         'storage_account_name': cfg['CP_STATE_STORAGE_ACCOUNT'],
