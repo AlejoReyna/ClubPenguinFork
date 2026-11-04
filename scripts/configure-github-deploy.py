@@ -22,6 +22,8 @@ def run(command, data=None):
 
 def main():
     cfg = lablib.load_config('plan')
+    run(['gh', 'api', '-X', 'PUT', f'repos/{REPO}/actions/permissions/fork-pr-contributor-approval',
+         '-f', 'approval_policy=all_external_contributors'])
     account = run(['az', 'account', 'show', '-o', 'json'])
     name = 'gh-clubpenguin-lab-deploy'
     apps = run(['az', 'ad', 'app', 'list', '--filter', f"displayName eq '{name}'", '-o', 'json'])
