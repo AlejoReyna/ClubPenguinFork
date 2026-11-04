@@ -37,10 +37,12 @@ class BackupTests(unittest.TestCase):
                         '-e', 'POSTGRES_USER=houdini', '-e', 'POSTGRES_DB=houdini',
                         '-e', 'POSTGRES_PASSWORD=' + secrets.token_hex(8), IMAGE], check=True, capture_output=True)
         for _ in range(120):
-            if subprocess.run(['docker', 'exec', cls.name, 'pg_isready', '-U', 'houdini', '-d', 'houdini'],
+            # initdb temporarily accepts Unix-socket connections, then restarts.
+            # TCP readiness proves the final server is running before backup tests.
+            if subprocess.run(['docker', 'exec', cls.name, 'pg_isready', '-h', '127.0.0.1', '-U', 'houdini', '-d', 'houdini'],
                               capture_output=True).returncode == 0:
                 # initdb restarts the server once; require it to answer a real query.
-                if subprocess.run(['docker', 'exec', cls.name, 'psql', '-U', 'houdini', '-d', 'houdini', '-Atc',
+                if subprocess.run(['docker', 'exec', cls.name, 'psql', '-h', '127.0.0.1', '-U', 'houdini', '-d', 'houdini', '-Atc',
                                    'SELECT count(*) FROM penguin'], capture_output=True).returncode == 0:
                     break
             time.sleep(1)
