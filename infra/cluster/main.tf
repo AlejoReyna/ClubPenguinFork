@@ -69,7 +69,9 @@ resource "helm_release" "prometheus" {
   version    = "29.40.3"
   timeout    = 600
   atomic     = true
-  values     = [file("${path.module}/../../monitoring/prometheus.yaml")]
+  values = concat([file("${path.module}/../../monitoring/prometheus.yaml")],
+    var.bots_enabled ? [file("${path.module}/../../monitoring/bots-rules.yaml")] : [],
+  var.web_enabled ? [file("${path.module}/../../monitoring/puffle-rules.yaml")] : [])
 }
 
 resource "helm_release" "grafana" {

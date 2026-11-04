@@ -1,5 +1,5 @@
-resource_group_name  = "rg-tfstate"
-storage_account_name = "sttfstate2188627882"
+resource_group_name  = "rg-example-state"
+storage_account_name = "stexamplestate"
 container_name       = "tfstate-clubpenguin"
 key                  = "cloud.tfstate"
 use_azuread_auth     = true

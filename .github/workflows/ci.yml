@@ -1,0 +1,142 @@
+name: CI and deployment
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Apply reviewed image updates after CI (main only)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate configuration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install validation tools
+        run: |
+          bash scripts/install-tools.sh "$RUNNER_TEMP/cp-tools"
+          echo "$RUNNER_TEMP/cp-tools" >> "$GITHUB_PATH"
+          echo "$RUNNER_TEMP/cp-tools/ansible/bin" >> "$GITHUB_PATH"
+      - name: Validate Terraform, Ansible, Python and Helm
+        run: bash scripts/validate.sh
+
+  build-and-test:
+    name: Test isolated containers and bots
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@v3
+      - name: Fetch verified upstream revisions
+        run: python3 scripts/fetch-sources.py --only houdini,dash,ruffle
+      - name: Build native test images
+        run: >-
+          python3 scripts/build-images.py --tag "$GITHUB_SHA" --platform linux/amd64
+          --components runtime,database,web,bots --web-media stub
+      - name: Bot unit tests without network access
+        run: bash scripts/run-bot-tests.sh "clubpenguin/runtime:$GITHUB_SHA"
+      - name: Puffle and production isolation tests without network access
+        run: bash scripts/run-puffle-tests.sh "clubpenguin/runtime:$GITHUB_SHA"
+      - name: Verify backup and restore with disposable PostgreSQL
+        run: CP_TEST_DB_IMAGE="clubpenguin/database:$GITHUB_SHA" CP_TEST_QUIET=1 python3 -m unittest discover -s scripts/tests -t scripts -p test_backup_offline.py
+      - name: Real Houdini and simulated bots on an isolated network
+        run: python3 scripts/test-containers.py --tag "$GITHUB_SHA" --web-tag "$GITHUB_SHA" --bots-tag "$GITHUB_SHA" --puffle
+
+  deploy:
+    name: Deploy tested image updates to the Pi
+    needs: build-and-test
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy)) &&
+      vars.CP_AUTO_DEPLOY_ENABLED == 'true'
+    runs-on: [self-hosted, macOS, ARM64, clubpenguin-lab]
+    environment: clubpenguin-lab
+    concurrency:
+      group: clubpenguin-pi-deployment
+      cancel-in-progress: false
+    timeout-minutes: 240
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      BUILD_BUILDID: ${{ github.run_id }}
+      BUILD_BUILDNUMBER: ${{ github.run_number }}
+      BUILD_SOURCEBRANCH: ${{ github.ref }}
+      PLAN_RUN_ID: run-${{ github.run_id }}-${{ github.run_attempt }}
+      CP_NODE_NAME: ${{ vars.CP_NODE_NAME }}
+      TF_VAR_bots_enabled: 'true'
+      TF_VAR_bots_replicas: '1'
+      TF_VAR_bots_provider_mode: ${{ vars.CP_BOTS_PROVIDER_MODE }}
+      ARM_USE_OIDC: 'true'
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      CP_AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Isolate run files and Azure CLI credentials
+        run: |
+          echo "AZURE_CONFIG_DIR=$RUNNER_TEMP/clubpenguin-azure-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
+          echo "RELEASE_FILE=$RUNNER_TEMP/clubpenguin-release-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.json" >> "$GITHUB_ENV"
+          echo "MANIFEST_FILE=$RUNNER_TEMP/clubpenguin-manifest-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.json" >> "$GITHUB_ENV"
+      - name: Refuse an obsolete commit
+        run: test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$GITHUB_SHA"
+      - name: Require explicit private configuration
+        run: |
+          set -euo pipefail
+          test -n "$ARM_CLIENT_ID" && test -n "$ARM_TENANT_ID" && test -n "$ARM_SUBSCRIPTION_ID"
+          case "$TF_VAR_bots_provider_mode" in api|simulated) ;; *) exit 1 ;; esac
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Verify the Pi and the active bot provider
+        run: |
+          python3 scripts/deploy.py preflight
+          python3 scripts/github_deploy_guard.py
+      - name: Resolve and test ARM64 release
+        run: |
+          python3 scripts/release.py resolve --out "$RELEASE_FILE"
+          python3 scripts/release.py build --release "$RELEASE_FILE" --platform linux/arm64
+      - name: Publish images and save manifest
+        run: |
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$GITHUB_SHA"
+          python3 scripts/release.py publish --release "$RELEASE_FILE"
+          python3 scripts/release.py manifest --release "$RELEASE_FILE" --out "$MANIFEST_FILE"
+      - name: Plan and gate image updates
+        run: python3 scripts/deploy.py plan --manifest "$MANIFEST_FILE" --expect images-only
+      - name: Apply the exact gated plan
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$GITHUB_SHA"
+          python3 scripts/github_deploy_guard.py
+          plan_sha="$(python3 -c 'import json,os,sys; sys.path.insert(0,"scripts"); import lablib; p=lablib.RunDir(run_id=os.environ["PLAN_RUN_ID"],create=False).sub("evidence")/"plan-summary.json"; print(json.loads(p.read_text())["plan_sha256"])')"
+          python3 scripts/deploy.py apply --expect-sha256 "$plan_sha" --backup auto --expect images-only
+      - name: Verify without registering accounts
+        run: python3 scripts/deploy.py verify --manifest "$MANIFEST_FILE" --skip-game-journey --require-public
+      - name: Record verified release
+        run: python3 scripts/deploy.py record --manifest "$MANIFEST_FILE"
+      - name: Remove private run state
+        if: always()
+        run: |
+          python3 scripts/deploy.py cleanup || true
+          python3 -c 'import os, pathlib, shutil; [pathlib.Path(os.environ[k]).unlink(missing_ok=True) for k in ("RELEASE_FILE", "MANIFEST_FILE") if os.environ.get(k)]; p=os.environ.get("AZURE_CONFIG_DIR"); shutil.rmtree(p, ignore_errors=True) if p else None'

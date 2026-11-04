@@ -1,5 +1,34 @@
-game_enabled = true
-web_enabled  = true
+game_enabled        = true
+web_enabled         = true
 cloudflared_enabled = true
+
+# Legacy tag for runtime and database; web_image_tag overrides it for the web image.
 image_tag     = "lab-002"
 web_image_tag = "lab-006"
+# Optional per-component tags (they take precedence over image_tag):
+# runtime_image_tag  = "rt-0123456789ab"
+# database_image_tag = "db-0123456789ab"
+
+# REQUIRED for a real deployment: the default is the anonymized sample and would
+# rewrite the live game-ingress policy. Use your actual LAN range.
+# lan_cidr = "10.0.0.0/24"
+
+# Optional connected NPC service; provision external credentials and review its plan first.
+# If bots are already deployed, set all four. Omitting them makes the next plan
+# remove the Deployment (the budget PVC has prevent_destroy).
+# bots_enabled       = true
+# bots_image_tag     = "bots-001"
+# bots_provider_mode = "api"
+# bots_replicas      = 1
+
+# State location of infra/cloud (required; deploy.py fills it from deploy.env).
+cloud_state = {
+  resource_group_name  = "rg-example-state"
+  storage_account_name = "stexamplestate"
+  container_name       = "tfstate-clubpenguin"
+  key                  = "cloud.tfstate"
+}
+## Puffle: OAuth and music remain on each player's computer.
+## Create the external puffle-service Secret before enabling.
+puffle_enabled         = false
+puffle_allowed_players = [] # empty = every human can explicitly pair their own device

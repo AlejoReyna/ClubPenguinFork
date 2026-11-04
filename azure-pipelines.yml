@@ -1,115 +1,449 @@
-# CI uses hosted Linux with no lab credentials. Optional CD uses a trusted Mac
-# agent on the same LAN as the Pi and a federated Azure service connection.
+# Club Penguin lab: CI/CD for a Raspberry Pi 5 (ARM64, single-node K3s).
+#
+#   Pull request  -> Validate + Test on Microsoft-hosted Linux. No Azure or Pi credentials.
+#   Push to main  -> same, then (only if CP_RELEASE_ENABLED=true or a manual run asks for it)
+#                    Release on the trusted Mac agent: ARM64 build, tests, publish to ACR,
+#                    and a *saved* Terraform plan. Nothing is applied.
+#   deploy = true -> Apply: environment approval, then exactly the reviewed plan, a backup
+#                    first when the plan touches data, functional verification and evidence.
+#
+# Real deployment is OFF by default. Writing this file does not create the Azure DevOps
+# pieces it relies on (GitHub connection, service connection, agent pool/agent, environment,
+# branch policies); see docs/ci-cd/. Private values (hostname, Azure names, Pi address) are
+# never in this file: they come from ~/.config/clubpenguin-lab/deploy.env on the agent.
+name: $(Date:yyyyMMdd)$(Rev:.r)
+
 trigger:
+  batch: true
   branches:
     include: [main]
 pr:
+  autoCancel: true
+  drafts: false
   branches:
     include: [main]
 
+# One deployment at a time to the single environment (pairs with the environment's
+# Exclusive lock check; Terraform's own state lock is a second barrier).
+lockBehavior: sequential
+
 parameters:
   - name: deploy
+    displayName: Apply the reviewed plan to the Raspberry Pi (needs environment approval)
     type: boolean
     default: false
+  - name: release
+    displayName: Build, publish and plan only (no apply), even if CP_RELEASE_ENABLED is not set
+    type: boolean
+    default: false
+  - name: rollbackTo
+    displayName: Redeploy a recorded release instead of building ("previous" or releases/<name>.json); needs release or deploy
+    type: string
+    default: ''
   - name: azureServiceConnection
+    displayName: Azure service connection (workload identity federation)
     type: string
     default: clubpenguin-azure
   - name: deploymentPool
+    displayName: Agent pool that contains the trusted Mac agent
     type: string
-    default: Default
+    default: clubpenguin-lab-mac
+  - name: deploymentAgent
+    displayName: Name of that agent (plan and apply must run on the same machine)
+    type: string
+    default: ''
+  - name: backupMode
+    displayName: Backup before apply (auto = whenever the plan touches data)
+    type: string
+    default: auto
+    values: [auto, always]
+  - name: pinTags
+    displayName: Keep existing tags, e.g. database=lab-002 (migration from lab-NNN tags)
+    type: string
+    default: ''
+  - name: rebuildSalt
+    displayName: Change to force new image tags (e.g. refreshed base images)
+    type: string
+    default: ''
+  - name: allowDestructive
+    displayName: Exact resource addresses allowed to be deleted/replaced (leave empty)
+    type: string
+    default: ''
+  - name: requirePublicEdge
+    displayName: Fail the deployment if the public URL check fails (otherwise a warning)
+    type: boolean
+    default: false
+
+variables:
+  PYTHONDONTWRITEBYTECODE: '1'
+  TOOLS_DIR: $(Pipeline.Workspace)/lab-tools
 
 stages:
+  # ---------------------------------------------------------------- PR + main: no secrets
   - stage: Validate
+    displayName: Validate configuration
     jobs:
       - job: Configuration
         pool:
           vmImage: ubuntu-24.04
+        timeoutInMinutes: 25
         steps:
           - checkout: self
+            fetchDepth: 0
+            persistCredentials: false
+          - task: Cache@2
+            displayName: Restore tools and provider caches
+            inputs:
+              key: 'tools | "$(Agent.OS)" | scripts/install-tools.sh'
+              path: $(TOOLS_DIR)
+          - task: Cache@2
+            displayName: Restore Terraform provider cache
+            inputs:
+              key: 'terraform | "$(Agent.OS)" | infra/cluster/.terraform.lock.hcl | infra/cloud/.terraform.lock.hcl'
+              path: $(Pipeline.Workspace)/terraform-plugin-cache
           - bash: |
               set -euo pipefail
-              tools_dir="$(Pipeline.Workspace)/lab-tools"
-              mkdir -p "$tools_dir"
-              cd "$tools_dir"
-              curl -fsSLO https://releases.hashicorp.com/terraform/1.17.1/terraform_1.17.1_linux_amd64.zip
-              curl -fsSLO https://releases.hashicorp.com/terraform/1.17.1/terraform_1.17.1_SHA256SUMS
-              sha256sum --check --ignore-missing terraform_1.17.1_SHA256SUMS
-              unzip -o terraform_1.17.1_linux_amd64.zip
-              curl -fsSLO https://get.helm.sh/helm-v3.19.0-linux-amd64.tar.gz
-              curl -fsSLO https://get.helm.sh/helm-v3.19.0-linux-amd64.tar.gz.sha256sum
-              sha256sum --check helm-v3.19.0-linux-amd64.tar.gz.sha256sum
-              tar -xzf helm-v3.19.0-linux-amd64.tar.gz
-              mv linux-amd64/helm "$tools_dir/helm"
-              python3 -m venv "$tools_dir/ansible"
-              "$tools_dir/ansible/bin/pip" install 'ansible-core>=2.20,<2.21'
-              echo "##vso[task.prependpath]$tools_dir"
-              echo "##vso[task.prependpath]$tools_dir/ansible/bin"
-            displayName: Install pinned validation tools
+              bash scripts/install-tools.sh "$(TOOLS_DIR)"
+              mkdir -p "$(Pipeline.Workspace)/terraform-plugin-cache"
+              echo "##vso[task.prependpath]$(TOOLS_DIR)"
+              echo "##vso[task.prependpath]$(TOOLS_DIR)/ansible/bin"
+            displayName: Install pinned tools (checksums verified)
           - bash: bash scripts/validate.sh
-            displayName: Validate Terraform, Ansible, Python and Helm
+            displayName: Validate Terraform, Ansible, Python, Helm, unit tests and this pipeline
+            env:
+              TF_PLUGIN_CACHE_DIR: $(Pipeline.Workspace)/terraform-plugin-cache
+          - bash: |
+              set -euo pipefail
+              if [ "$(Build.Reason)" = "PullRequest" ]; then
+                git fetch --no-tags --quiet origin "$(System.PullRequest.TargetBranch)" || true
+                target="origin/$(echo "$(System.PullRequest.TargetBranch)" | sed 's|^refs/heads/||')"
+                python3 scripts/changed.py --base "$target" --vso
+              else
+                python3 scripts/changed.py --all --vso
+              fi
+            name: changes
+            displayName: Decide whether container tests are needed (conservative)
 
-  - stage: BuildAndTest
+  - stage: Test
+    displayName: Build and test containers (isolated)
     dependsOn: Validate
     jobs:
-      - job: Backend
+      - job: Containers
         pool:
           vmImage: ubuntu-24.04
+        timeoutInMinutes: 60
+        condition: eq(stageDependencies.Validate.Configuration.outputs['changes.runContainers'], 'true')
+        variables:
+          imageTag: ci-$(Build.BuildId)
+          BUILDX_CACHE: $(Pipeline.Workspace)/buildx-cache
         steps:
           - checkout: self
-          - bash: python3 scripts/fetch-sources.py
-            displayName: Fetch verified upstream revisions
-          - bash: python3 scripts/build-images.py --tag "$(Build.SourceVersion)" --platform linux/amd64
-            displayName: Build native test images
-          - bash: python3 scripts/test-containers.py --tag "$(Build.SourceVersion)"
-            displayName: Verify registration, login, shared room and socket proxy
+            persistCredentials: false
+          # Upstream sources and the Ruffle archive are verified by revision/checksum after
+          # restore, so a stale or corrupted cache fails loudly instead of being trusted.
+          - task: Cache@2
+            displayName: Restore pinned upstream sources
+            inputs:
+              key: 'sources | "$(Agent.OS)" | sources.json | scripts/fetch-sources.py'
+              path: $(Build.SourcesDirectory)/vendor
+          - task: Cache@2
+            displayName: Restore Ruffle archive
+            inputs:
+              key: 'ruffle | "$(Agent.OS)" | scripts/fetch-sources.py'
+              path: $(Build.SourcesDirectory)/.local
+          - task: Cache@2
+            displayName: Restore BuildKit layer cache (public inputs only, no secrets)
+            inputs:
+              key: 'buildx | "$(Agent.OS)" | containers/runtime/Dockerfile | containers/runtime/constraints.txt | containers/database/Dockerfile | containers/web/Dockerfile | sources.json'
+              restoreKeys: |
+                buildx | "$(Agent.OS)"
+              path: $(BUILDX_CACHE)
+          # The legacy media (~1.7 GiB) is not needed: the web image is built around a stub.
+          - bash: python3 scripts/fetch-sources.py --only houdini,dash,ruffle
+            displayName: Fetch verified upstream revisions (without media)
+          - bash: |
+              set -euo pipefail
+              docker buildx create --name cp-ci --driver docker-container --use
+              python3 scripts/build-images.py --tag "$(imageTag)" --platform linux/amd64 \
+                --components runtime,database,web,bots --web-media stub \
+                --builder cp-ci --cache-dir "$(BUILDX_CACHE)"
+            displayName: Build native test images (stub media)
+          - bash: python3 scripts/test-containers.py --tag "$(imageTag)" --web-tag "$(imageTag)" --bots-tag "$(imageTag)" --puffle
+            displayName: Registration, login, shared room, WebSocket proxy and nginx route
+          - bash: |
+              CP_TEST_DB_IMAGE="clubpenguin/database:$(imageTag)" CP_TEST_QUIET=1 \
+                python3 -m unittest discover -s scripts/tests -t scripts -p 'test_backup_offline.py' -v
+            displayName: Backup and restore verification against a throwaway PostgreSQL
+          - bash: bash scripts/run-bot-tests.sh "clubpenguin/runtime:$(imageTag)"
+            displayName: Bot unit tests, if present (no network, no provider credentials)
+          - bash: bash scripts/run-puffle-tests.sh "clubpenguin/runtime:$(imageTag)"
+            displayName: Puffle and production isolation tests (no network or credentials)
+          - bash: |
+              docker ps -aq --filter label=clubpenguin.lab.test-run | xargs -r docker rm -f -v
+              docker network ls -q --filter label=clubpenguin.lab.test-run | xargs -r docker network rm
+            displayName: Remove leftovers of this run (by label only)
+            condition: always()
 
+  # ---------------------------------------------------------------- main only: trusted Mac
+  - stage: Release
+    displayName: Build ARM64 release, publish and plan (no apply)
+    dependsOn: Test
+    condition: |
+      and(
+        succeeded(),
+        ne(variables['Build.Reason'], 'PullRequest'),
+        eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+        or(
+          eq('${{ parameters.deploy }}', 'True'),
+          eq('${{ parameters.release }}', 'True'),
+          eq(variables['CP_RELEASE_ENABLED'], 'true')
+        )
+      )
+    jobs:
+      - job: BuildPublishPlan
+        displayName: Release and saved plan
+        pool:
+          name: ${{ parameters.deploymentPool }}
+          demands:
+            - Agent.OS -equals Darwin
+            - ${{ if ne(parameters.deploymentAgent, '') }}:
+                - Agent.Name -equals ${{ parameters.deploymentAgent }}
+        timeoutInMinutes: 150
+        variables:
+          releaseFile: $(Pipeline.Workspace)/release.json
+          manifestFile: $(Pipeline.Workspace)/release-manifest.json
+        steps:
+          - checkout: self
+            clean: true
+            fetchDepth: 0
+            persistCredentials: false
+          - bash: |
+              test -n "$AGENT_NAME_PARAM" || { echo "Set the deploymentAgent parameter: plan and apply must run on the same agent."; exit 1; }
+            displayName: Require a pinned agent
+            env:
+              AGENT_NAME_PARAM: ${{ parameters.deploymentAgent }}
+          # Everything that talks to Azure runs inside AzureCLI@2: a federated, task-scoped
+          # login in its own config dir, separate from any `az` session of the Mac's user.
+          - task: AzureCLI@2
+            displayName: Preflight (identity, tunnel, node identity, Ansible)
+            timeoutInMinutes: 15
+            inputs:
+              azureSubscription: ${{ parameters.azureServiceConnection }}
+              scriptType: bash
+              scriptLocation: inlineScript
+              addSpnToEnvironment: false
+              useGlobalConfig: false
+              workingDirectory: $(Build.SourcesDirectory)
+              inlineScript: python3 scripts/deploy.py preflight
+          - ${{ if eq(parameters.rollbackTo, '') }}:
+              - task: AzureCLI@2
+                displayName: Resolve per-component image tags and reuse existing images
+                timeoutInMinutes: 10
+                inputs:
+                  azureSubscription: ${{ parameters.azureServiceConnection }}
+                  scriptType: bash
+                  scriptLocation: inlineScript
+                  addSpnToEnvironment: false
+                  useGlobalConfig: false
+                  workingDirectory: $(Build.SourcesDirectory)
+                  inlineScript: |
+                    set -euo pipefail
+                    pins=()
+                    IFS=',' read -ra items <<< "${PIN_TAGS:-}"
+                    for item in "${items[@]:-}"; do [ -n "$item" ] && pins+=(--pin "$item"); done
+                    python3 scripts/release.py resolve --out "$(releaseFile)" --salt "${REBUILD_SALT:-}" "${pins[@]:-}"
+                env:
+                  PIN_TAGS: ${{ parameters.pinTags }}
+                  REBUILD_SALT: ${{ parameters.rebuildSalt }}
+              - bash: python3 scripts/release.py build --release "$(releaseFile)" --platform linux/arm64
+                displayName: Build missing components for ARM64 and test them natively
+                timeoutInMinutes: 90
+              - task: AzureCLI@2
+                displayName: Publish new images to ACR and record digests
+                timeoutInMinutes: 60
+                inputs:
+                  azureSubscription: ${{ parameters.azureServiceConnection }}
+                  scriptType: bash
+                  scriptLocation: inlineScript
+                  addSpnToEnvironment: false
+                  useGlobalConfig: false
+                  workingDirectory: $(Build.SourcesDirectory)
+                  inlineScript: |
+                    set -euo pipefail
+                    python3 scripts/release.py publish --release "$(releaseFile)"
+                    python3 scripts/release.py manifest --release "$(releaseFile)" --out "$(manifestFile)"
+          - ${{ else }}:
+              - task: AzureCLI@2
+                displayName: Fetch the recorded release to redeploy
+                timeoutInMinutes: 10
+                inputs:
+                  azureSubscription: ${{ parameters.azureServiceConnection }}
+                  scriptType: bash
+                  scriptLocation: inlineScript
+                  addSpnToEnvironment: false
+                  useGlobalConfig: false
+                  workingDirectory: $(Build.SourcesDirectory)
+                  inlineScript: python3 scripts/release.py fetch "$ROLLBACK_TO" --out "$(manifestFile)"
+                env:
+                  ROLLBACK_TO: ${{ parameters.rollbackTo }}
+          - task: AzureCLI@2
+            name: plan
+            displayName: Terraform plan for infra/cluster (saved, private to this run)
+            timeoutInMinutes: 45
+            inputs:
+              azureSubscription: ${{ parameters.azureServiceConnection }}
+              scriptType: bash
+              scriptLocation: inlineScript
+              addSpnToEnvironment: false
+              useGlobalConfig: false
+              workingDirectory: $(Build.SourcesDirectory)
+              inlineScript: |
+                set -euo pipefail
+                extra=()
+                if [ -n "${ROLLBACK_TO:-}" ]; then extra+=(--expect images-only); fi
+                python3 scripts/deploy.py plan --manifest "$(manifestFile)" --allow-destructive "${ALLOW_DESTRUCTIVE:-}" "${extra[@]:-}"
+            env:
+              ROLLBACK_TO: ${{ parameters.rollbackTo }}
+              ALLOW_DESTRUCTIVE: ${{ parameters.allowDestructive }}
+          - bash: |
+              set -euo pipefail
+              out="$(Build.ArtifactStagingDirectory)/evidence-release"
+              python3 scripts/deploy.py evidence --out "$out" --extra "$(manifestFile)"
+              echo "##vso[task.uploadsummary]$out/plan-summary.md"
+            displayName: Collect non-secret evidence (the saved plan is never published)
+            condition: always()
+          - task: PublishPipelineArtifact@1
+            displayName: Publish release manifest and plan summary
+            condition: always()
+            inputs:
+              targetPath: $(Build.ArtifactStagingDirectory)/evidence-release
+              artifact: release-evidence
+          - bash: python3 scripts/deploy.py cleanup --keep-workspace
+            displayName: Close the tunnel if this run opened it
+            condition: always()
+
+  # ---------------------------------------------------------------- explicit deployment
   - ${{ if eq(parameters.deploy, true) }}:
-      - stage: DeployPi
-        dependsOn: BuildAndTest
-        condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+      - stage: Apply
+        displayName: Apply reviewed plan, verify, record
+        dependsOn: Release
+        condition: |
+          and(
+            succeeded('Release'),
+            ne(variables['Build.Reason'], 'PullRequest'),
+            eq(variables['Build.SourceBranch'], 'refs/heads/main')
+          )
+        variables:
+          planSha256: $[ stageDependencies.Release.BuildPublishPlan.outputs['plan.planSha256'] ]
+          planHasChanges: $[ stageDependencies.Release.BuildPublishPlan.outputs['plan.planHasChanges'] ]
+          manifestFile: $(Pipeline.Workspace)/release-evidence/release-manifest.json
         jobs:
           - deployment: Raspberry
+            displayName: Apply to the Raspberry Pi
+            # Approvals, Exclusive lock and Branch control are configured on this environment
+            # in Azure DevOps; they are not created by this file.
             environment: clubpenguin-lab
             pool:
               name: ${{ parameters.deploymentPool }}
               demands:
                 - Agent.OS -equals Darwin
+                - ${{ if ne(parameters.deploymentAgent, '') }}:
+                    - Agent.Name -equals ${{ parameters.deploymentAgent }}
+            timeoutInMinutes: 150
             strategy:
               runOnce:
                 deploy:
                   steps:
                     - checkout: self
                       clean: true
-                    - bash: |
-                        set -euo pipefail
-                        python3 scripts/tunnel.py start
-                        (cd ansible && ansible-playbook preflight.yml)
-                        python3 scripts/fetch-sources.py
-                        python3 scripts/build-images.py --tag "$(Build.SourceVersion)" --platform linux/arm64
-                        python3 scripts/test-containers.py --tag "$(Build.SourceVersion)"
-                      displayName: Verify Pi and build ARM64 release
+                      fetchDepth: 0
+                      persistCredentials: false
+                    - download: current
+                      artifact: release-evidence
                     - task: AzureCLI@2
-                      displayName: Publish images, deploy and verify backup
+                      displayName: Apply exactly the reviewed plan (backup first if it touches data)
+                      timeoutInMinutes: 90
                       inputs:
                         azureSubscription: ${{ parameters.azureServiceConnection }}
                         scriptType: bash
                         scriptLocation: inlineScript
-                        addSpnToEnvironment: true
+                        addSpnToEnvironment: false
+                        useGlobalConfig: false
+                        workingDirectory: $(Build.SourcesDirectory)
                         inlineScript: |
                           set -euo pipefail
-                          umask 077
-                          export ARM_USE_OIDC=true
-                          export ARM_CLIENT_ID="$servicePrincipalId"
-                          export ARM_TENANT_ID="$tenantId"
-                          export ARM_OIDC_TOKEN="$idToken"
-                          export ARM_SUBSCRIPTION_ID="$(az account show --query id -o tsv)"
-                          python3 scripts/publish-images.py --tag "$(Build.SourceVersion)"
-                          terraform -chdir=infra/cluster init -input=false -backend-config=backend.hcl.example
-                          terraform -chdir=infra/cluster plan -input=false \
-                            -var=game_enabled=true -var=web_enabled=true \
-                            -var="image_tag=$(Build.SourceVersion)" \
-                            -var="web_image_tag=$(Build.SourceVersion)" -out=deploy.tfplan
-                          terraform -chdir=infra/cluster apply -input=false deploy.tfplan
-                          kubectl --kubeconfig "$HOME/.kube/clubpenguin-pi.yaml" \
-                            -n clubpenguin exec -i deploy/dash -- python - < scripts/game-smoke.py
-                          python3 scripts/backup.py
+                          extra=()
+                          if [ -n "${ROLLBACK_TO:-}" ]; then extra+=(--expect images-only); fi
+                          python3 scripts/deploy.py apply --expect-sha256 "$(planSha256)" --backup "$BACKUP_MODE" "${extra[@]:-}"
+                      env:
+                        BACKUP_MODE: ${{ parameters.backupMode }}
+                        ROLLBACK_TO: ${{ parameters.rollbackTo }}
+                    # No Azure identity is needed from here: verification talks to the cluster only.
+                    - bash: |
+                        set -euo pipefail
+                        extra=()
+                        if [ "$REQUIRE_PUBLIC" = "True" ]; then extra+=(--require-public); fi
+                        python3 scripts/deploy.py verify --manifest "$(manifestFile)" "${extra[@]:-}"
+                      displayName: Verify rollout, images, HTTP, WebSocket and the game journey
+                      timeoutInMinutes: 30
+                      env:
+                        REQUIRE_PUBLIC: ${{ parameters.requirePublicEdge }}
+                    - task: AzureCLI@2
+                      displayName: Record the verified release in Blob
+                      timeoutInMinutes: 10
+                      inputs:
+                        azureSubscription: ${{ parameters.azureServiceConnection }}
+                        scriptType: bash
+                        scriptLocation: inlineScript
+                        addSpnToEnvironment: false
+                        useGlobalConfig: false
+                        workingDirectory: $(Build.SourcesDirectory)
+                        inlineScript: |
+                          set -euo pipefail
+                          extra=()
+                          if [ -n "${ROLLBACK_TO:-}" ]; then extra+=(--rollback); fi
+                          python3 scripts/deploy.py record --manifest "$(manifestFile)" "${extra[@]:-}"
+                      env:
+                        ROLLBACK_TO: ${{ parameters.rollbackTo }}
+                    - bash: python3 scripts/deploy.py evidence --out "$(Build.ArtifactStagingDirectory)/evidence-deploy"
+                      displayName: Collect non-secret evidence
+                      condition: always()
+                    - task: PublishPipelineArtifact@1
+                      displayName: Publish deployment evidence
+                      condition: always()
+                      inputs:
+                        targetPath: $(Build.ArtifactStagingDirectory)/evidence-deploy
+                        artifact: deploy-evidence
+                on:
+                  failure:
+                    steps:
+                      - bash: |
+                          echo "##vso[task.logissue type=error]Deployment failed. The previous release is recorded in Blob; see docs/ci-cd/respaldos-y-rollback.md (rollbackTo: previous). Data is NOT rolled back automatically."
+                        displayName: Point to the rollback procedure
+
+  # ---------------------------------------------------------------- always: remove the plan
+  - stage: Cleanup
+    displayName: Remove this run's private plan and workspace
+    dependsOn:
+      - Release
+      - ${{ if eq(parameters.deploy, true) }}:
+          - Apply
+    condition: |
+      and(
+        always(),
+        in(dependencies.Release.result, 'Succeeded', 'SucceededWithIssues', 'Failed', 'Canceled')
+      )
+    jobs:
+      - job: Workspace
+        pool:
+          name: ${{ parameters.deploymentPool }}
+          demands:
+            - Agent.OS -equals Darwin
+            - ${{ if ne(parameters.deploymentAgent, '') }}:
+                - Agent.Name -equals ${{ parameters.deploymentAgent }}
+        timeoutInMinutes: 10
+        steps:
+          - checkout: self
+            persistCredentials: false
+          - bash: python3 scripts/deploy.py cleanup
+            displayName: Close our tunnel (if we opened it) and delete the private plan

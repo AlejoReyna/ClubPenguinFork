@@ -1,0 +1,43 @@
+name: Verified production backup
+on:
+  schedule:
+    - cron: '0 12 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  backup:
+    if: github.ref == 'refs/heads/main' && vars.CP_BACKUP_ENABLED == 'true'
+    runs-on: [self-hosted, macOS, ARM64, clubpenguin-lab]
+    environment: clubpenguin-backup
+    concurrency:
+      group: clubpenguin-pi-deployment
+      cancel-in-progress: false
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      PLAN_RUN_ID: backup-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Isolate Azure login
+        run: echo "AZURE_CONFIG_DIR=$RUNNER_TEMP/clubpenguin-backup-azure-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Verify destination and back up
+        run: |
+          python3 scripts/tunnel.py start --state-file "$RUNNER_TEMP/backup-tunnel-$GITHUB_RUN_ID.json"
+          python3 scripts/tunnel.py verify
+          python3 scripts/backup.py --reason scheduled-production
+          python3 scripts/backup-operator-state.py
+      - name: Close only this run's tunnel
+        if: always()
+        run: |
+          python3 scripts/tunnel.py stop --state-file "$RUNNER_TEMP/backup-tunnel-$GITHUB_RUN_ID.json"
+          python3 -c 'import os,shutil; shutil.rmtree(os.environ["AZURE_CONFIG_DIR"],ignore_errors=True)'

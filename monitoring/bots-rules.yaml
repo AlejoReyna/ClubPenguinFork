@@ -1,0 +1,13 @@
+# Additional Helm values, loaded only when bots_enabled=true.
+serverFiles:
+  recording_rules.yml:
+    groups:
+      - name: clubpenguin-bot-presence
+        rules:
+          - record: clubpenguin_bot_players
+            expr: sum(bots_connected{namespace="clubpenguin"} and on(job,instance) (up == 1))
+            labels:
+              world: Glaciar
+          # Samples arrive at different times. This is an estimate, not a capacity test.
+          - record: clubpenguin_human_players_estimated
+            expr: clamp_min(clubpenguin_players - on(world) group_left() clubpenguin_bot_players, 0)

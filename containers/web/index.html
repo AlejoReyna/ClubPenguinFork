@@ -1,30 +1,66 @@
 <!doctype html>
 <html lang="es">
+<head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#00529b">
+<meta name="description" content="Glaciar: mundo privado de Club Penguin (AS2) jugable desde tu teléfono.">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Glaciar">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <title>Club Penguin · Glaciar</title>
 <style>
-  *{box-sizing:border-box}
+  /* El fondo IMITA el borde del SWF: el contenedor desaparece y solo queda el juego. */
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html{touch-action:manipulation}
   html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#00529b;color:#fff;font:16px system-ui,sans-serif}
-  main{position:fixed;inset:0;width:100%;height:100%;height:100dvh}
-  #game{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:min(100vw,158.333333vh);height:min(100vh,63.157895vw);width:min(100vw,158.333333dvh);height:min(100dvh,63.157895vw)}
+  body{position:fixed;inset:0;overscroll-behavior:none}
+  #game{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+        width:min(100vw,158.333333dvh);height:min(100dvh,63.157895vw)}
   /* Oculta el marco del SWF de 760 × 480, incluido el suavizado del borde. */
   ruffle-player{display:block;width:100%;height:100%;clip-path:inset(1.25% .789474% round .526316% / .833334%)}
-  .toolbar{position:fixed;top:12px;right:12px;z-index:2;display:flex;gap:8px;transition:opacity .2s}
-  .toolbar a,.toolbar button{padding:10px 14px;border:1px solid #ffffff40;border-radius:7px;background:#063354e8;color:#fff;font:inherit;text-decoration:none;cursor:pointer;box-shadow:0 2px 8px #0003}
-  .toolbar a:hover,.toolbar button:hover{background:#075386}
-  .toolbar a:focus-visible,.toolbar button:focus-visible{outline:3px solid #ffdf70;outline-offset:3px}
-  body.controls-hidden .toolbar{opacity:0;pointer-events:none}
-  body.controls-hidden .toolbar:focus-within{opacity:1;pointer-events:auto}
-  #status{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:3;max-width:90vw;margin:0;padding:10px 16px;border-radius:7px;background:#063354e8;text-align:center}
-  #status:empty{display:none}
+
+  /* Solo avisos mínimos: nada de interfaz propia. */
+  #estado{position:fixed;top:calc(12px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:40;max-width:88vw;
+          margin:0;padding:9px 15px;border-radius:11px;background:#063354c9;text-align:center;font-size:14px;opacity:0;transition:opacity .25s;
+          pointer-events:none}
+  #estado.on{opacity:1}
+
+  .bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom));z-index:30;display:none;gap:9px;
+       transition:opacity .25s}
+  body.listo .bar{display:flex}
+  body.quiet .bar{opacity:0;pointer-events:none}
+  body.quiet .bar:focus-within{opacity:1;pointer-events:auto}
+  .bar button{min-height:42px;min-width:48px;padding:0 15px;border:1px solid #ffffff2e;border-radius:12px;background:#063354c9;color:#fff;
+              font:inherit;font-size:13.5px;cursor:pointer}
+
+  .overlay{position:fixed;inset:0;z-index:50;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+           background:#00529bd9;text-align:center}
+  .overlay.on{display:flex}
+  #rota .avion{width:72px;height:64px;animation:gira-aviso 2.4s ease-in-out infinite;border-radius:14px;border:3px solid #ffffffb0}
+  @keyframes gira-aviso{0%,20%{transform:rotate(0)}55%,100%{transform:rotate(90deg)}}
+  #rota p{margin:0;font-size:17px;font-weight:700;text-shadow:0 2px 8px #0006}
 </style>
-<main aria-label="Club Penguin · Glaciar"><div id="game"></div></main>
-<nav class="toolbar" aria-label="Controles del juego">
-  <a href="/register.html">Crear un pingüino</a>
-  <button id="fullscreen" type="button">Pantalla completa</button>
+</head>
+<body>
+<nav class="bar" aria-label="Controles">
+  <button id="salir" type="button" hidden>Salir</button>
+  <button id="fullscreen" type="button" aria-label="Pantalla completa">⛶</button>
+  <button id="puffle" type="button">Mi puffle</button>
 </nav>
-<p id="status" role="status">Cargando el juego…</p>
+<p id="estado" role="status" class="on">Cargando el glaciar…</p>
+
+<div class="overlay" id="rota" role="dialog" aria-label="Gira tu teléfono">
+  <div class="avion" aria-hidden="true"></div>
+  <p>Gira el teléfono y el juego se ve entero</p>
+</div>
+
+<main aria-label="Club Penguin · Glaciar"><div id="game"></div></main>
+<script src="/ruffle/ruffle.js" defer></script>
 <script>
   window.RufflePlayer = window.RufflePlayer || {};
   const socketBase = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}`;
@@ -39,48 +75,91 @@
       {host: location.hostname, port: 9876, proxyUrl: socketBase + '/socket/world'}
     ]
   };
-  const fullscreenButton = document.getElementById('fullscreen');
-  fullscreenButton.hidden = !document.fullscreenEnabled;
-  fullscreenButton.addEventListener('click', async () => {
-    try {
-      if (document.fullscreenElement) await document.exitFullscreen();
-      else await document.documentElement.requestFullscreen({navigationUI: 'hide'});
-    } catch (error) {
-      document.getElementById('status').textContent = 'No se pudo activar la pantalla completa. Inténtalo nuevamente.';
-    }
-  });
-  document.addEventListener('fullscreenchange', () => {
-    fullscreenButton.textContent = document.fullscreenElement ? 'Salir de pantalla completa' : 'Pantalla completa';
-  });
-  let controlsTimeout;
-  function showControls() {
-    document.body.classList.remove('controls-hidden');
-    clearTimeout(controlsTimeout);
-    controlsTimeout = setTimeout(() => document.body.classList.add('controls-hidden'), 2500);
+
+  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
   }
-  document.addEventListener('pointermove', showControls, {passive: true, capture: true});
-  document.addEventListener('pointerdown', showControls, {passive: true, capture: true});
-  document.addEventListener('keydown', showControls, {capture: true});
-  showControls();
-  let player;
-  window.grecaptchaSubmit = () => {
-    if (player && typeof player.finishedCaptcha === 'function') player.finishedCaptcha('houdini');
+
+  const estado = texto => {
+    const el = document.getElementById('estado');
+    el.textContent = texto;
+    el.classList.toggle('on', !!texto);
   };
+
+  // Carga el juego a la primera, sin lobby: el cliente ES la interfaz.
   window.addEventListener('load', async () => {
-    player = window.RufflePlayer.newest().createPlayer();
-    player.id = 'penguin-player';
-    document.getElementById('game').appendChild(player);
     try {
+      const build = await fetch('/puffle/build.json', {cache: 'no-store'}).then(r => {
+        if (!r.ok) throw new Error('No se pudo verificar el cliente.');
+        return r.json();
+      });
+      // A new query also bypasses media cached by the previous service worker.
+      window.RufflePlayer.config.urlRewriteRules.unshift([
+        /^(?:.*\/)?engine\.swf(?:\?.*)?$/,
+        location.origin + '/media/play/v2/client/engine.swf?v=' + encodeURIComponent(build['engine.swf'])
+      ]);
+      const player = window.RufflePlayer.newest().createPlayer();
+      player.id = 'penguin-player';
+      document.getElementById('game').appendChild(player);
       await player.ruffle().load({
         url: new URL('/media/boots.swf', location.href).href,
         parameters: {lang: 'es', base: location.origin + '/'}
       });
-      document.getElementById('status').textContent = '';
+      estado('');
+      document.body.classList.add('listo');          // revela la barra discreta
+      document.getElementById('salir').hidden = false;
     } catch (error) {
-      document.getElementById('status').textContent = 'No se pudo cargar el juego. Recarga la página para intentarlo de nuevo.';
       console.error(error);
+      estado('No se pudo cargar el juego. Recarga la página (desliza para actualizar).');
     }
   });
+
+  // Pantalla completa: la primera interacción es suficiente permiso.
+  document.addEventListener('pointerdown', () => {
+    if (!document.fullscreenElement && document.fullscreenEnabled) {
+      document.documentElement.requestFullscreen?.({navigationUI: 'hide'}).catch(() => {});
+    }
+  }, {once: true, passive: true});
+
+  const fsBoton = document.getElementById('fullscreen');
+  fsBoton.addEventListener('click', async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await document.documentElement.requestFullscreen({navigationUI: 'hide'});
+    } catch (e) {
+      estado('La pantalla completa no está disponible aquí.');
+      setTimeout(() => estado(''), 2200);
+    }
+  });
+
+  // Barra que se esconde sola mientras juegas.
+  let quieto;
+  function despertar() {
+    document.body.classList.remove('quiet');
+    clearTimeout(quieto);
+    quieto = setTimeout(() => document.body.classList.add('quiet'), 2500);
+  }
+  for (const tipo of ['pointerdown', 'pointermove', 'keydown']) {
+    document.addEventListener(tipo, despertar, {passive: true, capture: true});
+  }
+  despertar();
+
+  // Aviso de rotación: solo en móvil y solo en vertical.
+  const vertical = matchMedia('(orientation: portrait)');
+  const tactil = matchMedia('(pointer: coarse)');
+  const revisar = () => document.getElementById('rota')
+    .classList.toggle('on', vertical.matches && tactil.matches);
+  vertical.addEventListener?.('change', revisar);
+  revisar();
+
+  document.getElementById('salir').addEventListener('click', () => location.reload());
+  document.getElementById('puffle').addEventListener('click', () => window.open('/puffle/', '_blank', 'noopener'));
+
+  // Enganche heredado del captcha del registro.
+  window.grecaptchaSubmit = () => {
+    const player = document.getElementById('penguin-player');
+    if (player && typeof player.finishedCaptcha === 'function') player.finishedCaptcha('houdini');
+  };
 </script>
-<script src="/ruffle/ruffle.js"></script>
+</body>
 </html>

@@ -19,6 +19,11 @@ COPY --from=build /opt/venv /opt/venv
 ENV PATH=/opt/venv/bin:$PATH PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 COPY --from=houdini --chown=10001:10001 houdini /app/houdini/houdini
 COPY --from=houdini --chown=10001:10001 bootstrap.py /app/houdini/bootstrap.py
+COPY --from=puffle --chown=10001:10001 . /app/experiments/puffle_sim/
+COPY --from=production --chown=10001:10001 . /app/production/puffle/
+RUN PYTHONPATH=/app python -m experiments.puffle_sim.houdini_patch \
+    --houdini /app/houdini/houdini --output /tmp/puffle-overlay \
+    && cp -R /tmp/puffle-overlay/. /app/houdini/houdini/ && rm -rf /tmp/puffle-overlay
 COPY --from=dash --chown=10001:10001 dash /app/dash/dash
 COPY --from=dash --chown=10001:10001 locale /app/dash/locale
 COPY --from=dash --chown=10001:10001 autocomplete /app/dash/autocomplete
@@ -27,7 +32,7 @@ COPY --chown=10001:10001 run.py /app/run.py
 COPY --chown=10001:10001 lab_config.py /app/dash/lab_config.py
 COPY --chown=10001:10001 exporter.py /app/exporter.py
 COPY --chown=10001:10001 socket_proxy.py /app/socket_proxy.py
-RUN mkdir -p /app/houdini/logs && chown -R 10001:10001 /app
+RUN mkdir -p /app/houdini/logs /var/lib/puffle && chown -R 10001:10001 /app /var/lib/puffle
 USER 10001:10001
 WORKDIR /app
 ENTRYPOINT ["python", "/app/run.py"]

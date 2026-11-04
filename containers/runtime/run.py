@@ -4,7 +4,9 @@ import runpy
 import sys
 
 mode = os.environ.get('MODE', 'login')
-if mode == 'exporter':
+if mode == 'puffle':
+    runpy.run_module('production.puffle.broker', run_name='__main__')
+elif mode == 'exporter':
     runpy.run_path('/app/exporter.py', run_name='__main__')
 elif mode == 'proxy':
     runpy.run_path('/app/socket_proxy.py', run_name='__main__')
@@ -16,6 +18,9 @@ elif mode == 'dash':
 elif mode in ('login', 'world'):
     os.chdir('/app/houdini')
     sys.path.insert(0, '/app/houdini')
+    if mode == 'world':
+        from production.puffle.world import install
+        install()
     sys.argv = [
         'bootstrap.py', mode,
         '--address', '0.0.0.0',

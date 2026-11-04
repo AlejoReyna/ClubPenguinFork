@@ -1,8 +1,17 @@
 # Club Penguin AS2: Raspberry Pi + Azure
 
+La integración de puffle, música por dispositivo, pruebas y operación de producción
+se describe en [Puffle en producción](docs/ci-cd/puffle-produccion.md). El
+[plan integral](docs/ci-cd/plan-produccion-integral.md) conserva el diagnóstico de
+partida; los estados históricos de esta página no sustituyen la verificación del clúster.
+
 Laboratorio DevOps para practicar Ansible, Terraform, Kubernetes, Azure Pipelines,
 Prometheus y Grafana. El juego y el monitoreo corren en un Raspberry Pi 5 de 8 GB.
 Azure conserva imágenes, estado de Terraform y respaldos. No se crea AKS ni una VM.
+
+La extensión de NPC conectados se documenta en [docs/bots.md](docs/bots.md):
+servicio Python independiente, prueba con Houdini desechable y modo simulado por
+defecto. Su implementación local no implica despliegue ni inferencia real probada.
 
 ## Estado comprobado
 
@@ -14,9 +23,9 @@ Comprobación por SSH y API de Azure, 3 de noviembre de 2026:
 - Consumo inicial del nodo: aproximadamente 1.9 GiB, 58 millicores.
 - El usuario tiene kubeconfig en `/home/pi/.kube/config`.
 - Copia para este laboratorio: `~/.kube/clubpenguin-pi.yaml`, modo 0600.
-- ACR Basic existente: `acrdevopslabn3fc0.azurecr.io`.
-- Cuenta existente para estado: `sttfstate2188627882`, grupo `rg-tfstate`.
-- Se detuvo el AKS anterior `aks-devopslab-lab`, conservando sus recursos;
+- ACR Basic existente: `<CP_ACR_NAME>.azurecr.io` (nombre privado en `deploy.env`).
+- Cuenta existente para estado: `<CP_STATE_STORAGE_ACCOUNT>`, grupo `<CP_STATE_RESOURCE_GROUP>`.
+- Se detuvo el AKS anterior `<AKS anterior>`, conservando sus recursos;
   Azure confirmó `power=Stopped`, `provisioning=Succeeded`.
   Su costo residual es independiente de este laboratorio.
 
@@ -47,10 +56,13 @@ python3 scripts/sync-kubeconfig.py
 kubectl --kubeconfig ~/.kube/clubpenguin-pi.yaml get nodes
 ```
 
-En sesiones posteriores, iniciar/reutilizar el túnel privado:
+En sesiones posteriores, iniciar/reutilizar el túnel privado (host y usuario salen de
+`--host/--user` o de `~/.config/clubpenguin-lab/deploy.env`; ver `docs/ci-cd/agente-mac.md`):
 
 ```bash
-python3 scripts/tunnel.py start
+python3 scripts/tunnel.py start      # reutiliza uno existente; `verify` comprueba que es el Pi
+python3 scripts/tunnel.py verify
+python3 scripts/tunnel.py stop
 ```
 
 El API de Kubernetes se usa mediante `https://127.0.0.1:16443`, con TLS y un túnel
@@ -158,7 +170,7 @@ actual usa `lab-002` para runtime/database y `lab-006` para web, con las rutas d
 cliente corregidas, fondo azul y vista de pantalla completa. Cambiar sólo web no reinicia PostgreSQL ni el mundo.
 
 ```bash
-terraform -chdir=infra/cluster init -backend-config=backend.hcl.example
+terraform -chdir=infra/cluster init -backend-config=backend.hcl  # copia privada de backend.hcl.example
 terraform -chdir=infra/cluster plan -out=release.tfplan
 terraform -chdir=infra/cluster apply release.tfplan
 ```
@@ -169,7 +181,8 @@ estado usa Azure Blob y su bloqueo nativo; las credenciales se protegen con RBAC
 
 ## Validaciones y métricas
 
-Validación local de configuración:
+Validación local de configuración (Terraform, Ansible, Python, shell, JSON, pruebas
+unitarias de los scripts, políticas del pipeline y Helm):
 
 ```bash
 bash scripts/validate.sh
@@ -215,45 +228,52 @@ python3 scripts/backup.py
 
 El script genera un dump de PostgreSQL, restaura en una base temporal `verify_*`,
 comprueba que puede leer las cuentas, elimina sólo esa base de verificación y sube
-el dump y un manifiesto SHA256 a Azure. Conserva copia privada en `.local/backups/`.
+el dump y un manifiesto SHA256 a Azure. Conserva copia privada en `~/.clubpenguin-lab/backups/`.
 La prueba inicial produjo un dump de unos 356 KB y se verificó su presencia en Blob.
 La base se inicializa con el esquema/datos upstream; el conteo incluye esos datos.
 
 No hay una programación diaria: los respaldos se ejecutan manualmente antes de
-apagar o en la etapa de despliegue del pipeline. El Pi apagado no puede generar un
+apagar, y el pipeline respalda **antes** de aplicar cualquier plan que toque datos. El Pi apagado no puede generar un
 respaldo nuevo. El historial de imágenes y respaldos requiere limpieza periódica;
 no hay una regla que borre automáticamente el estado de Terraform.
 
-## Pipeline preparado
+## Pipeline
 
-`azure-pipelines.yml` está escrito y sus comandos se probaron localmente. No se ha
-creado ni ejecutado un pipeline remoto ni publicado este repo en GitHub/Azure Repos.
-Antes de activarlo, resolver la adopción de los recursos del túnel y pasar
-`cloudflared_enabled=true` explícitamente en CD: el `.tfvars` local no viaja a Git.
+GitHub Actions tiene un flujo local para CI y despliegue de actualizaciones de
+imagen a partir de `main`; su activación y prerrequisitos están en
+[`docs/ci-cd/github-actions.md`](docs/ci-cd/github-actions.md). Todavía debe
+versionarse, configurarse y probarse remotamente. El despliegue está apagado
+hasta configurar explícitamente la variable del repositorio.
 
-- CI valida Terraform/Ansible/Helm y construye/prueba imágenes nativas AMD64 en Ubuntu.
-- `deploy=false` por defecto: el CI no tiene credenciales del Pi ni de Azure.
-- Con `deploy=true`, sólo desde `main`, CD requiere un agente Mac confiable en la LAN.
-- El agente requiere SSH al Pi, kubeconfig dedicado, Docker, Terraform, Azure CLI y Ansible.
-- Requiere una conexión Azure con federación de identidad, llamada `clubpenguin-azure`
-  por defecto, y un environment `clubpenguin-lab` con sus controles de despliegue.
-- Dar a esa identidad permisos de publicación en el ACR y de datos en los
-  contenedores de estado/respaldos. El pipeline no administra el AKS anterior.
-- Configurar revisión de PR, rama protegida y las aprobaciones del environment en
-  Azure DevOps. Los valores del YAML no crean esas políticas automáticamente.
+`azure-pipelines.yml` implementa el flujo PR → validación y pruebas sin credenciales;
+`main` → release ARM64, publicación y plan guardado; despliegue explícito → aplicación
+del plan revisado, comprobaciones funcionales y evidencia. **No se ha ejecutado de forma
+remota**: la conexión con GitHub, la service connection federada, el agente Mac, el
+environment y las políticas de rama se crean fuera del repositorio.
 
-Para Azure Repos, la validación de PR se conecta mediante branch policies; la clave
-`pr` del YAML sirve para proveedores que la soportan, como GitHub.
+- Despliegue real desactivado por defecto (`deploy=false`, `release=false`).
+- Documentación completa en [`docs/ci-cd/`](docs/ci-cd/README.md): configuración privada,
+  GitHub y Azure DevOps, agente y túnel, primera ejecución, adopción del conector,
+  respaldos y rollback, observabilidad y la matriz de etapas.
+- Etiquetas de imagen **por componente** (`rt-…`, `db-…`, `web-…`), derivadas del
+  contenido: un cambio solo de frontend no reinicia PostgreSQL. `terraform.tfvars` con
+  `image_tag`/`web_image_tag` sigue funcionando.
+- `infra/cluster` lo despliega el pipeline; `infra/cloud` (token de lectura del Pi,
+  contenedor de respaldos) lo aplica un operador.
+- Valores reales (dominio, red, Pi, nombres de Azure) en `~/.config/clubpenguin-lab/deploy.env`
+  del agente; el repositorio solo contiene valores de ejemplo. `lan_cidr` debe sobrescribirse:
+  el valor por defecto reescribiría la política de red viva.
 
 ## Estado remoto y almacenamiento
 
 Preparar el backend una sola vez, con sesión Azure CLI y permiso de datos Blob:
 
 ```bash
-az storage container create --account-name sttfstate2188627882 \
+az storage container create --account-name "<CP_STATE_STORAGE_ACCOUNT>" \
   --auth-mode login --name tfstate-clubpenguin --public-access off
 
-terraform -chdir=infra/cloud init -backend-config=backend.hcl.example
+# backend.hcl y terraform.tfvars son privados (ignorados); copiar de los .example
+terraform -chdir=infra/cloud init -backend-config=backend.hcl
 terraform -chdir=infra/cloud plan \
   -var=subscription_id=00000000-0000-0000-0000-000000000000 -out=cloud.tfplan
 terraform -chdir=infra/cloud apply cloud.tfplan

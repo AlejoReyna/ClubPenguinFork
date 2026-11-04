@@ -1,0 +1,26 @@
+serverFiles:
+  prometheus.yml:
+    rule_files:
+      - /etc/config/recording_rules.yml
+      - /etc/config/alerting_rules.yml
+      - /etc/config/puffle_rules.yml
+      - /etc/config/rules
+      - /etc/config/alerts
+  puffle_rules.yml:
+    groups:
+      - name: puffle-availability
+        rules:
+          - alert: PuffleBrokerUnavailable
+            expr: (kube_deployment_status_replicas_available{namespace="clubpenguin",deployment="puffle"} < 1) and on(namespace,deployment) (kube_deployment_spec_replicas{namespace="clubpenguin",deployment="puffle"} > 0)
+            for: 2m
+            labels:
+              severity: warning
+            annotations:
+              summary: El servicio del puffle no está disponible
+          - alert: PuffleQueueSaturated
+            expr: puffle_jobs >= 24
+            for: 2m
+            labels:
+              severity: warning
+            annotations:
+              summary: La cola del puffle está cerca del límite

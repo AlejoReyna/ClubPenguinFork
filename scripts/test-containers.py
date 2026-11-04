@@ -1,83 +1,199 @@
 #!/usr/bin/env python3
-"""Test an isolated release before publishing or deploying it."""
+"""Test an isolated release before publishing or deploying it.
+
+Everything runs in containers on a private, *internal* Docker network (no route to
+the Internet or to the Raspberry Pi), with throwaway volumes. Consequently no test
+can reach Moonshot or any other paid API, and nothing here touches real data.
+
+Checks, in order:
+  1. PostgreSQL, Redis, login, Glaciar, Dash and the socket proxy start and listen.
+  2. The internal network really has no egress (a connection to a public IP fails).
+  3. Two synthetic accounts register, authenticate and share room 100.
+  4. The WebSocket proxy forwards the AS2 handshake from an allowed origin.
+  5. With --web-tag: nginx -> proxy -> login works for allowed origins, refuses other
+     origins and paths, serves /healthz and /servers.xml, and registration works
+     through nginx (the route the browser uses).
+
+Cleanup removes only containers, volumes and the network carrying this run's label.
+"""
 import argparse
 import os
 from pathlib import Path
+import re
 import secrets
 import subprocess
+import sys
 import tempfile
 import time
 
-parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument('--tag', default='lab-002')
-args = parser.parse_args()
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import lablib  # noqa: E402
+
 root = Path(__file__).resolve().parents[1]
-prefix = 'penguin-test-' + secrets.token_hex(4)
+TAG_RE = re.compile(r'^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$')
+FORBIDDEN_ENV = re.compile(r'(?i)(moonshot|kimi|openai|anthropic).*(key|token|secret)|^(MOONSHOT|KIMI)_')
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('--tag', default='lab-002', help='tag for components without --component-tag')
+    parser.add_argument('--component-tag', action='append', default=[], metavar='NAME=TAG')
+    parser.add_argument('--web-tag', help='also test the web image (nginx + proxy + registration route)')
+    parser.add_argument('--bots-tag', help='also test a separate bots service against real, disposable Houdini')
+    parser.add_argument('--puffle', action='store_true', help='test the production world and two isolated companions')
+    parser.add_argument('--keep-logs', action='store_true', help='print container logs even when tests pass')
+    args = parser.parse_args()
+    tags = {name: args.tag for name in ('runtime', 'database')}
+    for item in args.component_tag:
+        name, _, value = item.partition('=')
+        tags[name] = value
+    if args.web_tag:
+        tags['web'] = args.web_tag
+    if args.bots_tag:
+        tags['bots'] = args.bots_tag
+    for name, value in tags.items():
+        if not TAG_RE.fullmatch(value) or value == 'latest':
+            raise SystemExit(f'Invalid image tag for {name}')
+    return args, tags
+
+
+args, tags = parse_args()
+run_id = secrets.token_hex(4)
+prefix = 'penguin-test-' + run_id
+label = f'clubpenguin.lab.test-run={run_id}'
 containers = []
 
 
-def run(command, **kwargs):
-    return subprocess.run(command, check=True, capture_output=True, text=True, **kwargs)
+def docker(command, timeout=240, **kwargs):
+    return subprocess.run(['docker'] + command, check=True, capture_output=True, text=True, timeout=timeout, **kwargs)
+
+
+def exec_script(container, script_text, *argv):
+    return docker(['exec', '-i', container, 'python', '-'] + list(argv), input=script_text)
+
+
+def cleanup():
+    """Remove only what this run created (identified by its own label)."""
+    found = subprocess.run(['docker', 'ps', '-aq', '--filter', f'label={label}'], capture_output=True, text=True).stdout.split()
+    for name in found:
+        subprocess.run(['docker', 'rm', '-f', '-v', name], capture_output=True)
+    subprocess.run(['docker', 'network', 'rm', prefix], capture_output=True)
+    left = subprocess.run(['docker', 'ps', '-aq', '--filter', f'label={label}'], capture_output=True, text=True).stdout.split()
+    networks = subprocess.run(['docker', 'network', 'ls', '-q', '--filter', f'label={label}'], capture_output=True, text=True).stdout.split()
+    if left or networks:
+        print(f'WARNING: {len(left)} containers and {len(networks)} networks from this run were not removed')
+
+
+def show_logs():
+    for name in containers:
+        result = subprocess.run(['docker', 'logs', '--tail', '8', name], capture_output=True, text=True)
+        print(name + ':\n' + lablib.redact(result.stdout + result.stderr)[-1200:])
 
 
 try:
-    run(['docker', 'network', 'create', prefix])
+    # --internal: containers can talk to each other but have no route outward.
+    docker(['network', 'create', '--internal', '--label', label, prefix])
     with tempfile.TemporaryDirectory(prefix='penguin-test-') as temp:
-        env = Path(temp) / 'runtime.env'
-        env.write_text('POSTGRES_USER=houdini\nPOSTGRES_DB=houdini\nPOSTGRES_PASSWORD=' + secrets.token_hex(16)
-                       + '\nPOSTGRES_HOST=postgres\nREDIS_HOST=redis\n')
-        env.chmod(0o600)
+        env_file = Path(temp) / 'runtime.env'
+        env_text = ('POSTGRES_USER=houdini\nPOSTGRES_DB=houdini\nPOSTGRES_PASSWORD=' + secrets.token_hex(16)
+                    + '\nPOSTGRES_HOST=postgres\nREDIS_HOST=redis\n')
+        if any(FORBIDDEN_ENV.search(line.split('=', 1)[0]) for line in env_text.splitlines()):
+            raise SystemExit('Provider credentials must never reach test containers')
+        env_file.write_text(env_text)
+        env_file.chmod(0o600)
 
-        def start(alias, image, mode=None):
+        def start(alias, image, mode=None, extra=None, network=None):
             name = prefix + '-' + alias
-            command = ['docker', 'run', '-d', '--name', name, '--network', prefix,
-                       '--network-alias', alias, '--env-file', str(env)]
+            command = ['run', '-d', '--name', name, '--label', label]
+            if mode != 'proxy':  # the proxy needs no database credentials
+                command += ['--env-file', str(env_file)]
+            command += ['--network', network] if network else ['--network', prefix, '--network-alias', alias]
             if mode:
                 command += ['-e', 'MODE=' + mode]
-            run(command + [image])
+            command += extra or []
+            docker(command + [image])
             containers.append(name)
             return name
 
-        postgres = start('postgres', f'clubpenguin/database:{args.tag}')
+        runtime = f'clubpenguin/runtime:{tags["runtime"]}'
+        puffle_extra = []
+        if args.puffle:
+            service_secret = Path(temp) / 'puffle-secret'
+            service_secret.write_text(secrets.token_hex(32))
+            service_secret.chmod(0o444)  # synthetic credential in the throwaway network
+            puffle_extra = ['-e', 'PUFFLE_ENABLED=true', '-e', 'PUFFLE_SECRET_FILE=/etc/puffle/secret',
+                            '-v', f'{service_secret}:/etc/puffle/secret:ro']
+        postgres = start('postgres', f'clubpenguin/database:{tags["database"]}')
         start('redis', 'redis:7.4-alpine')
-        for _ in range(40):
-            ready = subprocess.run(['docker', 'exec', postgres, 'pg_isready', '-U', 'houdini', '-d', 'houdini'], capture_output=True)
+        for _ in range(60):
+            ready = subprocess.run(['docker', 'exec', postgres, 'pg_isready', '-h', '127.0.0.1', '-U', 'houdini', '-d', 'houdini'], capture_output=True)
             if ready.returncode == 0:
                 break
             time.sleep(0.5)
         else:
             raise RuntimeError('Postgres did not start')
-        for alias, mode in [('login', 'login'), ('glaciar', 'world'), ('dash', 'dash'), ('proxy', 'proxy')]:
-            start(alias, f'clubpenguin/runtime:{args.tag}', mode)
-        # Wait for the application listeners, not just container startup.
-        readiness = '''import socket,time
-for host,port in [('login',6112),('glaciar',9876),('dash',3000),('proxy',8765)]:
- for attempt in range(40):
-  try:
-   s=socket.create_connection((host,port),timeout=1);s.close();break
-  except OSError:time.sleep(0.5)
- else:raise SystemExit('An application listener did not become ready')
-'''
-        run(['docker', 'exec', '-i', prefix + '-dash', 'python', '-'], input=readiness)
-        result = run(['docker', 'exec', '-i', prefix + '-dash', 'python', '-'], input=(root / 'scripts/game-smoke.py').read_text())
-        print(result.stdout.strip())
-        proxy_test = '''import asyncio,websockets
-async def main():
- async with websockets.connect('ws://proxy:8765/socket/login',origin='http://localhost') as ws:
-  await ws.send(b'<msg t="sys"><body action="verChk" r="0"><ver v="153"/></body></msg>\\0')
-  reply=await asyncio.wait_for(ws.recv(),timeout=10)
-  assert b'apiOK' in reply
-asyncio.run(main())
-'''
-        run(['docker', 'exec', '-i', prefix + '-dash', 'python', '-'], input=proxy_test)
+        for alias, mode in [('login', 'login'), ('glaciar', 'world'), ('dash', 'dash')]:
+            start(alias, runtime, mode, extra=puffle_extra if mode == 'world' else [])
+        start('proxy', runtime, 'proxy')
+        start('puffle', runtime, 'puffle', extra=puffle_extra or ['-e', 'PUFFLE_ENABLED=false'])
+        dash = prefix + '-dash'
+
+        waits = [('login', 6112), ('glaciar', 9876), ('dash', 3000), ('proxy', 8765), ('puffle', 9103)]
+        if args.web_tag:
+            web = start('web', f'clubpenguin/web:{tags["web"]}')
+            # Like the Kubernetes pod: the proxy shares the web container's network namespace,
+            # which is where nginx sends /socket/ (127.0.0.1:8765).
+            start('webproxy', runtime, 'proxy', extra=['-e', 'ALLOWED_ORIGINS=lab.test'], network=f'container:{web}')
+            waits.append(('web', 8080))
+        readiness = ('import socket,time\nfor host,port in %r:\n for attempt in range(80):\n  try:\n'
+                     '   s=socket.create_connection((host,port),timeout=1);s.close();break\n'
+                     '  except OSError:time.sleep(0.5)\n else:raise SystemExit("An application listener did not become ready")\n'
+                     % (waits,))
+        exec_script(dash, readiness)
+
+        # 2. The test network must not reach the outside world.
+        egress = ('import socket\ntry:\n socket.create_connection(("1.1.1.1",443),timeout=3)\n'
+                  'except OSError:\n print("blocked")\nelse:\n raise SystemExit("EGRESS POSSIBLE")\n')
+        if 'blocked' not in exec_script(dash, egress).stdout:
+            raise RuntimeError('The isolated network has outbound access')
+        print('PASS: test network has no outbound route (paid APIs are unreachable).')
+
+        smoke = (root / 'scripts/game-smoke.py').read_text()
+        probe = (root / 'scripts/ws_probe.py').read_text()
+        print(exec_script(dash, smoke).stdout.strip())
+
+        exec_script(dash, probe, '--url', 'ws://proxy:8765/socket/login', '--origin', 'http://localhost')
         print('PASS: WebSocket proxy forwards the AS2 handshake to the allowed login endpoint.')
-except subprocess.CalledProcessError as exc:
-    print((exc.stderr or '')[-2000:])
-    for name in containers:
-        result = subprocess.run(['docker', 'logs', '--tail', '8', name], capture_output=True, text=True)
-        print(name + ':\n' + (result.stdout + result.stderr)[-1200:])
+
+        if args.web_tag:
+            http = ('import sys,urllib.request\nr=urllib.request.urlopen(sys.argv[1],timeout=10)\n'
+                    'body=r.read().decode()\nassert r.status==200,r.status\nassert sys.argv[2] in body,"unexpected body"\n')
+            exec_script(dash, http, 'http://web:8080/healthz', 'ok')
+            exec_script(dash, http, 'http://web:8080/servers.xml', 'id="3101"')
+            print('PASS: nginx serves /healthz and /servers.xml.')
+            web_url = 'ws://web:8080/socket/login'
+            exec_script(dash, probe, '--url', web_url, '--origin', 'http://localhost')
+            exec_script(dash, probe, '--url', web_url, '--origin', 'https://lab.test')
+            exec_script(dash, probe, '--url', web_url, '--origin', 'https://evil.test', '--expect-reject')
+            exec_script(dash, probe, '--url', 'ws://web:8080/socket/unknown', '--origin', 'http://localhost', '--expect-reject')
+            print('PASS: nginx -> proxy -> login accepts allowed origins and refuses other origins and paths.')
+            print(exec_script(dash, smoke, '--dash-url', 'http://web:8080').stdout.strip().replace('PASS:', 'PASS (via nginx):', 1))
+        if args.bots_tag:
+            from bots_integration import check_bots
+            check_bots(root, docker, exec_script, dash, postgres, prefix + '-glaciar',
+                       prefix, label, tags['bots'], Path(temp))
+        if args.puffle:
+            from puffle_integration import check_puffle
+            check_puffle(root, docker, exec_script, dash, postgres)
+        if args.keep_logs:
+            show_logs()
+except (subprocess.CalledProcessError, RuntimeError, subprocess.TimeoutExpired) as exc:
+    detail = getattr(exc, 'stdout', None) or ''
+    print(lablib.redact(((getattr(exc, 'stderr', '') or '') + detail)[-2000:]) or str(exc))
+    show_logs()
+    cleanup()
     raise SystemExit(1)
-finally:
-    for name in reversed(containers):
-        subprocess.run(['docker', 'rm', '-f', '-v', name], capture_output=True)
-    subprocess.run(['docker', 'network', 'rm', prefix], capture_output=True)
+except BaseException:
+    cleanup()
+    raise
+cleanup()

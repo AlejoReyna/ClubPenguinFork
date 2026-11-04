@@ -1,11 +1,15 @@
 """Bridge Ruffle WebSockets to the two allowed game endpoints only."""
 import asyncio
+import os
 from urllib.parse import urlparse
 
 import websockets
 
 TARGETS = {'/socket/login': ('login', 6112), '/socket/world': ('glaciar', 9876)}
-ALLOWED_ORIGINS = {'192.168.0.10', '127.0.0.1', 'localhost', 'club.example.com'}
+# Defaults for production; a lab can extend them with ALLOWED_ORIGINS (comma-separated),
+# e.g. to test from a phone on the LAN without touching this file.
+_extra = {o.strip() for o in os.environ.get('ALLOWED_ORIGINS', '').split(',') if o.strip()}
+ALLOWED_ORIGINS = {'192.168.0.10', '127.0.0.1', 'localhost', 'club.example.com'} | _extra
 
 
 async def handle(websocket, path):

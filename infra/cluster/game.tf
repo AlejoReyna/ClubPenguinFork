@@ -3,17 +3,52 @@ variable "game_enabled" {
   default = false
 }
 variable "image_tag" {
+  type        = string
+  default     = "lab-001"
+  description = "Fallback tag for runtime and database when their own tags are not set."
+}
+
+# Per-component tags let a release change one image without touching the others
+# (for example, a frontend-only release must not restart PostgreSQL). Both fall
+# back to image_tag, so existing tfvars keep working unchanged.
+variable "runtime_image_tag" {
+  type        = string
+  default     = null
+  description = "Tag of clubpenguin/runtime (login, world, dash, exporter and the socket proxy)."
+}
+
+variable "database_image_tag" {
+  type        = string
+  default     = null
+  description = "Tag of clubpenguin/database (PostgreSQL)."
+}
+
+# Where the `cloud` root stores its state. No default: deploy.py passes it from
+# deploy.env, and manual runs read it from the private terraform.tfvars.
+variable "cloud_state" {
+  type = object({
+    resource_group_name  = string
+    storage_account_name = string
+    container_name       = string
+    key                  = string
+  })
+}
+
+# LAN allowed to reach the game ports. The default is the anonymized sample from the public
+# repository; a real deployment MUST override it (the pipeline requires CP_LAN_CIDR), or the
+# live policy would be rewritten to the sample range.
+variable "lan_cidr" {
   type    = string
-  default = "lab-001"
+  default = "192.168.0.0/24"
 }
 
 data "terraform_remote_state" "cloud" {
   backend = "azurerm"
   config = {
-    resource_group_name  = "rg-tfstate"
-    storage_account_name = "sttfstate2188627882"
-    container_name       = "tfstate-clubpenguin"
-    key                  = "cloud.tfstate"
+    resource_group_name  = var.cloud_state.resource_group_name
+    storage_account_name = var.cloud_state.storage_account_name
+    container_name       = var.cloud_state.container_name
+    key                  = var.cloud_state.key
     use_azuread_auth     = true
   }
 }
@@ -22,8 +57,8 @@ locals {
   game_namespace = kubernetes_namespace_v1.lab["clubpenguin"].metadata[0].name
   game_labels    = { "app.kubernetes.io/part-of" = "clubpenguin-lab" }
   registry       = data.terraform_remote_state.cloud.outputs.registry_login_server
-  runtime_image  = "${local.registry}/clubpenguin/runtime:${var.image_tag}"
-  database_image = "${local.registry}/clubpenguin/database:${var.image_tag}"
+  runtime_image  = "${local.registry}/clubpenguin/runtime:${coalesce(var.runtime_image_tag, var.image_tag)}"
+  database_image = "${local.registry}/clubpenguin/database:${coalesce(var.database_image_tag, var.image_tag)}"
   runtimes = var.game_enabled ? {
     login    = { mode = "login", port = 6112, cpu = "250m", memory = "384Mi", node_port = 30612 }
     glaciar  = { mode = "world", port = 9876, cpu = "750m", memory = "768Mi", node_port = 30976 }
@@ -241,7 +276,7 @@ resource "kubernetes_deployment_v1" "runtime" {
             container_port = each.value.port
           }
           dynamic "env" {
-            for_each = {
+            for_each = merge({
               MODE           = each.value.mode
               PORT           = tostring(each.value.port)
               POSTGRES_HOST  = "postgres"
@@ -249,7 +284,11 @@ resource "kubernetes_deployment_v1" "runtime" {
               POSTGRES_DB    = "houdini"
               REDIS_HOST     = "redis"
               WORLD_CAPACITY = "20"
-            }
+              }, each.key == "glaciar" ? {
+              PUFFLE_ENABLED         = tostring(var.puffle_enabled)
+              PUFFLE_SECRET_FILE     = "/etc/puffle/secret"
+              PUFFLE_ALLOWED_PLAYERS = join(",", var.puffle_allowed_players)
+            } : {})
             content {
               name  = env.key
               value = env.value
@@ -278,6 +317,24 @@ resource "kubernetes_deployment_v1" "runtime" {
             tcp_socket { port = each.value.port }
             failure_threshold = 30
             period_seconds    = 5
+          }
+          dynamic "volume_mount" {
+            for_each = each.key == "glaciar" && var.puffle_enabled ? [1] : []
+            content {
+              name       = "puffle-secret"
+              mount_path = "/etc/puffle"
+              read_only  = true
+            }
+          }
+        }
+        dynamic "volume" {
+          for_each = each.key == "glaciar" && var.puffle_enabled ? [1] : []
+          content {
+            name = "puffle-secret"
+            secret {
+              secret_name  = var.puffle_service_secret
+              default_mode = "0440"
+            }
           }
         }
       }
@@ -310,7 +367,13 @@ resource "kubernetes_network_policy_v1" "game" {
     namespace = local.game_namespace
   }
   spec {
-    pod_selector {}
+    pod_selector {
+      match_expressions {
+        key      = "app"
+        operator = "NotIn"
+        values   = ["puffle"]
+      }
+    }
     policy_types = ["Ingress"]
     ingress {
       from {
@@ -328,7 +391,7 @@ resource "kubernetes_network_policy_v1" "game" {
     }
     ingress {
       from {
-        ip_block { cidr = "192.168.0.0/24" }
+        ip_block { cidr = var.lan_cidr }
       }
       dynamic "ports" {
         for_each = [6112, 9876, 8080]
