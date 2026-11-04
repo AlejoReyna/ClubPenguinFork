@@ -43,6 +43,7 @@ CONFIG_SPEC = {
     'CP_PI_HOST': (IP_OR_HOST_RE, None, 'Address of the Raspberry Pi on the LAN'),
     'CP_PI_USER': (USER_RE, None, 'SSH user on the Raspberry Pi'),
     'CP_LAN_CIDR': (CIDR_RE, None, 'LAN range allowed to reach the game ports (network policy game-ingress)'),
+    'CP_PROXY_EXTRA_HOSTS': (re.compile(r'^(?:[A-Za-z0-9][A-Za-z0-9.-]*(?:,[A-Za-z0-9][A-Za-z0-9.-]*)*)?$'), '', 'Comma-separated extra WebSocket origin hosts retained by clean checkouts'),
     'CP_ACR_NAME': (AZURE_NAME_RE, None, 'Name of the existing Azure Container Registry'),
     'CP_STATE_RESOURCE_GROUP': (RG_RE, None, 'Resource group of the Terraform state account'),
     'CP_STATE_STORAGE_ACCOUNT': (BLOB_RE, None, 'Storage account for Terraform state and backups'),

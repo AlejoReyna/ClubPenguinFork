@@ -30,6 +30,8 @@ créditos disponibles. No se ejecutan inferencias reales desde CI.
    Vacío permite a cada jugador humano emparejar voluntariamente su dispositivo.
    `CP_RELEASE_PINS=database=lab-002` conserva la base actual al resolver releases
    automáticas; cambiar ese pin requiere una actualización deliberada y revisada.
+   Fijar `CP_PROXY_EXTRA_HOSTS` con los mismos hosts adicionales del proxy vivo:
+   los checkouts limpios del runner no tienen el `terraform.tfvars` del operador.
 4. Construir y probar runtime/web ARM64. El build completo descarga FFDec 26.4.0
    si falta y verifica tanto su distribución como el JAR por SHA-256. Solo se
    parchea una copia de las fuentes upstream fijadas y del SWF original.
