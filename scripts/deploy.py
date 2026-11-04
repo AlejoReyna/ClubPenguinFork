@@ -132,6 +132,12 @@ def live_objects(cfg):
     return live
 
 
+def puffle_settings(manifest, cfg):
+    supported = manifest.get('features', {}).get('puffle') is True
+    return {'puffle_enabled': supported and cfg['CP_PUFFLE_ENABLED'] == 'true',
+            'puffle_broker_replicas': int(cfg['CP_PUFFLE_BROKER_REPLICAS']) if supported else 0}
+
+
 def cmd_plan(args):
     cfg = lablib.load_config('plan')
     ws = workspace()
@@ -139,8 +145,7 @@ def cmd_plan(args):
     manifest = json.loads(Path(args.manifest).read_text())
     values = release.manifest_to_tfvars(manifest, cfg['CP_PUBLIC_HOSTNAME'])
     values.update({
-        'puffle_enabled': manifest.get('features', {}).get('puffle') is True and cfg['CP_PUFFLE_ENABLED'] == 'true',
-        'puffle_broker_replicas': int(cfg['CP_PUFFLE_BROKER_REPLICAS']) if manifest.get('features', {}).get('puffle') is True else 0,
+        **puffle_settings(manifest, cfg),
         'puffle_allowed_players': [int(x) for x in cfg['CP_PUFFLE_ALLOWED_PLAYERS'].split(',') if x],
         'public_hostname': cfg['CP_PUBLIC_HOSTNAME'], 'kubeconfig_path': cfg['CP_KUBECONFIG'], 'lan_cidr': cfg['CP_LAN_CIDR'],
         'cloud_state': {'resource_group_name': cfg['CP_STATE_RESOURCE_GROUP'],
