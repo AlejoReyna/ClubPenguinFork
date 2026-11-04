@@ -26,31 +26,6 @@
       ansible.builtin.command: systemctl is-active k3s
       changed_when: false
 
-    - name: Wait for the existing Kubernetes node to be ready
-      ansible.builtin.command:
-        argv:
-          - kubectl
-          - --kubeconfig
-          - "{{ ansible_facts.user_dir }}/.kube/config"
-          - wait
-          - --for=condition=Ready
-          - node
-          - --all
-          - --timeout=30s
-      changed_when: false
-
-    - name: Show current node usage
-      ansible.builtin.command:
-        argv:
-          - kubectl
-          - --kubeconfig
-          - "{{ ansible_facts.user_dir }}/.kube/config"
-          - top
-          - nodes
-      changed_when: false
-      register: node_usage
-
-    - name: Report node usage
-      ansible.builtin.debug:
-        var: node_usage.stdout_lines
+    # Kubernetes destination, architecture and Ready state are checked from
+    # the operator with the dedicated kubeconfig by scripts/tunnel.py verify.
 

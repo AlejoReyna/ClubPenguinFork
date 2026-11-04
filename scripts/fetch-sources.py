@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Download the pinned upstream sources and the verified Ruffle release."""
+"""Download the pinned upstream sources and the verified Ruffle release.
+
+--only limits the download (e.g. `--only houdini,dash,ruffle` skips the ~1.7 GiB of
+legacy media, which backend tests do not need).
+"""
+import argparse
 import hashlib
 import json
 from pathlib import Path
@@ -8,10 +13,18 @@ import urllib.request
 import zipfile
 
 root = Path(__file__).resolve().parents[1]
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--only', help='comma-separated subset of: houdini,dash,legacy-media,ruffle')
+args = parser.parse_args()
+wanted = set(args.only.split(',')) if args.only else None
 vendor = root / 'vendor'
 vendor.mkdir(exist_ok=True)
 sources = json.loads((root / 'sources.json').read_text())
+if wanted and not wanted <= set(sources) | {'ruffle'}:
+    raise SystemExit('Unknown source in --only')
 for name, source in sources.items():
+    if wanted is not None and name not in wanted:
+        continue
     path = vendor / name
     if not path.exists():
         subprocess.run(['git', 'clone', '--depth', '1', source['url'], str(path)], check=True)
@@ -27,6 +40,8 @@ for name, source in sources.items():
         raise SystemExit(f'{name}: tracked files differ from the pinned source.')
     print(f'{name}: {actual}')
 
+if wanted is not None and 'ruffle' not in wanted:
+    raise SystemExit(0)
 archive = root / '.local/ruffle-0.7.1.zip'
 archive.parent.mkdir(mode=0o700, exist_ok=True)
 if not archive.exists():

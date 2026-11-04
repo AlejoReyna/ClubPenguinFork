@@ -50,6 +50,7 @@
 <nav class="bar" aria-label="Controles">
   <button id="salir" type="button" hidden>Salir</button>
   <button id="fullscreen" type="button" aria-label="Pantalla completa">⛶</button>
+  <button id="puffle" type="button">Mi puffle</button>
 </nav>
 <p id="estado" role="status" class="on">Cargando el glaciar…</p>
 
@@ -88,6 +89,15 @@
   // Carga el juego a la primera, sin lobby: el cliente ES la interfaz.
   window.addEventListener('load', async () => {
     try {
+      const build = await fetch('/puffle/build.json', {cache: 'no-store'}).then(r => {
+        if (!r.ok) throw new Error('No se pudo verificar el cliente.');
+        return r.json();
+      });
+      // A new query also bypasses media cached by the previous service worker.
+      window.RufflePlayer.config.urlRewriteRules.unshift([
+        /^(?:.*\/)?engine\.swf(?:\?.*)?$/,
+        location.origin + '/media/play/v2/client/engine.swf?v=' + encodeURIComponent(build['engine.swf'])
+      ]);
       const player = window.RufflePlayer.newest().createPlayer();
       player.id = 'penguin-player';
       document.getElementById('game').appendChild(player);
@@ -143,6 +153,7 @@
   revisar();
 
   document.getElementById('salir').addEventListener('click', () => location.reload());
+  document.getElementById('puffle').addEventListener('click', () => window.open('/puffle/', '_blank', 'noopener'));
 
   // Enganche heredado del captcha del registro.
   window.grecaptchaSubmit = () => {

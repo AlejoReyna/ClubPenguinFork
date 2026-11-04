@@ -1,19 +1,22 @@
 variable "subscription_id" { type = string }
 variable "registry_name" {
-  type    = string
-  default = "acrdevopslabn3fc0"
+  type = string
 }
 variable "registry_resource_group" {
-  type    = string
-  default = "rg-devopslab-lab"
+  type = string
 }
 variable "storage_account_name" {
-  type    = string
-  default = "sttfstate2188627882"
+  type = string
 }
 variable "storage_resource_group" {
-  type    = string
-  default = "rg-tfstate"
+  type = string
+}
+
+# Repositories the Raspberry may pull from (read-only). Add "bots" here once an
+# image for it exists; never grant the whole registry.
+variable "pull_repositories" {
+  type    = list(string)
+  default = ["runtime", "database", "web"]
 }
 
 # These resources already have owners in other Terraform states.
@@ -42,7 +45,7 @@ resource "azurerm_container_registry_scope_map" "pi_pull" {
   container_registry_name = data.azurerm_container_registry.existing.name
   resource_group_name     = var.registry_resource_group
   actions = flatten([
-    for repository in ["runtime", "database", "web"] : [
+    for repository in var.pull_repositories : [
       "repositories/clubpenguin/${repository}/content/read",
       "repositories/clubpenguin/${repository}/metadata/read"
     ]

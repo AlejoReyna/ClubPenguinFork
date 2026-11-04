@@ -1,5 +1,5 @@
 /* Service worker de Glaciar: precache mínimo y cache-first para media pesada. */
-const VERSION = 'glaciar-m1';
+const VERSION = 'glaciar-puffle-v1';
 const ESTATICO = `pre-${VERSION}`;
 const MEDIA = `media-${VERSION}`;
 const PRECACHE = ['/', '/register.html', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/apple-touch-icon.png'];
@@ -23,7 +23,12 @@ self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   // Solo same-origin GET; nunca interfiere con sockets, salud, registro ni navegación offline.
   if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
-  if (url.pathname.startsWith('/socket/') || url.pathname === '/healthz' || url.pathname.startsWith('/create/')) return;
+  if (url.pathname.startsWith('/socket/') || url.pathname === '/healthz' || url.pathname.startsWith('/create/') || url.pathname.startsWith('/puffle/')) return;
+  // The protocol renderer must match the deployed world, including after rollback.
+  if (url.pathname.endsWith('/engine.swf')) {
+    event.respondWith(fetch(event.request, {cache: 'no-store'}));
+    return;
+  }
 
   // Media y runtime de Ruffle: cache-first con refresco en segundo plano (180 días de vida útil).
   if (url.pathname.startsWith('/media/') || url.pathname.startsWith('/ruffle/') || url.pathname.startsWith('/play/')) {

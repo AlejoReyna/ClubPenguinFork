@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tu puffle · Glaciar</title>
+<style>body{max-width:640px;margin:40px auto;padding:0 22px;font:18px/1.6 system-ui;color:#143044}a{color:#00529b}code{font-size:14px;overflow-wrap:anywhere}li{margin:12px 0}</style>
+<h1>Tu puffle, tu computadora</h1>
+<p>Conecta tu puffle para conversar y pedir música desde tu propio iglú. Tus cuentas permanecen en tu computadora; las visitas pueden ver los globos, pero no controlar tu música.</p>
+<ol>
+<li><a href="/puffle/companion.zip" download>Descarga el acompañante</a> y extrae el archivo. Requiere Python 3.11 o posterior. Para Música y Safari necesitas una Mac.</li>
+<li>Desde la carpeta extraída, ejecuta <code>python3 -m experiments.puffle_sim.connect_server</code>. Abre <a href="http://127.0.0.1:1455/">la conexión local</a> y conecta voluntariamente tu cuenta. Usar ChatGPT puede consumir cuota y créditos disponibles; administra tus límites antes de continuar.</li>
+<li>Ejecuta <code id="pair">python3 -m production.puffle.companion pair --url URL</code>. Entra a tu iglú y escribe el código que te muestre. Confirma que el pingüino indicado sea el tuyo en tu computadora.</li>
+<li>Para conversar y usar Música, ejecuta <code>python3 -m production.puffle.companion run --music-mac</code>. Para Apple Music en Safari usa <code>run --music-safari-window-id ID</code>, con tu ventana dedicada abierta. Para Spotify usa <code>run --spotify</code>, después de conectarlo en la página local.</li>
+</ol>
+<p>Puedes detener el acompañante con Ctrl+C. Para retirar el vínculo escribe <code>puffle desconectar</code> en tu iglú o ejecuta <code>python3 -m production.puffle.companion disconnect</code>. Desconecta tus cuentas desde la página local si también quieres revocar su acceso.</p>
+<p><a href="/">Volver al juego</a></p>
+<script>document.getElementById('pair').textContent='python3 -m production.puffle.companion pair --url '+location.origin;</script>
+</html>

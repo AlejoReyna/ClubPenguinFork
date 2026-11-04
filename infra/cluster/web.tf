@@ -60,7 +60,7 @@ resource "kubernetes_deployment_v1" "web" {
           }
           env {
             name  = "ALLOWED_ORIGINS"
-            value = var.public_hostname
+            value = join(",", distinct(compact(concat([var.public_hostname], var.proxy_extra_hosts))))
           }
           port { container_port = 8765 }
           resources {
@@ -80,6 +80,12 @@ resource "kubernetes_deployment_v1" "web" {
       }
     }
   }
+  # The first pull of a new web image (media layers) took ~8.5 minutes on the Pi's link;
+  # the provider's 10-minute default would fail an otherwise healthy rollout.
+  timeouts {
+    create = "25m"
+    update = "25m"
+  }
   depends_on = [kubernetes_deployment_v1.runtime]
 }
 
@@ -98,4 +104,10 @@ resource "kubernetes_service_v1" "web" {
       node_port   = 30080
     }
   }
+}
+
+variable "proxy_extra_hosts" {
+  description = "Additional hostnames or IPs allowed by the WebSocket proxy."
+  type        = list(string)
+  default     = []
 }
