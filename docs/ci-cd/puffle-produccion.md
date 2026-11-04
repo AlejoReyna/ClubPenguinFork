@@ -5,6 +5,12 @@ sirve `/puffle/`, el acompañante descargable y sus hashes. `MODE=puffle` ejecut
 el broker privado con una réplica y un PVC de hashes de emparejamiento. La opción
 `puffle_enabled` controla la función. La base de datos del juego no cambia de imagen.
 
+El fondo personalizado 19155 ya está registrado en la base de producción. Sus
+SWF de tarjeta e icono viven en `containers/web/custom-clothing` y se superponen
+a los medios originales al construir la web. La prueba de contenedores verifica
+ambos archivos por hash. El despliegue conserva la base existente; recuperar el
+registro del ítem depende del respaldo, no de reconstruir la imagen web.
+
 Las credenciales de ChatGPT y Spotify permanecen en la computadora del jugador.
 El emparejamiento tiene dos pasos: código privado desde el iglú autenticado y
 confirmación del pingüino en esa computadora. El broker no acepta un ID elegido

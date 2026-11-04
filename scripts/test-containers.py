@@ -170,6 +170,16 @@ try:
                     'body=r.read().decode()\nassert r.status==200,r.status\nassert sys.argv[2] in body,"unexpected body"\n')
             exec_script(dash, http, 'http://web:8080/healthz', 'ok')
             exec_script(dash, http, 'http://web:8080/servers.xml', 'id="3101"')
+            asset_check = ('import hashlib,sys,urllib.request\n'
+                           'data=urllib.request.urlopen(sys.argv[1],timeout=10).read()\n'
+                           'assert hashlib.sha256(data).hexdigest()==sys.argv[2],"custom background mismatch"\n')
+            for kind, digest in (
+                ('photos', '2e197285cb8146c2dfbd5d2f4411cd861ce680f90bbfd31444a925ca9294c3cf'),
+                ('icons', '9152b4ae337a035b373971e0143ed022ccfb95107ecaca96981fa2fc3f08f159'),
+            ):
+                exec_script(dash, asset_check,
+                            f'http://web:8080/media/play/v2/content/global/clothing/{kind}/19155.swf', digest)
+            print('PASS: custom background 19155 assets match the published files.')
             print('PASS: nginx serves /healthz and /servers.xml.')
             web_url = 'ws://web:8080/socket/login'
             exec_script(dash, probe, '--url', web_url, '--origin', 'http://localhost')
