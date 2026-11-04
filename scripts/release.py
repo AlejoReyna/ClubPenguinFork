@@ -183,7 +183,21 @@ def build(args):
     if not pending:
         print('Every component already exists in the registry for these inputs: nothing to build or test.')
         return
-    to_build = sorted(set(pending) | ({'runtime', 'database'} if pending else set()))
+    to_build = sorted(pending)
+    # Reuse the exact registry artifacts, especially a pinned PostgreSQL image.
+    # Rebuilding a pinned tag locally could test different base layers than the
+    # image actually deployed, even when its Dockerfile has not changed.
+    cfg = lablib.load_config('registry')
+    reused = [name for name in comps if name not in pending]
+    if reused:
+        auth = json.loads(run(['az', 'acr', 'login', '--name', cfg['CP_ACR_NAME'], '--expose-token', '-o', 'json'],
+                              quiet=True).stdout)
+        with tempfile.TemporaryDirectory(prefix='cp-release-pull-') as directory:
+            isolated_docker_config(directory, auth['loginServer'], auth['accessToken'])
+            for name in reused:
+                origin = f'{auth["loginServer"]}/clubpenguin/{name}@{comps[name]["registry_digest"]}'
+                run(['docker', '--config', directory, 'pull', '--platform', 'linux/arm64', origin], timeout=1800, quiet=True)
+                run(['docker', '--config', directory, 'tag', origin, f'clubpenguin/{name}:{comps[name]["tag"]}'], quiet=True)
     sources = sorted({s for n in to_build for s in COMPONENTS[n]['sources']})
     py = sys.executable
     run([py, str(ROOT / 'scripts/fetch-sources.py'), '--only', ','.join(sources)], timeout=3600)
@@ -194,9 +208,9 @@ def build(args):
     require_arm64([f'clubpenguin/{n}:{comps[n]["tag"]}' for n in pending])
     test = [py, str(ROOT / 'scripts/test-containers.py'), '--tag', comps['runtime']['tag'],
             '--component-tag', f'database={comps["database"]["tag"]}', '--puffle']
-    if 'web' in pending:
+    if 'web' in comps:
         test += ['--web-tag', comps['web']['tag']]
-    if 'bots' in pending:
+    if 'bots' in comps:
         test += ['--bots-tag', comps['bots']['tag']]
         run(['bash', str(ROOT / 'scripts/run-bot-tests.sh'),
              f'clubpenguin/runtime:{comps["runtime"]["tag"]}'], timeout=1800)
