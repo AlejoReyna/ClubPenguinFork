@@ -422,9 +422,13 @@ def cmd_verify(args):
                   'for path,key in (("/media/play/v2/client/engine.swf","engine.swf"),("/puffle/companion.zip","companion.zip")):\n'
                   ' raw=urllib.request.urlopen(base+path,timeout=10).read()\n'
                   ' assert hashlib.sha256(raw).hexdigest()==data[key],"puffle artifact hash mismatch"\n'
-                  'health=json.load(urllib.request.urlopen("http://puffle:9103/healthz",timeout=10))\n'
-                  'assert health["ok"] is True\nprint("puffle artifacts and service match")\n')
-        return exec_in_dash(cfg, script).stdout.strip()
+                  'print("puffle artifacts match")\n')
+        exec_in_dash(cfg, script)
+        health = ('import json,urllib.request; '
+                  'd=json.load(urllib.request.urlopen("http://127.0.0.1:9103/healthz",timeout=10)); '
+                  f'assert d["ok"] is True and d["enabled"] is {(cfg["CP_PUFFLE_ENABLED"] == "true")!r}')
+        kubectl(cfg, '-n', NAMESPACE, 'exec', 'deploy/puffle', '--', 'python', '-c', health)
+        return 'puffle artifact hashes and active capability match'
 
     def journey():
         out = exec_in_dash(cfg, (ROOT / 'scripts/game-smoke.py').read_text(), '--dash-url', 'http://web:8080', timeout=240)

@@ -367,7 +367,13 @@ resource "kubernetes_network_policy_v1" "game" {
     namespace = local.game_namespace
   }
   spec {
-    pod_selector {}
+    pod_selector {
+      match_expressions {
+        key      = "app"
+        operator = "NotIn"
+        values   = ["puffle"]
+      }
+    }
     policy_types = ["Ingress"]
     ingress {
       from {
