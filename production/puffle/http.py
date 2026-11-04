@@ -42,6 +42,8 @@ async def request(base, path, token='', data=None, timeout=8):
             if status != 200:
                 raise ConnectionError(f'service status {status}')
             return result
+        except (asyncio.IncompleteReadError, asyncio.LimitOverrunError) as error:
+            raise ConnectionError('incomplete service response') from error
         finally:
             writer.close()
             await writer.wait_closed()

@@ -109,6 +109,13 @@ class BrokerTests(unittest.TestCase):
         with self.assertRaises(Rejected):
             self.b.dispatch('/puffle/api/result', token, answer)
 
+    def test_malformed_job_identifiers_are_rejected_without_internal_errors(self):
+        token = self.device()
+        for invalid in ([], {}, None, 1):
+            for path, auth in (('/puffle/api/result', token), ('/internal/result', SECRET)):
+                with self.assertRaises(Rejected):
+                    self.b.dispatch(path, auth, {'player': 1, 'job': invalid})
+
     def test_persistence_contains_hashes_only_and_no_chat(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = str(Path(tmp) / 'devices.sqlite')

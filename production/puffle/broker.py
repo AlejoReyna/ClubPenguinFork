@@ -133,7 +133,10 @@ class Broker:
                     return {'job': key, 'context': job['context'],
                             'expires_in': max(0, job['expires'] - self.clock())}
             return {'job': None}
-        job = self.jobs.get(data.get('job'))
+        key = data.get('job')
+        if not isinstance(key, str):
+            raise Rejected(400)
+        job = self.jobs.get(key)
         if not job or job['player'] != player:
             raise Rejected(410)
         if path == '/puffle/api/active':
@@ -192,6 +195,8 @@ class Broker:
             self.counts['submitted'] += 1
             return {'job': key}
         key = data.get('job')
+        if not isinstance(key, str):
+            raise Rejected(400)
         job = self.jobs.get(key)
         if not job or job['player'] != player:
             raise Rejected(410)
