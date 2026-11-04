@@ -174,4 +174,3 @@ class Engine:
                         s.history.append(('puffle', answer))
         finally:
             s.task = None
-
