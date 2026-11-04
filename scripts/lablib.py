@@ -52,6 +52,7 @@ CONFIG_SPEC = {
     'CP_BACKUP_CONTAINER': (BLOB_RE, 'clubpenguin-backups', 'Blob container for backups and releases'),
     'CP_NODE_NAME': (IP_OR_HOST_RE, 'penguin-pi', 'Expected Kubernetes node name'),
     'CP_PUFFLE_ENABLED': (re.compile(r'^(true|false)$'), 'false', 'Explicit puffle production capability'),
+    'CP_PUFFLE_BROKER_REPLICAS': (re.compile(r'^[01]$'), '1', 'Retain the broker PVC while stopping a legacy rollback'),
     'CP_PUFFLE_ALLOWED_PLAYERS': (re.compile(r'^(\d+(,\d+)*)?$'), '', 'Optional pilot player IDs; empty permits voluntary pairing'),
     'CP_RELEASE_PINS': (re.compile(r'^(?:(?:runtime|database|web|bots)=[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}(?:,(?:runtime|database|web|bots)=[A-Za-z0-9_][A-Za-z0-9_.-]{0,127})*)?$'), '', 'Explicit image tags retained across automatic releases'),
     'CP_KUBECONFIG': (None, '~/.kube/clubpenguin-pi.yaml', 'Dedicated kubeconfig for the Pi'),

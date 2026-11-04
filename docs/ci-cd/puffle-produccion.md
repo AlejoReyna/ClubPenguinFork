@@ -74,7 +74,10 @@ En un rollback de aplicación se conserva `puffle-devices`, se apaga la función
 se restaura el manifiesto anterior. Mantener los recursos del broker al revertir
 imágenes evita borrar el PVC; si se vuelve a una imagen sin `MODE=puffle`, escalar
 solo el broker a cero en el plan de reversión o fijarlo a la última imagen que lo
-soporte. Conservar también `postgres-data` y `bots-budget`. La web evita cachear
+soporte. Los manifiestos históricos sin `features.puffle=true` fuerzan la función
+apagada y el broker a cero réplicas automáticamente, conservando el PVC; ese
+primer rollback requiere un plan completo, no `--expect images-only`.
+Conservar también `postgres-data` y `bots-budget`. La web evita cachear
 `engine.swf`; sus hashes se verifican antes de registrar la release.
 
 Prometheus incorpora reglas del puffle sin reemplazar las alertas existentes.

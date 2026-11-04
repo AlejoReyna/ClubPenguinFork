@@ -327,7 +327,7 @@ def build_manifest(release, run_info):
             'digest': entry.get('registry_digest'), 'platform': entry.get('platform', 'linux/arm64'),
             'published_by_this_run': bool(entry.get('published')),
         }
-    return {'schema': 1, 'commit': release['commit'], 'created_utc': time.strftime('%Y%m%dT%H%M%SZ', time.gmtime()),
+    return {'schema': 1, 'features': {'puffle': True}, 'commit': release['commit'], 'created_utc': time.strftime('%Y%m%dT%H%M%SZ', time.gmtime()),
             'run': run_info, 'components': components}
 
 

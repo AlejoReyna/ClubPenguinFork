@@ -12,6 +12,15 @@ variable "puffle_service_secret" {
   default = "puffle-service"
 }
 
+variable "puffle_broker_replicas" {
+  type    = number
+  default = 1
+  validation {
+    condition     = contains([0, 1], var.puffle_broker_replicas) && (!var.puffle_enabled || var.puffle_broker_replicas == 1)
+    error_message = "Use zero for a legacy rollback, or one; enabled puffle needs one broker."
+  }
+}
+
 variable "puffle_allowed_players" {
   type    = list(number)
   default = []
@@ -40,7 +49,7 @@ resource "kubernetes_deployment_v1" "puffle" {
     namespace = local.game_namespace
   }
   spec {
-    replicas = 1
+    replicas = var.puffle_broker_replicas
     strategy { type = "Recreate" }
     selector { match_labels = { app = "puffle" } }
     template {

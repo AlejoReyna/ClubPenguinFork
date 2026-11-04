@@ -139,7 +139,8 @@ def cmd_plan(args):
     manifest = json.loads(Path(args.manifest).read_text())
     values = release.manifest_to_tfvars(manifest, cfg['CP_PUBLIC_HOSTNAME'])
     values.update({
-        'puffle_enabled': cfg['CP_PUFFLE_ENABLED'] == 'true',
+        'puffle_enabled': manifest.get('features', {}).get('puffle') is True and cfg['CP_PUFFLE_ENABLED'] == 'true',
+        'puffle_broker_replicas': int(cfg['CP_PUFFLE_BROKER_REPLICAS']) if manifest.get('features', {}).get('puffle') is True else 0,
         'puffle_allowed_players': [int(x) for x in cfg['CP_PUFFLE_ALLOWED_PLAYERS'].split(',') if x],
         'public_hostname': cfg['CP_PUBLIC_HOSTNAME'], 'kubeconfig_path': cfg['CP_KUBECONFIG'], 'lan_cidr': cfg['CP_LAN_CIDR'],
         'cloud_state': {'resource_group_name': cfg['CP_STATE_RESOURCE_GROUP'],
@@ -464,7 +465,8 @@ def cmd_verify(args):
     checks.run('image-tags-and-digests', lambda: check_images(cfg, manifest))
     checks.run('http-through-web', http)
     checks.run('websocket-proxy', websocket)
-    checks.run('puffle-artifacts-and-service', puffle)
+    if manifest.get('features', {}).get('puffle') is True:
+        checks.run('puffle-artifacts-and-service', puffle)
     if not args.skip_game_journey:
         checks.run('game-journey', journey)
     checks.run('prometheus-signals', prometheus, blocking=args.require_prometheus)
