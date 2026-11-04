@@ -4,6 +4,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -125,6 +126,13 @@ class FingerprintTests(unittest.TestCase):
 
 
 class PinAndTfvarsTests(unittest.TestCase):
+    def test_registry_missing_tag_is_buildable_but_auth_failure_is_not(self):
+        with patch.object(release, 'run', return_value=subprocess.CompletedProcess([], 1, '', 'the specified tag does not exist')):
+            self.assertIsNone(release.registry_tag('registry', 'runtime', 'new-tag'))
+        with patch.object(release, 'run', return_value=subprocess.CompletedProcess([], 1, '', 'authentication failed')):
+            with self.assertRaises(SystemExit):
+                release.registry_tag('registry', 'runtime', 'new-tag')
+
     def test_pins_accept_component_equals_tag_only(self):
         self.assertEqual(release.parse_pins(['database=lab-002']), {'database': 'lab-002'})
         for bad in ('database=latest', 'nope=lab-1', 'database', 'web=bad tag', 'web='):

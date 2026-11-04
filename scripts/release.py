@@ -124,7 +124,7 @@ def registry_tag(acr, component, tag):
     if result.returncode == 0:
         return result.stdout.strip()
     message = (result.stderr + result.stdout).lower()
-    if 'not found' in message or 'could not be found' in message or 'resourcenotfound' in message:
+    if any(marker in message for marker in ('not found', 'could not be found', 'resourcenotfound', 'does not exist')):
         return None
     fail('Could not query the registry: ' + lablib.redact(result.stderr.strip()[-400:]))
 
