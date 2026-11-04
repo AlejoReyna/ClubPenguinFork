@@ -77,6 +77,8 @@ def parse_command(text):
     phrase = _norm(raw).strip()
     if not phrase or _NEG.search(phrase) or phrase.startswith('!'):
         return None
+    if re.fullmatch(r'(?:puffle[\s,:]+)?(?:sigue|reproduce)[\s.!¡?¿]*', phrase):
+        return {'action': 'resume', 'query': ''}
     words = phrase.split()
     musical = re.search(r'\b' + _MUSIC + r'\b', phrase) is not None
     match = _PLAY.match(phrase)
@@ -198,7 +200,7 @@ class SpotifyWebAPI:
             raise SpotifyError('rate')
         reason = _reason(raw)
         if status == 403:
-            raise SpotifyError('premium' if reason in (None, 'PREMIUM_REQUIRED') else 'error')
+            raise SpotifyError('premium' if reason == 'PREMIUM_REQUIRED' else 'error')
         if status == 404 and reason in (None, 'NO_ACTIVE_DEVICE'):
             raise SpotifyError('no_device')
         if status >= 400:
@@ -244,16 +246,18 @@ class SpotifyWebAPI:
             uri, name = items[0]['uri'], str(items[0].get('name') or '')
             self._call('PUT', '/me/player/play' + suffix, {'uris': [uri]})
             ok = self._verify(lambda cur, playing, _n: cur == uri and playing)
+            album = (items[0].get('album') or {}).get('uri')
+            if not ok and isinstance(album, str) and album.startswith('spotify:album:'):
+                self._call('PUT', '/me/player/play' + suffix,
+                           {'context_uri': album, 'offset': {'uri': uri}})
+                ok = self._verify(lambda cur, playing, _n: cur == uri and playing)
             return ('Puse «%s».' % name) if ok else MESSAGES['unverified']
         if action in ('next', 'previous'):
             self._call('POST', '/me/player/' + action + suffix)
             ok = self._verify(lambda cur, playing, _n: cur is not None and cur != before)
-            if action == 'previous' and not ok:
-                # "previous" may restart the same track; accept a playing state.
-                ok = self._verify(lambda cur, playing, _n: playing)
         elif action == 'pause':
             self._call('PUT', '/me/player/pause' + suffix)
-            ok = self._verify(lambda cur, playing, _n: not playing)
+            ok = self._verify(lambda cur, playing, _n: cur is not None and not playing)
         else:
             self._call('PUT', '/me/player/play' + suffix)
             ok = self._verify(lambda cur, playing, _n: playing)

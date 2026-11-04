@@ -36,6 +36,8 @@ class ParserTests(unittest.TestCase):
             'anterior': {'action': 'previous', 'query': ''},
             'pausa la música': {'action': 'pause', 'query': ''},
             'reanuda': {'action': 'resume', 'query': ''},
+            'sigue': {'action': 'resume', 'query': ''},
+            'reproduce': {'action': 'resume', 'query': ''},
         }
         for text, want in cases.items():
             self.assertEqual(sp.parse_command(text), want, text)
@@ -188,6 +190,7 @@ class WebAPITests(unittest.TestCase):
 
     def test_error_mapping(self):
         cases = [((403, {'error': {'reason': 'PREMIUM_REQUIRED'}}), 'premium'),
+                 ((403, None), 'error'),
                  ((404, {'error': {'reason': 'NO_ACTIVE_DEVICE'}}), 'no_device'),
                  ((429, None), 'rate'), ((500, None), 'error')]
         for resp, key in cases:
@@ -196,6 +199,18 @@ class WebAPITests(unittest.TestCase):
             with self.assertRaises(sp.SpotifyError) as ctx:
                 run(api.run({'action': 'next'}))
             self.assertEqual(ctx.exception.args[0], key)
+
+    def test_play_retries_with_album_only_when_first_request_is_unconfirmed(self):
+        track = dict(TRACK, album={'uri': 'spotify:album:abc'})
+        def player(_):
+            puts = sum(c[0] == 'PUT' for c in self.http.calls)
+            return 200, {'item': TRACK, 'is_playing': True} if puts >= 2 else {}
+        api = self.api({('GET', '/me/player/devices'): (200, {'devices': [{'id': 'd', 'is_active': True}]}),
+                        ('GET', '/search'): (200, {'tracks': {'items': [track]}}),
+                        ('PUT', '/me/player/play'): (204, None), ('GET', '/me/player'): player})
+        self.assertEqual(run(api.run({'action': 'play', 'query': 'despacito'})), 'Puse «Despacito».')
+        puts = [json.loads(c[3]) for c in self.http.calls if c[0] == 'PUT']
+        self.assertEqual(puts[1], {'context_uri': 'spotify:album:abc', 'offset': {'uri': TRACK['uri']}})
 
     def test_no_or_ambiguous_device(self):
         for devices in ([], [{'id': 'a'}, {'id': 'b'}], [{'id': 'r', 'is_restricted': True}]):
@@ -226,6 +241,18 @@ class WebAPITests(unittest.TestCase):
                         ('GET', '/me/player'): (200, {'item': TRACK, 'is_playing': True}),
                         ('PUT', '/me/player/pause'): (204, None)})
         self.assertEqual(run(api.run({'action': 'pause'})), sp.MESSAGES['unverified'])
+
+    def test_missing_playback_does_not_confirm_pause(self):
+        api = self.api({('GET', '/me/player/devices'): (200, {'devices': [{'id': 'd', 'is_active': True}]}),
+                        ('GET', '/me/player'): (204, None),
+                        ('PUT', '/me/player/pause'): (204, None)})
+        self.assertEqual(run(api.run({'action': 'pause'})), sp.MESSAGES['unverified'])
+
+    def test_unchanged_playing_track_does_not_confirm_previous(self):
+        api = self.api({('GET', '/me/player/devices'): (200, {'devices': [{'id': 'd', 'is_active': True}]}),
+                        ('GET', '/me/player'): (200, {'item': TRACK, 'is_playing': True}),
+                        ('POST', '/me/player/previous'): (204, None)})
+        self.assertEqual(run(api.run({'action': 'previous'})), sp.MESSAGES['unverified'])
 
 
 class AuthTests(unittest.TestCase):
