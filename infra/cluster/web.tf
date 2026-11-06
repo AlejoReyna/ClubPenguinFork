@@ -39,6 +39,36 @@ variable "panel_show_players" {
   description = "Show the connected-player count in the panel. Only enable once that figure is approved for this audience."
 }
 
+# egress-internal-only keeps the web pod inside its own namespace (plus DNS). The panel sidecar
+# needs exactly one more destination: the Prometheus server in monitoring-lab, port 9090. Policies
+# are additive, so this opens nothing else (no Grafana, no node-exporter, no other namespace).
+resource "kubernetes_network_policy_v1" "web_to_prometheus" {
+  count = var.web_enabled && var.panel_prometheus_url != "" ? 1 : 0
+  metadata {
+    name      = "web-to-prometheus"
+    namespace = local.game_namespace
+  }
+  spec {
+    pod_selector { match_labels = { app = "web" } }
+    policy_types = ["Egress"]
+    egress {
+      to {
+        namespace_selector { match_labels = { "kubernetes.io/metadata.name" = "monitoring-lab" } }
+        pod_selector {
+          match_labels = {
+            "app.kubernetes.io/name"      = "prometheus"
+            "app.kubernetes.io/component" = "server"
+          }
+        }
+      }
+      ports {
+        port     = "9090"
+        protocol = "TCP"
+      }
+    }
+  }
+}
+
 resource "kubernetes_deployment_v1" "web" {
   count = var.web_enabled ? 1 : 0
   metadata {
