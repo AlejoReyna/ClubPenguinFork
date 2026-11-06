@@ -18,6 +18,27 @@ variable "public_hostname" {
   default = ""
 }
 
+# Navbar "Infraestructura" panel (containers/runtime/panel_summary.py, MODE=panel). A pod-local
+# sidecar: nginx proxies /infra/summary.json to 127.0.0.1:8766, so the browser only ever sees an
+# aggregated same-origin summary, never the Prometheus/Grafana addresses configured here.
+variable "panel_prometheus_url" {
+  type        = string
+  default     = "http://prometheus.monitoring-lab.svc.cluster.local"
+  description = "Cluster-internal Prometheus base URL for the panel. Empty shows \"Sin configurar\"."
+}
+
+variable "panel_grafana_url" {
+  type        = string
+  default     = ""
+  description = "Authorised https dashboard URL. Empty keeps Grafana private (port-forward), shown as \"Acceso privado\"."
+}
+
+variable "panel_show_players" {
+  type        = bool
+  default     = false
+  description = "Show the connected-player count in the panel. Only enable once that figure is approved for this audience."
+}
+
 resource "kubernetes_deployment_v1" "web" {
   count = var.web_enabled ? 1 : 0
   metadata {
@@ -49,6 +70,75 @@ resource "kubernetes_deployment_v1" "web" {
               path = "/healthz"
               port = 8080
             }
+          }
+        }
+        container {
+          name  = "panel-summary"
+          image = local.runtime_image
+          env {
+            name  = "MODE"
+            value = "panel"
+          }
+          env {
+            name  = "PANEL_PROJECT"
+            value = "ClubPenguin Lab"
+          }
+          env {
+            name  = "PANEL_PROVIDER"
+            value = "Raspberry Pi 5 (autoalojado)"
+          }
+          env {
+            name  = "PANEL_PLATFORM"
+            value = "Kubernetes (k3s)"
+          }
+          env {
+            name  = "PANEL_ENVIRONMENT"
+            value = "lab"
+          }
+          env {
+            name  = "PANEL_COMPONENTS"
+            value = "Web (nginx), Runtime Houdini, Puffle, PostgreSQL, Redis, Prometheus, Grafana"
+          }
+          env {
+            name  = "PROMETHEUS_URL"
+            value = var.panel_prometheus_url
+          }
+          env {
+            name  = "GRAFANA_URL"
+            value = var.panel_grafana_url
+          }
+          env {
+            name  = "GRAFANA_PRIVATE"
+            value = var.panel_grafana_url == "" ? "true" : "false"
+          }
+          env {
+            name  = "PANEL_SHOW_PLAYERS"
+            value = tostring(var.panel_show_players)
+          }
+          volume_mount {
+            name       = "release-info"
+            mount_path = "/etc/release-info"
+            read_only  = true
+          }
+          resources {
+            requests = { cpu = "10m", memory = "24Mi" }
+            limits   = { cpu = "100m", memory = "64Mi" }
+          }
+          security_context {
+            run_as_non_root            = true
+            run_as_user                = 10001
+            allow_privilege_escalation = false
+            read_only_root_filesystem  = true
+            capabilities { drop = ["ALL"] }
+          }
+        }
+        # Optional: the ConfigMap only exists when var.release_info is set (release.tf). Only the
+        # `commit` and `version` keys are ever read by the sidecar.
+        volume {
+          name = "release-info"
+          config_map {
+            name     = "release-info"
+            optional = true
           }
         }
         container {

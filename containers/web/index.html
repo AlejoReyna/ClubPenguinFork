@@ -20,8 +20,9 @@
   html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#00529b;color:#fff;font:16px system-ui,sans-serif}
   body{position:fixed;inset:0;overscroll-behavior:none;height:100dvh;overflow:hidden;
        padding:0 env(safe-area-inset-right) 0 env(safe-area-inset-left)}
-  main{position:fixed;top:var(--bar-h,52px);left:0;right:0;bottom:0;z-index:0;overflow:hidden;
-       container-type:size;display:flex;align-items:flex-end;justify-content:center;background:#00529b}
+  main{position:fixed;top:var(--bar-h,52px);left:0;right:var(--infra-w,0px);bottom:0;z-index:0;overflow:hidden;
+       container-type:size;display:flex;align-items:flex-end;justify-content:center;background:#00529b;
+       transition:right .28s cubic-bezier(.22,1,.36,1)}
   /* Escala correcta (760×480) y el pie del SWF pegado al borde inferior. */
   #game{width:min(100cqw,158.333333cqh);aspect-ratio:760 / 480;max-height:100cqh;flex-shrink:0;
        overflow:hidden;background:#00529b}
@@ -34,7 +35,7 @@
           pointer-events:none}
   #estado.on{opacity:1}
 
-  .bar{position:fixed;top:0;left:0;right:0;z-index:30;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px 12px;
+  .bar{position:fixed;top:0;left:0;right:var(--infra-w,0px);z-index:30;transition:right .28s cubic-bezier(.22,1,.36,1);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px 12px;
        padding:calc(6px + env(safe-area-inset-top)) 12px 6px;background:#0b7ab9}
   .bar-actions{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-inline-start:auto}
   .bar label{display:flex;align-items:center;gap:6px;color:#fff;font-size:.875rem;font-weight:700}
@@ -87,6 +88,54 @@
   #rota .avion{width:72px;height:64px;animation:gira-aviso 2.4s ease-in-out infinite;border-radius:14px;border:3px solid #ffffffb0}
   @keyframes gira-aviso{0%,20%{transform:rotate(0)}55%,100%{transform:rotate(90deg)}}
   #rota p{margin:0;font-size:17px;font-weight:700;text-shadow:0 2px 8px #0006}
+
+  /* Panel de infraestructura: lateral oscuro. En escritorio reserva su ancho (main y .bar se
+     comprimen hacia la izquierda y Ruffle se reescala sin recargar); en pantallas estrechas es
+     una hoja superpuesta que respeta las áreas seguras. */
+  .infra{position:fixed;top:0;right:0;bottom:0;z-index:35;display:flex;flex-direction:column;width:22rem;max-width:100%;
+       background:#0b0b0d;color:#ececf1;border-left:1px solid #2a2a31;font:14px/1.45 system-ui,sans-serif;
+       padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) 0;
+       transform:translateX(100%);visibility:hidden;transition:transform .28s cubic-bezier(.22,1,.36,1),visibility 0s linear .28s}
+  html.infra-abierto .infra{transform:none;visibility:visible;transition:transform .28s cubic-bezier(.22,1,.36,1),visibility 0s}
+  @media(min-width:1000px){html.infra-abierto{--infra-w:22rem}}
+  @media(max-width:999.98px){.infra{width:min(26rem,100%)}}
+  @media(max-width:480px){.infra{width:100%;border-left:0}}
+  .infra-cab{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px 10px}
+  .infra-cab h2{margin:0;font-size:16px;font-weight:600}
+  .infra .infra-x{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;padding:0;
+       border:1px solid #2a2a31;border-radius:50%;background:#151518;color:#ececf1;font:400 22px/1 system-ui;cursor:pointer}
+  .infra-tabs{display:flex;flex-direction:column;gap:4px;padding:4px 12px 12px}
+  .infra-tab{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border:1px solid transparent;border-radius:11px;
+       background:transparent;color:#9a9aa6;font:600 14px system-ui,sans-serif;text-align:left;cursor:pointer}
+  .infra-tab:hover{background:#151518;color:#ececf1}
+  .infra-tab[aria-current="true"]{background:#8b5cf629;border-color:#8b5cf673;color:#fff}
+  .infra-tab[aria-current="true"] svg{color:#8b5cf6}
+  .infra-cuerpo{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;display:flex;flex-direction:column;gap:12px;padding:4px 12px 16px}
+  .infra-card{margin:0;padding:14px 16px;border:1px solid #2a2a31;border-radius:14px;background:#151518}
+  .infra-card h3{margin:0 0 10px;color:#9a9aa6;font-size:11.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+  .infra-fila{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+  .infra-fila h3{margin:0}
+  .infra-datos{display:grid;gap:8px;margin:0}
+  .infra-datos div{display:grid;grid-template-columns:5.5rem minmax(0,1fr);gap:12px}
+  .infra-datos dt{color:#9a9aa6}.infra-datos dd{margin:0;overflow-wrap:anywhere}
+  .infra .mudo{color:#9a9aa6}
+  .infra .mono{font:13px ui-monospace,Menlo,monospace}
+  .infra-lista{display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;list-style:none}
+  .infra-lista li{padding:3px 10px;border:1px solid #2a2a31;border-radius:999px;background:#1c1c21}
+  .infra-metricas{display:grid;grid-template-columns:repeat(auto-fit,minmax(7rem,1fr));gap:8px;margin:0;padding:0;list-style:none}
+  .infra-metricas li{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border:1px solid #2a2a31;border-radius:10px;background:#1c1c21}
+  .infra-metricas span{color:#9a9aa6;font-size:12px}.infra-metricas b{font-size:19px;font-variant-numeric:tabular-nums}
+  .infra-lectura{margin:12px 0 0;color:#9a9aa6;font-size:12.5px}
+  .infra-estado{flex:none;padding:2px 10px;border:1px solid #2a2a31;border-radius:999px;color:#9a9aa6;font-size:12px;font-weight:700;white-space:nowrap}
+  .infra-estado.ok{border-color:#4ade8066;color:#4ade80}.infra-estado.aviso{border-color:#fbbf2466;color:#fbbf24}
+  .infra-estado.mal{border-color:#f8717166;color:#f87171}.infra-estado.priv{border-color:#8b5cf680;color:#c4b5fd}
+  .infra .infra-accion{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 16px;border:1px solid #8b5cf673;
+       border-radius:11px;background:#8b5cf629;color:#fff;font:700 14px system-ui,sans-serif;text-decoration:none;cursor:pointer}
+  .infra .infra-accion:hover{background:#8b5cf647}.infra .infra-accion:disabled{opacity:.6;cursor:progress}
+  .infra :focus-visible{outline:2px solid #8b5cf6;outline-offset:2px}
+  @media(prefers-reduced-motion:reduce){
+    .infra,html.infra-abierto .infra,main,.bar{transition:none!important}
+  }
 </style>
 </head>
 <body>
@@ -105,6 +154,12 @@
       </select>
     </label>
     <button id="fullscreen" type="button" aria-pressed="false">Pantalla completa</button>
+    <button id="infra" class="bar-icon" type="button" aria-label="Infraestructura" title="Infraestructura"
+            aria-expanded="false" aria-controls="infra-panel">
+      <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="M7 7h.01M7 17h.01"/>
+      </svg>
+    </button>
     <button id="spotify" class="bar-icon" type="button" aria-label="Spotify" title="Spotify"
             aria-haspopup="dialog" aria-expanded="false" aria-controls="globo">
       <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
@@ -126,6 +181,30 @@
   <div id="globo-acciones" class="globo-acciones"></div>
   <p id="globo-nota" class="globo-nota" hidden></p>
 </div>
+
+<!-- Panel de infraestructura y monitoreo (lateral). Es solo lectura y no toca el juego: Ruffle y su
+     WebSocket siguen vivos al abrirlo y cerrarlo; únicamente cambia el espacio disponible. -->
+<aside id="infra-panel" class="infra" aria-labelledby="infra-titulo" inert>
+  <header class="infra-cab">
+    <h2 id="infra-titulo">Infraestructura y monitoreo</h2>
+    <button id="infra-cerrar" class="infra-x" type="button" aria-label="Cerrar panel de infraestructura">×</button>
+  </header>
+  <nav class="infra-tabs" id="infra-tabs" aria-label="Secciones de infraestructura">
+    <button type="button" class="infra-tab" data-sec="infra">
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="M7 7h.01M7 17h.01"/></svg>
+      <span>Infraestructura</span>
+    </button>
+    <button type="button" class="infra-tab" data-sec="prom">
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c1 3 4 4.5 4 8.2A4 4 0 0 1 12 15a4 4 0 0 1-4-3.8c0-1.4.6-2.4 1.5-3.4C10.4 6.8 11.7 5.6 12 3z"/><path d="M9 20h6M10 17.5h4"/></svg>
+      <span>Prometheus</span>
+    </button>
+    <button type="button" class="infra-tab" data-sec="graf">
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+      <span>Grafana</span>
+    </button>
+  </nav>
+  <div id="infra-cuerpo" class="infra-cuerpo" aria-live="polite"></div>
+</aside>
 
 <main aria-label="Club Penguin · Glaciar">
   <div id="game"></div>
@@ -166,6 +245,9 @@
     document.getElementById('etiqueta-idioma').textContent = 'Language';
     fsBoton.textContent = 'Fullscreen';
     document.getElementById('puffle').textContent = 'My puffle';
+    const infraBtn = document.getElementById('infra');
+    infraBtn.setAttribute('aria-label', 'Infrastructure');
+    infraBtn.title = 'Infrastructure';
     enlaceSpotify.setAttribute('aria-label', 'Spotify');
     enlaceSpotify.title = 'Spotify';
     avisoEstado.textContent = 'Loading Glaciar…';
@@ -341,7 +423,9 @@
     const r = enlaceSpotify.getBoundingClientRect();
     const ancho = globo.offsetWidth;
     const centro = r.left + r.width / 2;
-    const izq = Math.max(16, Math.min(innerWidth - 16 - ancho, centro - ancho / 2));
+    // La barra se estrecha cuando el panel reserva espacio: el globo no debe invadirlo.
+    const limite = Math.min(innerWidth, barra.getBoundingClientRect().right);
+    const izq = Math.max(16, Math.min(limite - 16 - ancho, centro - ancho / 2));
     globo.style.left = izq + 'px';
     globo.style.top = (r.bottom + 12) + 'px';
     globo.style.setProperty('--flecha', Math.max(18, Math.min(ancho - 18, centro - izq)) + 'px');
@@ -359,7 +443,9 @@
     botonPuffle.setAttribute('aria-expanded', 'false');
     pintar();
   };
-  const alternar = () => { if (globo.hidden) { abrir(); refrescar(); } else cerrar(); };
+  // Un clic del usuario en el puffle/Spotify cede el sitio al panel de infraestructura (no así
+  // las aperturas automáticas del globo, que no deben quitarle el panel a quien lo está leyendo).
+  const alternar = () => { if (globo.hidden) { cerrarInfra(); abrir(); refrescar(); } else cerrar(); };
 
   async function accion(boton, fn) {
     boton.disabled = true;
@@ -509,6 +595,202 @@
   new ResizeObserver(colocar).observe(barra);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refrescar(); });
   refrescar();
+
+
+  // ---- Panel de infraestructura: datos de /infra/summary.json (mismo origen, resumen agregado) ----
+  // Solo lectura. Abrirlo o cerrarlo no recarga la página ni toca a Ruffle: el reproductor, su
+  // WebSocket y la sala del jugador siguen exactamente donde estaban; solo cambia el ancho de <main>.
+  const botonInfra = document.getElementById('infra');
+  const panelInfra = document.getElementById('infra-panel');
+  const cuerpoInfra = document.getElementById('infra-cuerpo');
+  const raiz = document.documentElement;
+  const TI = enIngles ? {
+    panel: 'Infrastructure and monitoring', close: 'Close infrastructure panel', tabs: 'Infrastructure sections',
+    infra: 'Infrastructure', prom: 'Prometheus', graf: 'Grafana', deploy: 'Deployment', components: 'Main components',
+    project: 'Project', provider: 'Provider', platform: 'Platform', env: 'Environment', release: 'Release',
+    metrics: 'Metrics', dash: 'Dashboard', loading: 'Loading…', none: 'Not configured', na: 'Not available',
+    operational: 'Operational', degraded: 'Degraded', stale: 'Stale data', offline: 'Offline', priv: 'Private access', avail: 'Available',
+    lastRead: 'Last reading:', noRead: 'no readings', refresh: 'Refresh reading', refreshing: 'Refreshing…',
+    noSource: 'No metrics source is configured for this environment.',
+    offlineText: 'The metrics source could not be reached. The game keeps running.',
+    staleText: 'These readings are not recent; do not treat them as current status.',
+    noMetrics: 'No readings available.', privText: 'The dashboard is only reachable through a tunnel or port-forward from an authorised machine.',
+    noDash: 'No authorised dashboard for this environment.', open: 'Open Grafana', newTab: '(opens in a new tab)',
+    workloads: 'Workloads available', players: 'Players',
+  } : {
+    panel: 'Infraestructura y monitoreo', close: 'Cerrar panel de infraestructura', tabs: 'Secciones de infraestructura',
+    infra: 'Infraestructura', prom: 'Prometheus', graf: 'Grafana', deploy: 'Despliegue', components: 'Componentes principales',
+    project: 'Proyecto', provider: 'Proveedor', platform: 'Plataforma', env: 'Entorno', release: 'Release',
+    metrics: 'Métricas', dash: 'Dashboard', loading: 'Cargando…', none: 'Sin configurar', na: 'No disponible',
+    operational: 'Operativo', degraded: 'Degradado', stale: 'Datos desactualizados', offline: 'Sin conexión', priv: 'Acceso privado', avail: 'Disponible',
+    lastRead: 'Última lectura:', noRead: 'sin lecturas', refresh: 'Actualizar lectura', refreshing: 'Actualizando…',
+    noSource: 'No hay una fuente de métricas configurada para este entorno.',
+    offlineText: 'No se pudo contactar la fuente de métricas. El juego sigue funcionando.',
+    staleText: 'Las lecturas no son recientes; no las tomes como estado actual.',
+    noMetrics: 'Sin lecturas disponibles.', privText: 'El dashboard solo es accesible mediante túnel o port-forward desde un equipo autorizado.',
+    noDash: 'No hay un dashboard autorizado para este entorno.', open: 'Abrir en Grafana', newTab: '(se abre en una pestaña nueva)',
+    workloads: 'Cargas disponibles', players: 'Jugadores',
+  };
+  document.getElementById('infra-titulo').textContent = TI.panel;
+  document.getElementById('infra-cerrar').setAttribute('aria-label', TI.close);
+  document.getElementById('infra-tabs').setAttribute('aria-label', TI.tabs);
+  panelInfra.querySelectorAll('.infra-tab').forEach(b => { b.querySelector('span').textContent = TI[b.dataset.sec]; });
+  const METRICA = {workloads: TI.workloads, players: TI.players};
+
+  let infraAbierto = false, infraSeccion = 'infra', resumen = null, resumenFallo = null, cargando = false, relojInfra = null;
+
+  const nodo = (etiqueta, clase, texto) => {
+    const e = document.createElement(etiqueta);
+    if (clase) e.className = clase;
+    if (texto !== undefined) e.textContent = texto;
+    return e;
+  };
+  const tarjeta = (titulo, estado) => {
+    const t = nodo('section', 'infra-card');
+    if (estado) {
+      const fila = nodo('div', 'infra-fila');
+      fila.append(nodo('h3', '', titulo), estado);
+      t.append(fila);
+    } else t.append(nodo('h3', '', titulo));
+    return t;
+  };
+  const insignia = (texto, clase) => nodo('span', 'infra-estado ' + (clase || ''), texto);
+  const valorOMudo = (valor, vacio) => valor ? nodo('dd', '', valor) : nodo('dd', 'mudo', vacio || TI.none);
+
+  function pintarInfra() {
+    if (!infraAbierto) return;
+    const hijos = [];
+    if (!resumen) {
+      const c = tarjeta(TI[infraSeccion]);
+      c.append(nodo('p', 'mudo', cargando ? TI.loading : (resumenFallo === 'sin_configurar' ? TI.none : TI.offline)));
+      if (infraSeccion === 'prom' && !cargando) {
+        c.querySelector('h3').replaceWith(...(() => { const f = nodo('div', 'infra-fila'); f.append(nodo('h3', '', TI.metrics), insignia(resumenFallo === 'sin_configurar' ? TI.none : TI.offline, resumenFallo === 'sin_configurar' ? '' : 'mal')); return [f]; })());
+      }
+      hijos.push(c);
+    } else if (infraSeccion === 'infra') {
+      const d = resumen.deployment || {};
+      const c = tarjeta(TI.deploy);
+      const dl = nodo('dl', 'infra-datos');
+      for (const [etiqueta, valor, mono, vacio] of [[TI.project, d.project], [TI.provider, d.provider], [TI.platform, d.platform],
+                                                    [TI.env, d.environment], [TI.release, d.release, true, TI.na]]) {
+        const fila = nodo('div');
+        const dd = valorOMudo(valor, vacio);
+        if (mono && valor) dd.className = 'mono';
+        fila.append(nodo('dt', '', etiqueta), dd);
+        dl.append(fila);
+      }
+      c.append(dl);
+      const k = tarjeta(TI.components);
+      if (d.components && d.components.length) {
+        const ul = nodo('ul', 'infra-lista');
+        d.components.forEach(x => ul.append(nodo('li', '', x)));
+        k.append(ul);
+      } else k.append(nodo('p', 'mudo', TI.none));
+      hijos.push(c, k);
+    } else if (infraSeccion === 'prom') {
+      const p = resumen.prometheus || {state: 'not_configured', metrics: []};
+      const mapa = {operational: [TI.operational, 'ok'], degraded: [TI.degraded, 'aviso'], stale: [TI.stale, 'aviso'],
+                    offline: [TI.offline, 'mal'], not_configured: [TI.none, '']};
+      const [texto, clase] = mapa[p.state] || mapa.not_configured;
+      const c = tarjeta(TI.metrics, insignia(texto, clase));
+      if (p.state === 'not_configured') c.append(nodo('p', 'mudo', TI.noSource));
+      else if (p.state === 'offline') c.append(nodo('p', 'mudo', TI.offlineText));
+      else {
+        if (p.state === 'stale') c.append(nodo('p', 'mudo', TI.staleText));
+        if (p.metrics && p.metrics.length) {
+          const ul = nodo('ul', 'infra-metricas');
+          p.metrics.forEach(m => { const li = nodo('li'); li.append(nodo('span', '', METRICA[m.id] || m.label), nodo('b', '', m.value)); ul.append(li); });
+          c.append(ul);
+        } else c.append(nodo('p', 'mudo', TI.noMetrics));
+      }
+      const lectura = nodo('p', 'infra-lectura', TI.lastRead + ' ');
+      if (p.lastReading) {
+        const t = nodo('time', '', new Date(p.lastReading * 1000).toLocaleTimeString(idioma, {hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false}));
+        t.dateTime = new Date(p.lastReading * 1000).toISOString();
+        lectura.append(t);
+      } else lectura.append(nodo('span', '', TI.noRead));
+      c.append(lectura);
+      const boton = nodo('button', 'infra-accion', cargando ? TI.refreshing : TI.refresh);
+      boton.type = 'button';
+      boton.disabled = cargando;
+      boton.addEventListener('click', () => cargarInfra(true));
+      hijos.push(c, boton);
+    } else {
+      const g = resumen.grafana || {access: 'not_configured'};
+      const c = tarjeta(TI.dash, g.access === 'link' ? insignia(TI.avail, 'ok') : g.access === 'private' ? insignia(TI.priv, 'priv') : insignia(TI.none));
+      if (g.access === 'link' && /^https:\/\//.test(g.url || '')) {
+        const a = nodo('a', 'infra-accion', TI.open);
+        a.href = g.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+        const oculto = nodo('span', '', ' ' + TI.newTab);
+        oculto.style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)';
+        a.append(oculto);
+        c.append(a);
+      } else c.append(nodo('p', 'mudo', g.access === 'private' ? TI.privText : TI.noDash));
+      hijos.push(c);
+    }
+    cuerpoInfra.replaceChildren(...hijos);
+    panelInfra.querySelectorAll('.infra-tab').forEach(b => {
+      if (b.dataset.sec === infraSeccion) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current');
+    });
+  }
+
+  async function cargarInfra(manual = false) {
+    if (cargando || !infraAbierto) return;
+    cargando = manual || !resumen;
+    pintarInfra();
+    const limite = new AbortController();
+    const temporizador = setTimeout(() => limite.abort(), 4000);
+    try {
+      const r = await fetch('/infra/summary.json', {cache: 'no-store', credentials: 'omit', signal: limite.signal});
+      if (r.status === 404) { resumen = null; resumenFallo = 'sin_configurar'; }
+      else if (!r.ok) throw new Error('http');
+      else { resumen = await r.json(); resumenFallo = null; }
+    } catch {
+      // Sin respuesta: nunca se muestra un dato viejo como actual.
+      resumen = null;
+      resumenFallo = 'sin_conexion';
+    } finally { clearTimeout(temporizador); cargando = false; }
+    pintarInfra();
+  }
+
+  const enOverlay = () => matchMedia('(max-width: 999.98px)').matches;
+  function abrirInfra() {
+    if (infraAbierto) return;
+    cerrar();                                   // el globo del puffle y el panel no comparten espacio
+    infraAbierto = true;
+    panelInfra.inert = false;
+    raiz.classList.add('infra-abierto');
+    botonInfra.setAttribute('aria-expanded', 'true');
+    pintarInfra();
+    cargarInfra();
+    clearInterval(relojInfra);
+    relojInfra = setInterval(() => { if (document.visibilityState !== 'hidden') cargarInfra(); }, 30000);
+    document.getElementById('infra-cerrar').focus({preventScroll: true});
+  }
+  function cerrarInfra() {
+    if (!infraAbierto) return;
+    infraAbierto = false;
+    clearInterval(relojInfra);
+    raiz.classList.remove('infra-abierto');
+    botonInfra.setAttribute('aria-expanded', 'false');
+    // Foco primero al botón (aún visible), luego el panel pasa a inert: el foco nunca queda en un nodo oculto.
+    botonInfra.focus({preventScroll: true});
+    panelInfra.inert = true;
+  }
+  botonInfra.addEventListener('click', () => (infraAbierto ? cerrarInfra() : abrirInfra()));
+  document.getElementById('infra-cerrar').addEventListener('click', cerrarInfra);
+  panelInfra.querySelectorAll('.infra-tab').forEach(b => b.addEventListener('click', () => { infraSeccion = b.dataset.sec; pintarInfra(); }));
+  document.addEventListener('keydown', e => {
+    if (!infraAbierto) return;
+    if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); cerrarInfra(); return; }
+    if (e.key === 'Tab' && enOverlay()) {
+      const items = [...panelInfra.querySelectorAll('button:not([disabled]),a[href]')];
+      if (!items.length) return;
+      const primero = items[0], ultimo = items[items.length - 1];
+      if (e.shiftKey && (document.activeElement === primero || !panelInfra.contains(document.activeElement))) { e.preventDefault(); ultimo.focus(); }
+      else if (!e.shiftKey && (document.activeElement === ultimo || !panelInfra.contains(document.activeElement))) { e.preventDefault(); primero.focus(); }
+    }
+  }, true);
 
   // Enganche heredado del captcha del registro.
   window.grecaptchaSubmit = () => {
