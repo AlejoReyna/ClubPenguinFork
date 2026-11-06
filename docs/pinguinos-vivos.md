@@ -968,7 +968,11 @@ responde localmente. No hay exportación de historial.
 
 ```bash
 bash scripts/run-bot-tests.sh clubpenguin/runtime:rt-origin-001
+python3 -I -u scripts/test-containers.py --tag rt-origin-001 --component-tag database=lab-002 \
+  --bots-tag bots-vivos-local --live-cast --recall
 ```
 
-Incluye `tests/test_recall.py` y escena de director con resumen + borrado. No
+Incluye `tests/test_recall.py`, escena de director con resumen + borrado y el
+banco `--recall` (nota tras 3 turnos, persistencia tras reinicio de bots, olvido).
+Despliegue en el Pi: [bots-pi-prueba-vivos.md](bots-pi-prueba-vivos.md). No
 sustituye la aceptación humana ni el gasto P2 real autorizado.

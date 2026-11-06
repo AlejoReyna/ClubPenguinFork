@@ -13,7 +13,8 @@ import bot_accounts
 from bots_image import verify_bots_image
 
 
-def check_live_bots(root, docker, exec_script, dash, postgres, world, network, label, tag, temp, voices=False, life=False):
+def check_live_bots(root, docker, exec_script, dash, postgres, world, network, label, tag, temp,
+                    voices=False, life=False, recall=False):
     sys.path.insert(0, str(root / 'containers/bots'))
     from bots.config import build_config
     from bots.rooms import load_catalog
@@ -25,7 +26,7 @@ def check_live_bots(root, docker, exec_script, dash, postgres, world, network, l
     document['bots'].extend(bot_accounts.cast_config_document(cast_path)['bots'])
     document['behavior'].update(life_min_delay=1, life_max_delay=2,
                                 walk_min_delay=0.8, walk_max_delay=1.5)
-    if voices or life:
+    if voices or life or recall:
         document['dialogue'] = {'enabled': True, 'greeting_chance': 0,
                                 'scene_min_delay': 3600, 'scene_max_delay': 3600}
     config = build_config(document, {'BOTS_CAST_DIR': str(cast_path)})
@@ -159,6 +160,10 @@ print('registered')
         from life_integration import check_life
         check_life(root, docker, exec_script, dash, network, label, image,
                    service, document, path, cast_path, observers, ids)
+    if recall:
+        from recall_integration import check_recall
+        check_recall(root, docker, exec_script, dash, network, label, image,
+                     service, document, path, cast_path, observers, ids, temp)
 
 
 CLIENTS = r'''

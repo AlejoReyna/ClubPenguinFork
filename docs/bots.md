@@ -309,6 +309,12 @@ de las mismas cuentas. `bots_replicas=0` permite detenerlo conservando el PVC de
 cuotas. Ese PVC tiene `prevent_destroy`: deshabilitar recursos o borrarlo exige
 revisar expresamente cómo conservar el contador de consumo.
 
+## Prueba en el Pi (cast, dialogue, recall)
+
+Pasos ordenados (Docker, publicación, tfvars, plan, clave Moonshot sin gasto
+obligatorio): [bots-pi-prueba-vivos.md](bots-pi-prueba-vivos.md). Comprobación
+previa: `bash scripts/pi-bots-vivos-ready.sh --expected-node alexis`.
+
 ## Dónde poner la API key
 
 La clave va en el **Secret externo `moonshot-api`**, campo `MOONSHOT_API_KEY`.

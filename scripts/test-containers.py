@@ -43,6 +43,7 @@ def parse_args():
     parser.add_argument('--live-cast', action='store_true', help='26 simulated sessions and 10 protocol clients; requires --bots-tag')
     parser.add_argument('--voices', action='store_true', help='also test opt-in Phase 2 with a synthetic loopback HTTP provider')
     parser.add_argument('--life', action='store_true', help='also test Phase 3 invitations, following and returns with simulated providers')
+    parser.add_argument('--recall', action='store_true', help='also test Phase 4 relationship notes on a writable PVC slice (simulated summaries)')
     parser.add_argument('--puffle', action='store_true', help='test the production world and two isolated companions')
     parser.add_argument('--keep-logs', action='store_true', help='print container logs even when tests pass')
     args = parser.parse_args()
@@ -52,6 +53,8 @@ def parse_args():
         parser.error('--voices requires --live-cast')
     if args.life and not args.live_cast:
         parser.error('--life requires --live-cast')
+    if args.recall and not args.live_cast:
+        parser.error('--recall requires --live-cast')
     tags = {name: args.tag for name in ('runtime', 'database')}
     for item in args.component_tag:
         name, _, value = item.partition('=')
@@ -218,7 +221,8 @@ try:
                 from bots_integration import check_bots
             check_bots(root, docker, exec_script, dash, postgres, prefix + '-glaciar',
                        prefix, label, tags['bots'], Path(temp),
-                       **(dict(voices=args.voices, life=args.life) if args.live_cast else {}))
+                       **(dict(voices=args.voices, life=args.life, recall=args.recall)
+                          if args.live_cast else {}))
         if args.puffle:
             from puffle_integration import check_puffle
             check_puffle(root, docker, exec_script, dash, postgres)
