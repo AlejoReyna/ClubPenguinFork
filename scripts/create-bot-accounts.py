@@ -26,7 +26,10 @@ def main():
     parser.add_argument('--expected-node', required=True)
     parser.add_argument('--credentials-file', default=str(ROOT / '.local/bots/credentials.json'))
     parser.add_argument('--work-roles', action='store_true', help='use a previously prepared work-credentials.json')
+    parser.add_argument('--cast', help='non-secret persona file/directory; requires prepared private credentials')
     args = parser.parse_args()
+    if args.cast and args.work_roles:
+        parser.error('--cast and --work-roles are mutually exclusive')
     kubeconfig = str(Path(args.kubeconfig).expanduser())
     config = json.loads(lablib.run(['kubectl', '--kubeconfig', kubeconfig, 'config', 'view', '-o', 'json'], quiet=True).stdout)
     if config['current-context'] != 'default' or len(config['clusters']) != 1 or config['clusters'][0]['cluster']['server'] != 'https://127.0.0.1:16443':
@@ -59,7 +62,33 @@ def main():
         lablib.fail('Bot credentials must remain inside ignored .local/.')
     if path.exists() and (path.stat().st_uid != os.getuid() or path.stat().st_mode & 0o077):
         lablib.fail('Credential file must be private (0600), without symlinks.')
-    names = [p[0].lower() for p in (bot_accounts.WORK_ROLES if args.work_roles else bot_accounts.PERSONAS)]
+    cast_mode = bool(args.cast)
+    cast_document = None
+    if cast_mode:
+        if not path.exists():
+            lablib.fail('Prepare a new private credential file with --cast first; no adoption performed.')
+        sys.path.insert(0, str(ROOT / 'containers/bots'))
+        from bots.cast import load_cards
+        from bots.config import build_config
+        cards = load_cards(args.cast)
+        cast_document = json.loads(path.read_text())
+        identities = cast_document.get('bots', [])
+        names = [bot['username'] for bot in identities]
+        allowed = set(cards) | {role[0].lower() for role in bot_accounts.WORK_ROLES}
+        if (len(names) != len(set(names)) or not names or set(names) - allowed
+                or any(card.enabled and name not in names for name, card in cards.items())):
+            lablib.fail('Prepared identities do not match this cast and its preserved work accounts.')
+        validated = build_config(cast_document, {'BOTS_CAST_DIR': str(Path(args.cast).resolve())})
+        effective = {bot.username: bot for bot in validated.bots}
+        if set(effective) != set(names):
+            lablib.fail('Prepared credentials include disabled characters; prepare only enabled accounts.')
+        if any(effective[bot['username']].nickname != bot.get('nickname') or
+               effective[bot['username']].room != bot.get('room') for bot in identities):
+            lablib.fail('Prepared names and rooms must match the cast before provisioning.')
+        # This validates all values before using them in SQL below.
+        bot_accounts.cast_nickname_sql(identities)
+    else:
+        names = [p[0].lower() for p in (bot_accounts.WORK_ROLES if args.work_roles else bot_accounts.PERSONAS)]
     # The names are fixed alphanumeric constants, never arbitrary SQL input.
     quoted = ','.join("'" + name + "'" for name in names)
     query = ("SELECT COALESCE(json_agg(json_build_object('username',username,'nickname',nickname,"
@@ -73,6 +102,10 @@ def main():
         return {row['username']: row for row in json.loads(raw)}
 
     existing = inventory()
+    if cast_mode:
+        expected = {bot['username']: bot['nickname'] for bot in cast_document['bots']}
+        if any(row.get('nickname') != expected[name] for name, row in existing.items()):
+            lablib.fail('An existing cast account has a different nickname; no rename or adoption performed.')
     if args.work_roles and not bot_accounts.legacy_work_nicknames_unchanged(existing):
         lablib.fail('A work account was renamed after legacy provisioning; no accounts or Secret changed.')
     for name, account in existing.items():
@@ -85,18 +118,20 @@ def main():
         lablib.fail('An external bot Secret already exists without this credential file; inspect ownership before provisioning.')
     if args.work_roles and not path.exists():
         lablib.fail('Prepare the private work-role configuration with verified areas first.')
-    document = json.loads(path.read_text()) if path.exists() else bot_accounts.config_document()
+    document = cast_document or (json.loads(path.read_text()) if path.exists() else bot_accounts.config_document())
     bots = {b['username'].lower(): b for b in document['bots']}
     if set(bots) != set(names):
-        lablib.fail('Private bot identities do not match the three expected accounts.')
+        lablib.fail('Private bot identities do not match the expected accounts.')
     if args.work_roles:
-        import sys
         sys.path.insert(0, str(ROOT / 'containers/bots'))
         from bots.config import build_config
         candidate_config = build_config(document, {})
-        expected = {name.lower(): (name, room) for name, _, room, _ in bot_accounts.WORK_ROLES}
+        expected = {name.lower(): (bot_accounts.WORK_VISIBLE[name][0], room)
+                    for name, _, room, _ in bot_accounts.WORK_ROLES}
         if len(candidate_config.bots) != 3 or any(
-            (b.nickname, b.room) != expected[b.username.lower()] or 'walk' not in bots[b.username.lower()]
+            (b.nickname, b.room) != expected[b.username.lower()] or
+            not ('walk' in bots[b.username.lower()] or
+                 (b.stationary and 'anchor' in bots[b.username.lower()]))
             for b in candidate_config.bots
         ):
             lablib.fail('Work roles require their dedicated names, rooms and explicit walk areas.')
@@ -105,23 +140,30 @@ def main():
         print(f'Preview: {len(missing)} new accounts, {len(existing)} existing; external Secret bot-credentials.')
         print('No account, Secret or file changed. --execute is required to provision.')
         return
-    if args.work_roles:
+    if args.work_roles or cast_mode:
         deployment = json.loads(kube('-n', 'clubpenguin', 'get', 'deployment', 'bots', '-o', 'json'))
         if not bot_accounts.deployment_is_stopped(deployment):
             lablib.fail('Stop the bots Deployment and wait for all replicas to terminate before migration.')
+        pods = json.loads(kube('-n', 'clubpenguin', 'get', 'pods', '-l', 'app=bots', '-o', 'json'))
+        if pods.get('items'):
+            lablib.fail('Stop the bots Deployment and wait until no bots pods remain.')
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     path.parent.chmod(0o700)
-    lablib.write_private(path, json.dumps(document, indent=2))
+    if not path.exists():
+        # Never overwrite prepared credentials, including on retries.
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, 'w') as target:
+            json.dump(document, target, indent=2)
     if missing:
         result = kube('-n', 'clubpenguin', 'exec', '-i', 'deploy/dash', '--', 'python', '-c',
                       bot_accounts.registration_program(), stdin=json.dumps({'bots': [bots[name] for name in missing]}))
         if json.loads(result)['created'] != len(missing):
             lablib.fail('Registration result did not match the requested accounts.')
-    if args.work_roles:
+    if args.work_roles or cast_mode:
         # Dash title-cases the nickname. Correct it before any roster or Secret write.
         corrected = kube('-n', 'clubpenguin', 'exec', 'postgres-0', '--', 'psql', '-U', 'houdini',
                          '-d', 'houdini', '-At', '-v', 'ON_ERROR_STOP=1', '-c',
-                         bot_accounts.nickname_correction_sql())
+                         bot_accounts.cast_nickname_sql(document['bots']) if cast_mode else bot_accounts.nickname_correction_sql())
         got = sorted(line.strip() for line in corrected.splitlines()
                      if line.strip() and not line.strip().startswith('UPDATE '))
         if got != sorted(names):
@@ -129,8 +171,9 @@ def main():
     after = inventory()
     if set(after) != set(names) or any(not a['active'] or a['moderator'] or a['stealth_moderator'] for a in after.values()):
         lablib.fail('Bot account checks did not pass; credentials remain private for recovery.')
-    if args.work_roles:
-        expected_nicks = {name.lower(): name for name, *_rest in bot_accounts.WORK_ROLES}
+    if args.work_roles or cast_mode:
+        expected_nicks = ({bot['username']: bot['nickname'] for bot in document['bots']} if cast_mode else
+                          {name.lower(): bot_accounts.WORK_VISIBLE[name][0] for name, *_rest in bot_accounts.WORK_ROLES})
         if any(after[name].get('nickname') != expected_nicks[name] or not after[name].get('approval_es')
                for name in names):
             lablib.fail('Visible name or Spanish approval flag is wrong; Secret was not changed.')
@@ -139,7 +182,7 @@ def main():
     if json.loads(authenticated)['authenticated'] != len(names):
         lablib.fail('Bot credential verification did not pass; Secret was not changed.')
     roster_report = {'approved': None, 'reason': None}
-    if args.work_roles:
+    if args.work_roles or cast_mode:
         roster_report = json.loads(kube('-n', 'clubpenguin', 'exec', '-i', 'deploy/dash', '--', 'python', '-c',
                                         bot_accounts.roster_approval_program(), stdin=json.dumps(document)))
         if roster_report.get('approved') != len(names) or roster_report.get('reason'):
@@ -153,7 +196,7 @@ def main():
         'all_active': True, 'all_non_moderator': True, 'secret': 'bot-credentials',
         'moonshot_calls': 0,
     }
-    if args.work_roles:
+    if args.work_roles or cast_mode:
         summary['nicknames_exact'] = True
         summary['spanish_roster_bit'] = bot_accounts.SPANISH_APPROVAL_BIT
         summary['roster_approved'] = roster_report.get('approved')

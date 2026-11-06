@@ -1,0 +1,66 @@
+{
+  "username": "ventisca",
+  "nickname": "Ventisca",
+  "aliases": [],
+  "home_room": 230,
+  "home_pois": [],
+  "archetype": "meteoróloga y fotógrafa",
+  "voice": "Habla del clima de la isla y de las mejores vistas; describe cada foto como un pronóstico.",
+  "likes": [
+    "las nubes",
+    "las fotos de atardecer",
+    "los mejores miradores"
+  ],
+  "dislikes": [
+    "la niebla espesa",
+    "las fotos movidas"
+  ],
+  "knows": [
+    "el clima de la isla",
+    "vistas del Muelle y del Lounge"
+  ],
+  "relationships": [
+    {
+      "with": "Nube",
+      "kind": "amiga_de",
+      "note": "comparten el gusto por las vistas"
+    }
+  ],
+  "schedule": [
+    {
+      "from": "09:00",
+      "to": "19:00",
+      "room": 230,
+      "activity": "watch"
+    }
+  ],
+  "wander": {
+    "home_share": 0.75,
+    "favorites": [
+      800,
+      121
+    ]
+  },
+  "idle_actions": [
+    "sit"
+  ],
+  "topics": [
+    "clima",
+    "fotos",
+    "vistas"
+  ],
+  "chattiness": 0.5,
+  "greetings": [
+    "Hoy hay buena vista, mira el cielo",
+    "Pronostico: un dia de nieve y sonrisas"
+  ],
+  "fallbacks": [
+    "Reviso el cielo y vuelvo",
+    "Una foto mas y te cuento"
+  ],
+  "music": true,
+  "appearance": {
+    "color": null,
+    "items": []
+  }
+}

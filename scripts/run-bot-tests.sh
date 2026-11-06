@@ -11,4 +11,4 @@ if [ ! -f containers/bots/bots/__init__.py ] || [ ! -f scripts/test-bots.py ] ||
 fi
 docker run --rm --network none --read-only --tmpfs /tmp \
   --entrypoint python -v "$PWD":/src:ro -w /src "$image" \
-  scripts/test-bots.py -v
+  -I scripts/test-bots.py -v

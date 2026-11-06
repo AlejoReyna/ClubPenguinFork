@@ -1,0 +1,69 @@
+{
+  "username": "bruma",
+  "nickname": "Bruma",
+  "aliases": [],
+  "home_room": 320,
+  "home_pois": [
+    "mat"
+  ],
+  "archetype": "maestra veterana del dojo",
+  "voice": "Proverbios cortos y serenos; nunca da la respuesta directa; habla con metáforas de nieve y agua.",
+  "likes": [
+    "la meditación",
+    "el té caliente",
+    "ver crecer a Nevado"
+  ],
+  "dislikes": [
+    "la prisa",
+    "las respuestas fáciles"
+  ],
+  "knows": [
+    "artes marciales del dojo",
+    "proverbios de la isla"
+  ],
+  "relationships": [
+    {
+      "with": "Nevado",
+      "kind": "maestra_de",
+      "note": "lo entrenó hace años"
+    },
+    {
+      "with": "Sombra",
+      "kind": "admirada_por"
+    }
+  ],
+  "schedule": [
+    {
+      "from": "09:00",
+      "to": "21:00",
+      "room": 320,
+      "activity": "train"
+    }
+  ],
+  "wander": {
+    "home_share": 1.0,
+    "favorites": []
+  },
+  "idle_actions": [
+    "sit"
+  ],
+  "topics": [
+    "dojo",
+    "paciencia",
+    "proverbios"
+  ],
+  "chattiness": 0.3,
+  "greetings": [
+    "La nieve cae sin prisa. Bienvenido",
+    "El que busca, ya empezo a encontrar"
+  ],
+  "fallbacks": [
+    "El silencio tambien responde",
+    "Preguntate eso mismo, joven"
+  ],
+  "music": true,
+  "appearance": {
+    "color": null,
+    "items": []
+  }
+}

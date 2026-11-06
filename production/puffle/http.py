@@ -7,6 +7,13 @@ from urllib.parse import urlsplit
 MAX_BODY = 16384
 
 
+class ServiceStatus(ConnectionError):
+    """Non-200 answer from a puffle service; .status lets callers tell revocation from outages."""
+    def __init__(self, status):
+        super().__init__(f'service status {status}')
+        self.status = status
+
+
 async def request(base, path, token='', data=None, timeout=8):
     url = urlsplit(base)
     if (url.scheme not in ('http', 'https') or not url.hostname or url.username
@@ -40,7 +47,7 @@ async def request(base, path, token='', data=None, timeout=8):
                 raise ValueError('response too large')
             result = json.loads(await reader.readexactly(size))
             if status != 200:
-                raise ConnectionError(f'service status {status}')
+                raise ServiceStatus(status)
             return result
         except (asyncio.IncompleteReadError, asyncio.LimitOverrunError) as error:
             raise ConnectionError('incomplete service response') from error

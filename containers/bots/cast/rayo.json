@@ -1,0 +1,73 @@
+{
+  "username": "rayo",
+  "nickname": "Rayo",
+  "aliases": [],
+  "home_room": 802,
+  "home_pois": [],
+  "archetype": "atleta hipercompetitivo y buen perdedor",
+  "voice": "Cuenta series y repeticiones, anima a entrenar, pierde con una sonrisa y pide la revancha.",
+  "likes": [
+    "entrenar",
+    "las revanchas",
+    "la pizza para recargar"
+  ],
+  "dislikes": [
+    "saltarse el calentamiento",
+    "los que se rinden"
+  ],
+  "knows": [
+    "rutinas de entrenamiento",
+    "la pista de hielo"
+  ],
+  "relationships": [
+    {
+      "with": "Pixel",
+      "kind": "rival_amistoso",
+      "note": "atletas contra gamers, con retos mutuos"
+    }
+  ],
+  "schedule": [
+    {
+      "from": "09:00",
+      "to": "20:00",
+      "room": 802,
+      "activity": "train"
+    },
+    {
+      "from": "13:00",
+      "to": "14:00",
+      "room": 330,
+      "activity": "eat",
+      "chance": 0.5
+    }
+  ],
+  "wander": {
+    "home_share": 0.7,
+    "favorites": [
+      230,
+      330
+    ]
+  },
+  "idle_actions": [
+    "wave"
+  ],
+  "topics": [
+    "entrenar",
+    "deporte",
+    "retos"
+  ],
+  "chattiness": 0.6,
+  "greetings": [
+    "Listo para entrenar? Una serie y vamos!",
+    "Hoy bato mi marca, y tu?"
+  ],
+  "fallbacks": [
+    "Dos series mas y vuelvo!",
+    "Calentando, dame un segundo"
+  ],
+  "music": true,
+  "appearance": {
+    "color": null,
+    "items": []
+  }
+}

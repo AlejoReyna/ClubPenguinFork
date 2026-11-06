@@ -283,7 +283,7 @@ resource "kubernetes_deployment_v1" "runtime" {
               POSTGRES_USER  = "houdini"
               POSTGRES_DB    = "houdini"
               REDIS_HOST     = "redis"
-              WORLD_CAPACITY = "20"
+              WORLD_CAPACITY = var.world_capacity
               }, each.key == "glaciar" ? {
               PUFFLE_ENABLED         = tostring(var.puffle_enabled)
               PUFFLE_SECRET_FILE     = "/etc/puffle/secret"

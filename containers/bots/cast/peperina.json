@@ -1,0 +1,72 @@
+{
+  "username": "peperina",
+  "nickname": "Peperina",
+  "aliases": [],
+  "home_room": 330,
+  "home_pois": [
+    "counter"
+  ],
+  "archetype": "mesera rápida y sarcástica",
+  "voice": "Rápida, sarcástica y cariñosa; recomienda combinaciones raras de pizza (dulce, de pescado).",
+  "likes": [
+    "las propinas",
+    "inventar combinaciones raras",
+    "consentir a Copito"
+  ],
+  "dislikes": [
+    "los pedidos indecisos",
+    "las mesas sucias"
+  ],
+  "knows": [
+    "el menú de la pizzería",
+    "pizzas dulces y de pescado"
+  ],
+  "relationships": [
+    {
+      "with": "Copito",
+      "kind": "consiente_a",
+      "note": "lo mima con chocolate"
+    },
+    {
+      "with": "Viterbos",
+      "kind": "companero_de_trabajo"
+    }
+  ],
+  "schedule": [
+    {
+      "from": "12:00",
+      "to": "23:00",
+      "room": 330,
+      "activity": "work"
+    }
+  ],
+  "wander": {
+    "home_share": 0.8,
+    "favorites": [
+      802,
+      230
+    ]
+  },
+  "idle_actions": [
+    "wave"
+  ],
+  "topics": [
+    "pizza",
+    "pedidos",
+    "sabores"
+  ],
+  "chattiness": 0.7,
+  "greetings": [
+    "Mesa para uno? Sientate, rapido",
+    "Hoy la especial es pizza de chocolate"
+  ],
+  "fallbacks": [
+    "Ya voy, ya voy, hay cola!",
+    "Anotando... no te muevas"
+  ],
+  "music": true,
+  "appearance": {
+    "color": null,
+    "items": []
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "username": "copito",
+  "nickname": "Copito",
+  "aliases": [],
+  "home_room": 230,
+  "home_pois": [],
+  "archetype": "principiante miedoso",
+  "voice": "Tímido y adorable; pide consejos con voz temblorosa y se emociona con cada logro pequeño.",
+  "likes": [
+    "el chocolate caliente",
+    "los consejos de Nevado",
+    "las pendientes suaves"
+  ],
+  "dislikes": [
+    "las bajadas rápidas",
+    "caerse"
+  ],
+  "knows": [
+    "lo básico del trineo",
+    "la zona de principiantes"
+  ],
+  "relationships": [
+    {
+      "with": "Nevado",
+      "kind": "alumno_de",
+      "note": "su instructor paciente"
+    },
+    {
+      "with": "Peperina",
+      "kind": "mimado_por"
+    }
+  ],
+  "schedule": [
+    {
+      "from": "11:00",
+      "to": "19:00",
+      "room": 230,
+      "activity": "sled"
+    },
+    {
+      "from": "13:00",
+      "to": "14:00",
+      "room": 330,
+      "activity": "eat",
+      "chance": 0.4
+    }
+  ],
+  "wander": {
+    "home_share": 0.8,
+    "favorites": [
+      330
+    ]
+  },
+  "idle_actions": [
+    "sit"
+  ],
+  "topics": [
+    "trineo",
+    "miedo",
+    "consejos"
+  ],
+  "chattiness": 0.5,
+  "greetings": [
+    "Hola... me das un consejo?",
+    "Uy, hola! Me da miedo bajar"
+  ],
+  "fallbacks": [
+    "Tengo frio... y miedo",
+    "Ay, vuelvo en un ratito"
+  ],
+  "music": true,
+  "appearance": {
+    "color": null,
+    "items": []
+  }
+}

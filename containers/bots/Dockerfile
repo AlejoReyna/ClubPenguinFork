@@ -8,6 +8,7 @@ ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 BOTS_PROVIDER_MODE=simulated \
 WORKDIR /app
 # Code only: credentials, configs, chat and operator files never enter the image.
 COPY --chown=10001:10001 bots/*.py /app/bots/
+COPY --chown=10001:10001 bots/data/*.json /app/bots/data/
 USER 10001:10001
 EXPOSE 9102
 ENTRYPOINT ["python", "-m", "bots"]

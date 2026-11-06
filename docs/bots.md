@@ -26,7 +26,14 @@ un plan aprobado, su aplicación y comprobar un reinicio real. Si la raíz vuelv
 a no coincidir, Kubernetes puede volver a cambiar permisos. No activar el
 despliegue automático.
 
-## Cambio de nombres y vestuario aplicado
+## Música (Spotify del jugador)
+
+Los jugadores con Spotify conectado en «Mi puffle» pueden pedirle su propia
+música a cualquier bot por su nombre («Cobra, pon despacito»). Está activado por
+defecto en cada bot (`"music": false` lo apaga) y solo funciona si el proceso
+tiene `BOTS_MUSIC_URL` y `BOTS_MUSIC_SECRET_FILE`. Ver
+[puffle-sin-descarga.md](puffle-sin-descarga.md#música-con-los-bots-cadencedj-cobra-juanito-viterbos-y-los-que-vengan).
+
 
 Las cuentas siguen siendo `baristaia`, `djia` y `pizzeroia`; sus nombres
 visibles son Juanito, DJ Cobra y Viterbos. Los alias Barista, DJ y
@@ -61,7 +68,7 @@ El puesto es el centro:
 | Rol | Sala | Zona x / y | Puesto | Fuente |
 |---|---|---|---|---|
 | BaristaIA | 110 | 300-360 / 290-350 | 330,320 | `coffee.swf`: suelo a la izquierda de la barra (barra x≥380, y 200-340) |
-| DJIA | 120 | 280-380 / 230-265 | 330,247 | `dance.swf`: delante de la cabina (y≤220), borde superior de la pista |
+| Cadence (djia) | 120 | — | **322,168** | Anclada en cabina, sin baile automático (2026-11-05) |
 | PizzeroIA | 330 | 365-430 / 258-290 | 397,274 | `pizza.swf`: delante del extremo derecho del mostrador, encima de las mesas; junto a `start_x/start_y` (400,278) |
 
 Se obtuvieron de la máscara `block_mc` de cada SWF exportada con FFDec (relleno =

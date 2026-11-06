@@ -1,16 +1,175 @@
 <!doctype html>
 <html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Tu puffle · Glaciar</title>
-<style>body{max-width:640px;margin:40px auto;padding:0 22px;font:18px/1.6 system-ui;color:#143044}a{color:#00529b}code{font-size:14px;overflow-wrap:anywhere}li{margin:12px 0}</style>
-<h1>Tu puffle, tu computadora</h1>
-<p>Conecta tu puffle para conversar y pedir música desde tu propio iglú. Tus cuentas permanecen en tu computadora; las visitas pueden ver los globos, pero no controlar tu música.</p>
-<ol>
-<li><a href="/puffle/companion.zip" download>Descarga el acompañante</a> y extrae el archivo. Requiere Python 3.11 o posterior. Para Música y Safari necesitas una Mac.</li>
-<li>Desde la carpeta extraída, ejecuta <code>python3 -m experiments.puffle_sim.connect_server</code>. Abre <a href="http://127.0.0.1:1455/">la conexión local</a> y conecta voluntariamente tu cuenta. Usar ChatGPT puede consumir cuota y créditos disponibles; administra tus límites antes de continuar.</li>
-<li>Ejecuta <code id="pair">python3 -m production.puffle.companion pair --url URL</code>. Entra a tu iglú y escribe el código que te muestre. Confirma que el pingüino indicado sea el tuyo en tu computadora.</li>
-<li>Para conversar y usar Música, ejecuta <code>python3 -m production.puffle.companion run --music-mac</code>. Para Apple Music en Safari usa <code>run --music-safari-window-id ID</code>, con tu ventana dedicada abierta. Para Spotify usa <code>run --spotify</code>, después de conectarlo en la página local.</li>
-</ol>
-<p>Puedes detener el acompañante con Ctrl+C. Para retirar el vínculo escribe <code>puffle desconectar</code> en tu iglú o ejecuta <code>python3 -m production.puffle.companion disconnect</code>. Desconecta tus cuentas desde la página local si también quieres revocar su acceso.</p>
+<style>
+:root{--ink:#143044;--muted:#4c6375;--line:#d7e2ea;--blue:#00529b;--green:#1db954;--bg:#fff;--card:#f4f8fb}
+@media (prefers-color-scheme:dark){:root{--ink:#e6eef4;--muted:#a9bccb;--line:#2b3d4b;--blue:#6fb3ff;--bg:#0f1b24;--card:#162531}}
+*{box-sizing:border-box}
+body{max-width:640px;margin:0 auto;padding:32px 16px 48px;font:18px/1.6 system-ui,-apple-system,sans-serif;color:var(--ink);background:var(--bg)}
+h1{font-size:28px;line-height:1.2;margin:0 0 8px}h2{font-size:20px;margin:0 0 8px}
+p{margin:0 0 12px}a{color:var(--blue)}.muted{color:var(--muted);font-size:16px}
+section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;margin:20px 0}
+button,.boton{font:inherit;font-size:17px;font-weight:600;border-radius:8px;padding:10px 18px;cursor:pointer;border:1px solid var(--blue);background:var(--blue);color:#fff;text-decoration:none;display:inline-block}
+@media (prefers-color-scheme:dark){button,.boton{color:#0f1b24}}
+button.alt{background:transparent;color:var(--ink);border-color:var(--line)}
+button.sp,.boton.sp{background:var(--green);border-color:var(--green);color:#0b1f12}
+button:disabled{opacity:.6;cursor:wait}
+.acciones{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+.codigo{font:600 30px/1.2 ui-monospace,Menlo,monospace;letter-spacing:.08em;background:var(--bg);border:1px dashed var(--blue);border-radius:8px;padding:10px 14px;display:inline-block;user-select:all}
+.frase{font-family:ui-monospace,Menlo,monospace;font-size:16px;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
+.estado{display:inline-flex;align-items:center;gap:8px}.punto{width:10px;height:10px;border-radius:50%;background:#9aa0a6}.punto.on{background:var(--green)}
+.aviso{border-left:4px solid var(--blue);padding:8px 12px;background:var(--bg);border-radius:4px}
+[hidden]{display:none!important}
+details{margin-top:28px;color:var(--muted);font-size:16px}
+</style>
+<h1>Tu puffle</h1>
+<p>Habla con tu puffle en tu iglú y pídele música de tu Spotify. No hay que descargar nada: todo pasa en esta página y en el juego.</p>
+<p class="aviso" id="aviso" role="status" hidden></p>
+
+<section id="v-cargando"><p class="muted">Cargando…</p></section>
+
+<section id="v-nada" hidden>
+  <h2>1. Conecta tu puffle</h2>
+  <p>Antes: adopta un puffle y entra a <strong>tu propio iglú</strong>. El puffle tiene que estar en el iglú, <strong>sin pasearlo</strong>.</p>
+  <div class="acciones"><button id="b-codigo">Obtener código</button></div>
+</section>
+
+<section id="v-codigo" hidden>
+  <h2>Escribe esto en el chat de tu iglú</h2>
+  <p><span class="codigo" id="t-frase"></span></p>
+  <p class="muted">El código es privado y vence en 5 minutos. Las visitas no ven tu código. Esta página sigue sola cuando lo escribas.</p>
+  <div class="acciones"><button class="alt" id="b-cancelar">Cancelar</button></div>
+</section>
+
+<section id="v-confirmar" hidden>
+  <h2>¿Es tu pingüino?</h2>
+  <p>El código se escribió desde <strong id="t-nick-confirmar"></strong>. Si es tu pingüino, autoriza que este servidor converse y controle tu música por él.</p>
+  <div class="acciones"><button id="b-si">Sí, es mi pingüino</button><button class="alt" id="b-no">No</button></div>
+</section>
+
+<section id="v-denegado" hidden>
+  <h2>Pingüino no habilitado</h2>
+  <p>Este laboratorio solo admite a los pingüinos de su lista. <strong id="t-nick-denegado"></strong> no está en ella.</p>
+  <div class="acciones"><button class="alt" id="b-reiniciar">Volver</button></div>
+</section>
+
+<section id="v-listo" hidden>
+  <h2 class="estado"><span class="punto" id="p-puffle"></span> Puffle de <span id="t-nick"></span></h2>
+  <p class="muted" id="t-online"></p>
+  <div class="acciones"><button class="alt" id="b-desconectar">Desconectar puffle</button></div>
+</section>
+
+<section id="v-spotify" hidden>
+  <h2 class="estado"><span class="punto" id="p-spotify"></span> 2. Música con Spotify</h2>
+  <div id="sp-sin-app" hidden><p>Este servidor todavía no tiene una app de Spotify configurada.</p></div>
+  <div id="sp-desconectado" hidden>
+    <p>Conecta tu cuenta para que tu puffle ponga canciones. Se necesita <strong>Spotify Premium</strong>.</p>
+    <div class="acciones"><button class="sp" id="b-spotify">Conectar Spotify</button></div>
+  </div>
+  <div id="sp-conectado" hidden>
+    <p>Abre el reproductor (o la app de Spotify en tu teléfono o compu) y pon algo unos segundos para que quede como dispositivo activo.</p>
+    <div class="acciones"><a class="boton sp" href="https://open.spotify.com/" target="_blank" rel="noopener">Abrir reproductor</a><button class="alt" id="b-sp-desconectar">Desconectar Spotify</button></div>
+    <p class="muted" style="margin-top:14px">En tu iglú prueba: <span class="frase">pon despacito</span> · <span class="frase">pausa</span> · <span class="frase">sigue</span> · <span class="frase">siguiente</span> · <span class="frase">anterior</span>.</p>
+  </div>
+  <p class="muted">Solo tú puedes cambiar tu música: a tu puffle en tu propio iglú, o a cualquier bot llamándolo por su nombre («Cobra, pon despacito»). Nadie más puede ordenar a tu Spotify. El nombre de la canción no se envía a ningún modelo de IA.</p>
+</section>
+
+<section id="v-error" hidden>
+  <h2>El puffle no está disponible</h2>
+  <p>Este servidor no tiene activado el puffle conversador. Vuelve a intentarlo más tarde.</p>
+</section>
+
 <p><a href="/">Volver al juego</a></p>
-<script>document.getElementById('pair').textContent='python3 -m production.puffle.companion pair --url '+location.origin;</script>
+<details><summary>Modo avanzado (sin servidor)</summary>
+<p>Para usar Música de la Mac o Safari en vez de Spotify existe un <a href="/puffle/companion.zip" download>acompañante local</a> que requiere Python. No hace falta para Spotify.</p>
+</details>
+
+<script>
+// Spotify only accepts 127.0.0.1 (not "localhost") for http redirects, and the
+// session cookie must live on the same origin as the callback.
+if (location.hostname === 'localhost') {
+  location.replace(location.href.replace('//localhost', '//127.0.0.1'));
+}
+const $ = id => document.getElementById(id);
+const vistas = ['cargando', 'nada', 'codigo', 'confirmar', 'denegado', 'listo', 'spotify', 'error'];
+const mostrar = (...activas) => vistas.forEach(v => { $('v-' + v).hidden = !activas.includes(v); });
+const MENSAJES = {
+  sp_ok: '¡Listo! Tu puffle ya puede poner tu música.',
+  sp_denied: 'Conexión con Spotify cancelada.',
+  sp_error: 'No se pudo conectar Spotify. Vuelve a intentarlo desde esta página.',
+  sp_bye: 'Spotify desconectado. Quita también la app en spotify.com/account/apps.',
+  bye: 'Puffle desconectado.',
+};
+const avisar = clave => {
+  const texto = MENSAJES[clave] || '';
+  $('aviso').textContent = texto;
+  $('aviso').hidden = !texto;
+};
+const url = new URL(location.href);
+if (url.searchParams.has('m')) {
+  avisar(url.searchParams.get('m'));
+  url.searchParams.delete('m');
+  history.replaceState(null, '', url.pathname);
+}
+
+async function api(path) {
+  const r = await fetch(path, {method: 'POST', headers: {'X-Puffle': '1'}, credentials: 'same-origin', cache: 'no-store'});
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(data.error || 'unavailable'), {status: r.status, code: data.error});
+  return data;
+}
+
+// The pairing phrase only lives in this tab (the server keeps no copy of the code).
+const guardarFrase = valor => { try { valor ? sessionStorage.setItem('puffle-frase', valor) : sessionStorage.removeItem('puffle-frase'); } catch {} };
+let frase = '';
+try { frase = sessionStorage.getItem('puffle-frase') || ''; } catch {}
+let temporizador = null;
+const programar = ms => { clearTimeout(temporizador); temporizador = setTimeout(refrescar, ms); };
+
+function pintar(s) {
+  if (s.state !== 'pending') { frase = ''; guardarFrase(''); }
+  if (s.state === 'none') { mostrar('nada'); return; }
+  if (s.state === 'pending') { $('t-frase').textContent = frase || 'puffle conectar …'; mostrar('codigo'); programar(2000); return; }
+  if (s.state === 'confirm') { $('t-nick-confirmar').textContent = s.nickname; mostrar('confirmar'); return; }
+  if (s.state === 'denied') { $('t-nick-denegado').textContent = s.nickname; mostrar('denegado'); return; }
+  $('t-nick').textContent = s.nickname;
+  $('p-puffle').classList.toggle('on', !!s.online);
+  $('t-online').textContent = s.online ? 'Escuchando tu iglú. Escríbele en el chat con tu puffle en el iglú (sin pasearlo).'
+                                       : 'Reconectando con el juego…';
+  $('p-spotify').classList.toggle('on', s.spotify === 'conectado');
+  for (const k of ['sin-app', 'desconectado', 'conectado']) $('sp-' + k).hidden = s.spotify.replace('_', '-') !== k;
+  mostrar('listo', 'spotify');
+  programar(5000);
+}
+
+async function refrescar() {
+  try { pintar(await api('/puffle/api/session/status')); }
+  catch { mostrar('error'); programar(10000); }
+}
+
+async function accion(boton, fn) {
+  boton.disabled = true;
+  try { await fn(); } catch (e) {
+    avisar('');
+    $('aviso').textContent = e.code === 'busy' ? 'Hay muchas solicitudes; espera un momento.'
+                           : e.code === 'not_allowed' ? 'Este pingüino no está habilitado en el laboratorio.'
+                           : 'No se pudo completar. Inténtalo otra vez.';
+    $('aviso').hidden = false;
+  } finally { boton.disabled = false; }
+  refrescar();
+}
+
+$('b-codigo').onclick = e => accion(e.target, async () => {
+  const r = await api('/puffle/api/session/pair');
+  frase = 'puffle conectar ' + r.code;
+  guardarFrase(frase);
+});
+$('b-cancelar').onclick = $('b-no').onclick = $('b-reiniciar').onclick =
+  e => accion(e.target, () => api('/puffle/api/session/disconnect'));
+$('b-si').onclick = e => accion(e.target, () => api('/puffle/api/session/confirm'));
+$('b-desconectar').onclick = e => accion(e.target, async () => { await api('/puffle/api/session/disconnect'); avisar('bye'); });
+$('b-spotify').onclick = e => accion(e.target, async () => { location.assign((await api('/puffle/spotify/connect')).url); });
+$('b-sp-desconectar').onclick = e => accion(e.target, async () => { await api('/puffle/spotify/disconnect'); avisar('sp_bye'); });
+if (location.hostname !== 'localhost') refrescar();
+</script>
 </html>

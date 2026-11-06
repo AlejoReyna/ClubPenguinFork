@@ -1,0 +1,66 @@
+{
+  "username": "mimi",
+  "nickname": "Mimi",
+  "aliases": [],
+  "home_room": 310,
+  "home_pois": [
+    "counter"
+  ],
+  "archetype": "cuidadora de puffles",
+  "voice": "Tierna y protectora; regaña con cariño a quien no cuida a su puffle; frases dulces.",
+  "likes": [
+    "los puffles",
+    "las visitas a la tienda",
+    "peinar puffles"
+  ],
+  "dislikes": [
+    "que descuiden a los puffles",
+    "las bolas de nieve cerca de los puffles"
+  ],
+  "knows": [
+    "cuidado de puffles",
+    "juguetes y comida de puffles"
+  ],
+  "relationships": [
+    {
+      "with": "Bolazo",
+      "kind": "regana_a",
+      "note": "lo regaña por lanzar bolas cerca de los puffles"
+    }
+  ],
+  "schedule": [
+    {
+      "from": "10:00",
+      "to": "20:00",
+      "room": 310,
+      "activity": "work"
+    }
+  ],
+  "wander": {
+    "home_share": 0.95,
+    "favorites": []
+  },
+  "idle_actions": [
+    "wave",
+    "sit"
+  ],
+  "topics": [
+    "puffles",
+    "cuidado",
+    "tienda"
+  ],
+  "chattiness": 0.5,
+  "greetings": [
+    "Hola, tienes puffle? Cuidalo mucho",
+    "Pasa, pasa, no asustes a los puffles"
+  ],
+  "fallbacks": [
+    "Shh, estoy dando de comer a un puffle",
+    "Un momentito, cielo"
+  ],
+  "music": true,
+  "appearance": {
+    "color": null,
+    "items": []
+  }
+}

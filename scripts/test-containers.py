@@ -40,9 +40,18 @@ def parse_args():
     parser.add_argument('--component-tag', action='append', default=[], metavar='NAME=TAG')
     parser.add_argument('--web-tag', help='also test the web image (nginx + proxy + registration route)')
     parser.add_argument('--bots-tag', help='also test a separate bots service against real, disposable Houdini')
+    parser.add_argument('--live-cast', action='store_true', help='26 simulated sessions and 10 protocol clients; requires --bots-tag')
+    parser.add_argument('--voices', action='store_true', help='also test opt-in Phase 2 with a synthetic loopback HTTP provider')
+    parser.add_argument('--life', action='store_true', help='also test Phase 3 invitations, following and returns with simulated providers')
     parser.add_argument('--puffle', action='store_true', help='test the production world and two isolated companions')
     parser.add_argument('--keep-logs', action='store_true', help='print container logs even when tests pass')
     args = parser.parse_args()
+    if args.live_cast and not args.bots_tag:
+        parser.error('--live-cast requires --bots-tag')
+    if args.voices and not args.live_cast:
+        parser.error('--voices requires --live-cast')
+    if args.life and not args.live_cast:
+        parser.error('--life requires --live-cast')
     tags = {name: args.tag for name in ('runtime', 'database')}
     for item in args.component_tag:
         name, _, value = item.partition('=')
@@ -133,12 +142,18 @@ try:
         else:
             raise RuntimeError('Postgres did not start')
         for alias, mode in [('login', 'login'), ('glaciar', 'world'), ('dash', 'dash')]:
-            start(alias, runtime, mode, extra=puffle_extra if mode == 'world' else [])
+            extra = list(puffle_extra if mode == 'world' else [])
+            if args.live_cast and mode in ('login', 'world'):
+                extra += ['-e', 'WORLD_CAPACITY=60']
+            start(alias, runtime, mode, extra=extra)
         start('proxy', runtime, 'proxy')
-        start('puffle', runtime, 'puffle', extra=puffle_extra or ['-e', 'PUFFLE_ENABLED=false'])
+        if not args.live_cast or args.puffle:
+            start('puffle', runtime, 'puffle', extra=puffle_extra or ['-e', 'PUFFLE_ENABLED=false'])
         dash = prefix + '-dash'
 
-        waits = [('login', 6112), ('glaciar', 9876), ('dash', 3000), ('proxy', 8765), ('puffle', 9103)]
+        waits = [('login', 6112), ('glaciar', 9876), ('dash', 3000), ('proxy', 8765)]
+        if not args.live_cast or args.puffle:
+            waits.append(('puffle', 9103))
         if args.web_tag:
             web = start('web', f'clubpenguin/web:{tags["web"]}')
             # Like the Kubernetes pod: the proxy shares the web container's network namespace,
@@ -197,9 +212,13 @@ try:
             print('PASS: nginx -> proxy -> login accepts allowed origins and refuses other origins and paths.')
             print(exec_script(dash, smoke, '--dash-url', 'http://web:8080').stdout.strip().replace('PASS:', 'PASS (via nginx):', 1))
         if args.bots_tag:
-            from bots_integration import check_bots
+            if args.live_cast:
+                from live_bots_integration import check_live_bots as check_bots
+            else:
+                from bots_integration import check_bots
             check_bots(root, docker, exec_script, dash, postgres, prefix + '-glaciar',
-                       prefix, label, tags['bots'], Path(temp))
+                       prefix, label, tags['bots'], Path(temp),
+                       **(dict(voices=args.voices, life=args.life) if args.live_cast else {}))
         if args.puffle:
             from puffle_integration import check_puffle
             check_puffle(root, docker, exec_script, dash, postgres)

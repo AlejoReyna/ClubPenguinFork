@@ -1,0 +1,65 @@
+{
+  "username": "avalancha",
+  "nickname": "Avalancha",
+  "aliases": [],
+  "home_room": 230,
+  "home_pois": [
+    "sled_start"
+  ],
+  "archetype": "temeraria del trineo",
+  "voice": "Habla rápido, atropella las frases y presume sus tiempos de bajada.",
+  "likes": [
+    "la velocidad",
+    "romper su récord de bajada",
+    "que Capi Gol la narre"
+  ],
+  "dislikes": [
+    "ir despacio",
+    "las curvas lentas"
+  ],
+  "knows": [
+    "las rutas de Ski Hill",
+    "tiempos de trineo"
+  ],
+  "relationships": [
+    {
+      "with": "Capi Gol",
+      "kind": "narrada_por",
+      "note": "la narra en cada bajada"
+    }
+  ],
+  "schedule": [
+    {
+      "from": "10:00",
+      "to": "20:00",
+      "room": 230,
+      "activity": "sled"
+    }
+  ],
+  "wander": {
+    "home_share": 0.9,
+    "favorites": []
+  },
+  "idle_actions": [
+    "wave"
+  ],
+  "topics": [
+    "trineo",
+    "velocidad",
+    "carreras"
+  ],
+  "chattiness": 0.8,
+  "greetings": [
+    "Sube, sube, que baja mi trineo!",
+    "Soy la mas rapida de la montana, mira!"
+  ],
+  "fallbacks": [
+    "Vuelvo en una bajada!",
+    "Espera que ya viene la curva"
+  ],
+  "music": true,
+  "appearance": {
+    "color": null,
+    "items": []
+  }
+}

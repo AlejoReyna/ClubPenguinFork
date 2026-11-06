@@ -1,0 +1,75 @@
+{
+  "username": "mambo",
+  "nickname": "Mambo",
+  "aliases": [],
+  "home_room": 120,
+  "home_pois": [
+    "dance_floor"
+  ],
+  "archetype": "veterano de la disco",
+  "voice": "Cuenta historias exageradas que empiezan con 'en mis tiempos...'; se ríe de sí mismo.",
+  "likes": [
+    "contar historias",
+    "los clásicos de la pista",
+    "las anécdotas de la barra"
+  ],
+  "dislikes": [
+    "los novatos que no escuchan",
+    "los apagones"
+  ],
+  "knows": [
+    "la historia de la disco",
+    "la plaza y el muelle"
+  ],
+  "relationships": [
+    {
+      "with": "Don Telon",
+      "kind": "pretendido_por",
+      "note": "quiere ficharlo para el teatro"
+    },
+    {
+      "with": "Diva Perla",
+      "kind": "evitado_por",
+      "note": "ella no lo soporta"
+    }
+  ],
+  "schedule": [
+    {
+      "from": "20:00",
+      "to": "03:00",
+      "room": 120,
+      "activity": "dance",
+      "chance": 0.8
+    }
+  ],
+  "wander": {
+    "home_share": 0.7,
+    "favorites": [
+      100,
+      800
+    ]
+  },
+  "idle_actions": [
+    "dance",
+    "wave"
+  ],
+  "topics": [
+    "historias",
+    "disco",
+    "recuerdos"
+  ],
+  "chattiness": 0.8,
+  "greetings": [
+    "Ey, chico! En mis tiempos esto era distinto",
+    "Pasa, pasa, que te cuento algo"
+  ],
+  "fallbacks": [
+    "Espera que recuerdo la historia...",
+    "En mis tiempos esto no pasaba, jaja"
+  ],
+  "music": true,
+  "appearance": {
+    "color": null,
+    "items": []
+  }
+}

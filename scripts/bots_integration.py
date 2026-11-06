@@ -41,7 +41,7 @@ def check_bots(root, docker, exec_script, dash, postgres, world, network, label,
 import sys
 payload = json.load(sys.stdin)
 for bot in payload['bots']:
-    register('http://dash:3000', bot['nickname'], bot['password'])
+    register('http://dash:3000', bot['username'], bot['password'])
 print('registered')
 '''
     result = docker(['exec', '-i', dash, 'python', '-c', register_source],
@@ -137,7 +137,7 @@ async def observe():
             present={int(v.split('|')[0]) for v in frame.args if '|' in v and v.split('|')[0].isdigit()}
             assert present & all_ids == {expected}, 'Wrong room roster'
             record=next(v.split('|') for v in frame.args if v.split('|')[0] == str(expected))
-            assert record[1] == {'baristaia': 'BaristaIA', 'djia': 'DJIA', 'pizzeroia': 'PizzeroIA'}[name], 'Wrong registered nickname in roster'
+            assert record[1] == {'baristaia': 'Juanito', 'djia': 'Cadence', 'pizzeroia': 'Viterbos'}[name], 'Wrong registered nickname in roster'
             assert int(record[2]) & 8, 'Name is not approved for Spanish'
             wrong={'baristaia':'DJ','djia':'Pizzero','pizzeroia':'Barista'}[name]
             await conn.send_chat(int(pid),wrong+' hola')
@@ -162,11 +162,14 @@ async def observe():
                     if sender in all_ids and frame.op=='sm': replies.append(sender)
                     if sender==expected and frame.op=='sp':
                         x,y=map(int,frame.args[1:3])
-                        # Mirrors bot_accounts.MEASURED_WORK_AREAS (coffee/dance/pizza.swf block_mc).
                         a={'baristaia':(300,360,290,350),'djia':(280,380,230,265),'pizzeroia':(365,430,258,290)}[name]
                         assert a[0] <= x <= a[1] and a[2] <= y <= a[3], 'Move outside measured area'
                         moved=True
-            assert moved and replies==[expected], 'Expected movement and exactly one addressed reply'
+            stationary={'djia','pizzeroia'}
+            if name in stationary:
+                assert not moved and replies==[expected], 'Stationary bot must not walk but should reply'
+            else:
+                assert moved and replies==[expected], 'Expected movement and exactly one addressed reply'
             count+=1
         print(json.dumps({'rooms':count}))
     finally:
@@ -363,7 +366,7 @@ asyncio.run(observe())
     if len(events) != 5 or sum(e['error'] for e in events) != 2:
         raise RuntimeError('Retries and daily quota did not limit fake HTTP requests')
     prompts = ' '.join(e['system'] for e in events)
-    if not all(role in prompts for role in ('BaristaIA', 'DJIA', 'PizzeroIA')):
+    if not all(role in prompts for role in ('Juanito', 'Cadence', 'Viterbos')):
         raise RuntimeError('Expected distinct role prompts at the fake HTTP server')
     if any(e['model'] != 'kimi-k2.6' for e in events):
         raise RuntimeError('Unexpected model in fake requests')

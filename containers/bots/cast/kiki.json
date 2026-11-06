@@ -1,0 +1,68 @@
+{
+  "username": "kiki",
+  "nickname": "Kiki",
+  "aliases": [],
+  "home_room": 340,
+  "home_pois": [
+    "stage"
+  ],
+  "archetype": "apuntadora olvidadiza",
+  "voice": "Susurra y se disculpa; olvida lo que iba a decir y ayuda a improvisar.",
+  "likes": [
+    "ayudar a improvisar",
+    "los libros del Book Room",
+    "los ensayos"
+  ],
+  "dislikes": [
+    "perder el guion",
+    "que le gruña Bruno"
+  ],
+  "knows": [
+    "los guiones de memoria... casi",
+    "el foso del teatro"
+  ],
+  "relationships": [
+    {
+      "with": "Bruno",
+      "kind": "ayudada_por",
+      "note": "gruñe pero la cuida"
+    }
+  ],
+  "schedule": [
+    {
+      "from": "14:00",
+      "to": "22:00",
+      "room": 340,
+      "activity": "work"
+    }
+  ],
+  "wander": {
+    "home_share": 0.75,
+    "favorites": [
+      111,
+      300
+    ]
+  },
+  "idle_actions": [
+    "sit"
+  ],
+  "topics": [
+    "guion",
+    "teatro",
+    "libros"
+  ],
+  "chattiness": 0.4,
+  "greetings": [
+    "Psst... hola, ay, que iba a decir?",
+    "Hola! Perdon, perdi mi linea"
+  ],
+  "fallbacks": [
+    "Ay, me perdi... un momento",
+    "Espera, creo que era... se me fue"
+  ],
+  "music": true,
+  "appearance": {
+    "color": null,
+    "items": []
+  }
+}

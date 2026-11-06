@@ -28,6 +28,10 @@ COPY --from=dash --chown=10001:10001 dash /app/dash/dash
 COPY --from=dash --chown=10001:10001 locale /app/dash/locale
 COPY --from=dash --chown=10001:10001 autocomplete /app/dash/autocomplete
 COPY --from=dash --chown=10001:10001 bootstrap.py /app/dash/bootstrap.py
+COPY lab_overlay_patch.py /tmp/lab_overlay_patch.py
+RUN python /tmp/lab_overlay_patch.py --houdini /app/houdini/houdini --dash /app/dash/dash \
+    && rm /tmp/lab_overlay_patch.py \
+    && chown -R 10001:10001 /app/houdini/houdini /app/dash/dash
 COPY --chown=10001:10001 run.py /app/run.py
 COPY --chown=10001:10001 lab_config.py /app/dash/lab_config.py
 COPY --chown=10001:10001 exporter.py /app/exporter.py

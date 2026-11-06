@@ -197,6 +197,8 @@ def main():
             raise RuntimeError('World restart followed by provision changed account ids')
         print('PASS: after a world restart the same three accounts are reused; roster bit 8 still holds.')
 
+        check_cast_provision(shim_dir, kubeconfig, credentials, state_path, state, postgres, bank)
+
         walk_positions(prefix, label, dash, postgres, credentials, ids)
     finally:
         cleanup()
@@ -220,7 +222,7 @@ def role_rows(postgres):
 
 
 def assert_roles(rows):
-    expected = {'baristaia': 'BaristaIA', 'djia': 'DJIA', 'pizzeroia': 'PizzeroIA'}
+    expected = {name.lower(): bot_accounts.WORK_VISIBLE[name][0] for name, *_ in bot_accounts.WORK_ROLES}
     if sorted(row['username'] for row in rows) != sorted(expected):
         raise RuntimeError('Role account set mismatch')
     for row in rows:
@@ -237,7 +239,8 @@ def secret_check(path):
     import base64
     document = json.loads(base64.b64decode(encoded))
     names = {bot['username']: bot['nickname'] for bot in document['bots']}
-    if names != {'baristaia': 'BaristaIA', 'djia': 'DJIA', 'pizzeroia': 'PizzeroIA'}:
+    expected = {name.lower(): bot_accounts.WORK_VISIBLE[name][0] for name, *_ in bot_accounts.WORK_ROLES}
+    if names != expected:
         raise RuntimeError('Secret config does not name the three roles')
     if any('password' not in bot or len(bot['password']) < 8 for bot in document['bots']):
         raise RuntimeError('Secret config is missing passwords')
@@ -245,7 +248,7 @@ def secret_check(path):
 
 
 def run_py(*args):
-    result = subprocess.run([sys.executable, *args], cwd=str(ROOT), capture_output=True, text=True)
+    result = subprocess.run([sys.executable, '-I', *args], cwd=str(ROOT), capture_output=True, text=True)
     if result.returncode != 0:
         raise RuntimeError((result.stderr or result.stdout or 'command failed')[-1500:])
     return result
@@ -255,12 +258,93 @@ def run_provision(shim_dir, kubeconfig, credentials, state_path, execute=False):
     env = os.environ.copy()
     env['PATH'] = str(shim_dir) + os.pathsep + env.get('PATH', '')
     env['CP_BANK_STATE'] = str(state_path)
-    command = [sys.executable, str(ROOT / 'scripts/create-bot-accounts.py'),
+    command = [sys.executable, '-I', str(ROOT / 'scripts/create-bot-accounts.py'),
                '--kubeconfig', str(kubeconfig), '--expected-node', NODE,
                '--work-roles', '--credentials-file', str(credentials)]
     if execute:
         command.append('--execute')
     return subprocess.run(command, cwd=str(ROOT), capture_output=True, text=True, env=env)
+
+
+def check_cast_provision(shim_dir, kubeconfig, credentials, state_path, state, postgres, bank):
+    """All writes go through this bank's shim, never a real Kubernetes client."""
+    import hashlib
+    cast_file = bank / 'cast.json'
+    cast_file.write_text(json.dumps([json.loads(p.read_text())
+                                    for p in sorted((ROOT / 'containers/bots/cast').glob('*.json'))]))
+    candidate = bank / 'cast-credentials.json'
+    run_py('scripts/prepare-work-bots.py', '--cast', str(cast_file),
+           '--base-credentials', str(credentials), '--output', str(candidate))
+    fingerprint = hashlib.sha256(candidate.read_bytes()).hexdigest()
+    document = json.loads(candidate.read_text())
+    if len(document['bots']) != 26 or document['bots'][:3] != json.loads(credentials.read_text())['bots']:
+        raise RuntimeError('Cast preparation did not preserve the three base identities')
+    refused = subprocess.run([sys.executable, '-I', 'scripts/prepare-work-bots.py', '--cast', str(cast_file),
+                              '--output', str(candidate)], cwd=ROOT, capture_output=True, text=True)
+    if refused.returncode == 0 or hashlib.sha256(candidate.read_bytes()).hexdigest() != fingerprint:
+        raise RuntimeError('Existing private candidate was overwritten')
+
+    def provision(execute=False, path=candidate):
+        env = os.environ.copy()
+        env['PATH'] = str(shim_dir) + os.pathsep + env.get('PATH', '')
+        env['CP_BANK_STATE'] = str(state_path)
+        command = [sys.executable, '-I', str(ROOT / 'scripts/create-bot-accounts.py'),
+                   '--kubeconfig', str(kubeconfig), '--expected-node', NODE,
+                   '--cast', str(cast_file), '--credentials-file', str(path)]
+        if execute:
+            command.append('--execute')
+        return subprocess.run(command, cwd=ROOT, capture_output=True, text=True, env=env)
+
+    def count():
+        return int(docker(['exec', postgres, 'psql', '-U', 'houdini', '-d', 'houdini', '-At',
+                           '-c', 'SELECT count(*) FROM penguin;']).stdout.strip())
+
+    before = count()
+    preview = provision()
+    require_ok(preview, bank / 'shim.log')
+    if 'Preview: 23 new accounts, 3 existing' not in preview.stdout or count() != before:
+        raise RuntimeError('Cast preview changed accounts or reported the wrong roster')
+    state['replicas'] = 1
+    state_path.write_text(json.dumps(state))
+    blocked = provision(True)
+    if blocked.returncode == 0 or count() != before:
+        raise RuntimeError('Cast provisioning did not refuse replicas=1')
+    state['replicas'], state['pods'] = 0, 1
+    state_path.write_text(json.dumps(state))
+    blocked = provision(True)
+    if blocked.returncode == 0 or 'no bots pods remain' not in blocked.stderr or count() != before:
+        raise RuntimeError('Cast provisioning did not refuse lingering pods')
+    state['pods'] = 0
+    state_path.write_text(json.dumps(state))
+    for created in (23, 0):
+        require_ok(provision(True), bank / 'shim.log')
+        summary = json.loads((bank / 'provisioning.json').read_text())
+        if summary.get('created') != created or summary.get('roster_approved') != 26:
+            raise RuntimeError('Cast provisioning summary or roster verification failed')
+        if hashlib.sha256(candidate.read_bytes()).hexdigest() != fingerprint:
+            raise RuntimeError('Cast provisioner overwrote the private candidate')
+    if count() != before + 23:
+        raise RuntimeError('Cast retry created duplicate accounts')
+    no_private = provision(True, path=bank / 'missing.json')
+    if no_private.returncode == 0:
+        raise RuntimeError('Cast provisioner adopted accounts without a private file')
+    secret_hash = hashlib.sha256(Path(state['secret_path']).read_bytes()).hexdigest()
+    for statement, restore in (
+        ("UPDATE penguin SET nickname='Renamed' WHERE username='lolaritmo'",
+         "UPDATE penguin SET nickname='Lola Ritmo' WHERE username='lolaritmo'"),
+        ("UPDATE penguin SET approval_es=false WHERE username='lolaritmo'",
+         "UPDATE penguin SET approval_es=true WHERE username='lolaritmo'"),
+        ("UPDATE penguin SET moderator=true WHERE username='lolaritmo'",
+         "UPDATE penguin SET moderator=false WHERE username='lolaritmo'"),
+    ):
+        docker(['exec', postgres, 'psql', '-U', 'houdini', '-d', 'houdini', '-c', statement])
+        rejected = provision(True)
+        if rejected.returncode == 0 or hashlib.sha256(Path(state['secret_path']).read_bytes()).hexdigest() != secret_hash:
+            raise RuntimeError('Invalid name, approval or privilege reached the shim Secret')
+        docker(['exec', postgres, 'psql', '-U', 'houdini', '-d', 'houdini', '-c', restore])
+    print('PASS: --cast preview; replicas/pod/file guards; 23 new + 3 preserved accounts; '
+          '26 names, rooms and Spanish roster bits verified; retry creates zero; candidate unchanged; '
+          'renamed, unapproved and privileged accounts refused before Secret publication.')
 
 
 def require_ok(result, log_path):
@@ -342,11 +426,13 @@ async def observe():
         await conn.login_legacy(identity["username"], world_login_password(key, rndk), 5)
         await conn.join_world(int(pid), key, 5)
         areas = doc["areas"]
+        stationary = set(doc.get("stationary") or [])
         for name, room in doc["rooms"]:
             await conn.join_room(room, 5)
             points = []
             until = asyncio.get_running_loop().time() + 8
-            while asyncio.get_running_loop().time() < until and len(points) < 2:
+            need = 0 if name in stationary else 2
+            while asyncio.get_running_loop().time() < until and len(points) < need:
                 try:
                     raw = await conn.read_line(0.5)
                 except TimeoutError:
@@ -361,7 +447,7 @@ async def observe():
                         raise SystemExit("outside")
                     points.append([x, y])
             found[name] = points
-        print(json.dumps(found))
+        print(json.dumps({"points": found}))
     finally:
         await conn.close()
 asyncio.run(observe())
@@ -369,15 +455,20 @@ asyncio.run(observe())
     areas = {name.lower(): [bot_accounts.MEASURED_WORK_AREAS[name][key]
                             for key in ('min_x', 'max_x', 'min_y', 'max_y')]
              for name in bot_accounts.MEASURED_WORK_AREAS}
+    stationary = [name.lower() for name, post in bot_accounts.MEASURED_WORK_POSTS.items()
+                  if post is not None]
     result = docker(['exec', '-i', dash, 'python', '-c', observe], input_text=json.dumps({
         'observer': observer, 'ids': ids,
         'rooms': [['baristaia', 110], ['djia', 120], ['pizzeroia', 330]],
-        'areas': areas}))
-    points = json.loads(result.stdout)
-    if any(len(points.get(name, [])) < 1 for name in ROLES):
-        raise RuntimeError('A bot did not walk inside its measured area')
-    print('PASS: real bots service walked inside the measured areas: '
-          + ', '.join('%s %s' % (name, points[name]) for name in ROLES))
+        'areas': areas, 'stationary': stationary}))
+    payload = json.loads(result.stdout)
+    points = payload['points']
+    if len(points.get('baristaia', [])) < 1:
+        raise RuntimeError('Barista did not walk inside the measured area')
+    if points.get('djia') or points.get('pizzeroia'):
+        raise RuntimeError('A stationary work bot moved on the room floor')
+    print('PASS: Juanito walked; Cadence and Viterbos stayed put: '
+          + ', '.join('%s %s' % (name, points.get(name, [])) for name in ROLES))
     docker(['restart', '-t', '8', service])
     deadline = time.monotonic() + 40
     while time.monotonic() < deadline:
@@ -452,6 +543,8 @@ elif args[:2] == ['get', 'nodes']:
 elif args[:3] == ['get', 'deployment', 'bots']:
     replicas = int(state['replicas'])
     emit({'spec': {'replicas': replicas}, 'status': {'replicas': replicas}})
+elif args[:2] == ['get', 'pods']:
+    emit({'items': [{'metadata': {'name': 'lingering-bot'}}] if state.get('pods') else []})
 elif args[:3] == ['get', 'secret', 'bot-credentials']:
     if Path(state['marker_path']).exists():
         sys.stdout.write('secret/bot-credentials\n')

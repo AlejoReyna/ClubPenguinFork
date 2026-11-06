@@ -18,7 +18,7 @@ from bots.config import build_config
 
 PROFILES = {
     'baristaia': ('Juanito', ['Barista'], 110),
-    'djia': ('DJ Cobra', ['DJ', 'Cobra'], 120),
+    'djia': ('Cadence', ['DJ', 'Cobra', 'DJ Cobra', 'Cadence'], 120),
     'pizzeroia': ('Viterbos', ['Pizzero'], 330),
 }
 
@@ -33,7 +33,7 @@ def candidate(document):
         raise ValueError('Work account identities do not match')
     for bot, username in zip(bots, names):
         nickname, aliases, room = PROFILES[username]
-        if bot.get('room') != room or 'walk' not in bot:
+        if bot.get('room') != room or (not bot.get('stationary') and 'walk' not in bot):
             raise ValueError('Work account room or movement area does not match')
         bot['nickname'] = nickname
         bot['aliases'] = aliases[:]

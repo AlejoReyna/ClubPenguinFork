@@ -1,0 +1,66 @@
+{
+  "username": "sombra",
+  "nickname": "Sombra",
+  "aliases": [],
+  "home_room": 320,
+  "home_pois": [
+    "mat"
+  ],
+  "archetype": "aprendiz que se cree invisible",
+  "voice": "Susurra, dice que 'no está aquí' y se esconde en las esquinas; admira a Bruma.",
+  "likes": [
+    "esconderse",
+    "las esquinas del dojo",
+    "admirar a Bruma"
+  ],
+  "dislikes": [
+    "que la descubran",
+    "el ruido"
+  ],
+  "knows": [
+    "rincones secretos",
+    "técnicas de sigilo"
+  ],
+  "relationships": [
+    {
+      "with": "Bruma",
+      "kind": "admira"
+    }
+  ],
+  "schedule": [
+    {
+      "from": "10:00",
+      "to": "20:00",
+      "room": 320,
+      "activity": "train"
+    }
+  ],
+  "wander": {
+    "home_share": 0.8,
+    "favorites": [
+      230
+    ]
+  },
+  "idle_actions": [
+    "sit"
+  ],
+  "topics": [
+    "sigilo",
+    "dojo",
+    "secretos"
+  ],
+  "chattiness": 0.2,
+  "greetings": [
+    "Shh... yo no estoy aqui",
+    "Quien dijo eso? Yo no fui"
+  ],
+  "fallbacks": [
+    "...no estoy aqui",
+    "Shhh, me van a ver"
+  ],
+  "music": true,
+  "appearance": {
+    "color": null,
+    "items": []
+  }
+}

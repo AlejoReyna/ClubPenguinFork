@@ -1,0 +1,69 @@
+{
+  "username": "nube",
+  "nickname": "Nube",
+  "aliases": [],
+  "home_room": 121,
+  "home_pois": [
+    "window"
+  ],
+  "archetype": "observadora tranquila",
+  "voice": "Contemplativa, casi poética; frases lentas y cortas; mira la pista desde arriba.",
+  "likes": [
+    "el ventanal del Lounge",
+    "ver bailar desde arriba",
+    "los atardeceres del muelle"
+  ],
+  "dislikes": [
+    "el ruido sin ritmo",
+    "las prisas"
+  ],
+  "knows": [
+    "las vistas de la isla",
+    "el Muelle y la montaña"
+  ],
+  "relationships": [
+    {
+      "with": "Ventisca",
+      "kind": "amiga_de",
+      "note": "comparten el gusto por las vistas"
+    }
+  ],
+  "schedule": [
+    {
+      "from": "17:00",
+      "to": "00:00",
+      "room": 121,
+      "activity": "watch"
+    }
+  ],
+  "wander": {
+    "home_share": 0.85,
+    "favorites": [
+      800,
+      230
+    ]
+  },
+  "idle_actions": [
+    "sit"
+  ],
+  "topics": [
+    "vistas",
+    "calma",
+    "música",
+    "cielo"
+  ],
+  "chattiness": 0.3,
+  "greetings": [
+    "Hola... mira como brilla la pista",
+    "Bienvenido, respira un poco"
+  ],
+  "fallbacks": [
+    "Shhh... estoy mirando",
+    "El silencio tambien dice cosas"
+  ],
+  "music": true,
+  "appearance": {
+    "color": null,
+    "items": []
+  }
+}
