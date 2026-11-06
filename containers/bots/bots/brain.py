@@ -112,6 +112,12 @@ class Brain:
             {'role': 'system', 'content': 'SITUACION (datos): ' + json.dumps(self.situation(now), ensure_ascii=False, sort_keys=True)},
         ]
         messages.extend(self.memory.context(sender_id))
+        recall = getattr(self.session, 'recall', None)
+        if recall is not None:
+            note = recall.get(self.bot.index, sender_id)
+            if note:
+                messages.append({'role': 'system', 'content': 'NOTA_DE_RELACION (datos): '
+                                 + json.dumps({'resumen': note}, ensure_ascii=False, sort_keys=True)})
         messages.append({'role': 'user', 'content': json.dumps({
             'tipo': 'saludo_de_entrada' if greeting else 'mensaje_del_jugador',
             'nombre': self.session.roster.get(sender_id, 'un jugador')[:30],
@@ -137,6 +143,46 @@ class Brain:
             safe = [item for item in safe if item and self.output_filter.check(item) is None]
             line = self.rng.choice(safe) if safe else ''
         return Answer(line, action, source)
+
+    def _user_turns(self, sender_id):
+        return sum(1 for turn in self.memory.context(sender_id) if turn['role'] == 'user')
+
+    async def summarize_relationship(self, sender_id):
+        """One P2 completion after enough turns; simulated mode uses a local stub."""
+        recall = getattr(self.session, 'recall', None)
+        settings = self.session.director.config.recall if self.session.director else None
+        if recall is None or settings is None or not settings.enabled:
+            return False
+        if self._user_turns(sender_id) < settings.min_turns:
+            return False
+        context = self.memory.context(sender_id)
+        if isinstance(self.session.provider, SimulatedProvider):
+            last = [turn['content'] for turn in context if turn['role'] == 'user'][-2:]
+            note = ' '.join(last)[: settings.max_note_chars]
+            if not note:
+                return False
+            answer = await self.safe(note, source='local')
+            return recall.upsert(self.bot.index, sender_id, answer.say)
+        payload = [
+            {'role': 'system', 'content': self.rules()},
+            {'role': 'system', 'content': 'FICHA (datos): ' + json.dumps(self.profile(), ensure_ascii=False, sort_keys=True)},
+            {'role': 'user', 'content': json.dumps({
+                'tarea': 'resumen_de_relacion',
+                'turnos': context[-settings.min_turns * 2:],
+                'reglas': f'Una sola frase en espanol, maximo {settings.max_note_chars} caracteres. '
+                          'Sin nombres propios, enlaces, correos, telefonos ni datos personales. '
+                          'Solo hechos utiles del chat reciente.',
+            }, ensure_ascii=False, sort_keys=True)},
+        ]
+        try:
+            raw, _usage = await self.session.provider.complete(payload, priority=spend.P2,
+                max_completion_tokens=min(120, settings.max_note_chars))
+        except ProviderError:
+            return False
+        answer = await self.safe(raw, source='llm')
+        if not answer.say:
+            return False
+        return recall.upsert(self.bot.index, sender_id, answer.say)
 
     async def reply(self, sender_id, message, *, priority=spend.P0, model=True, greeting=False):
         if asks_about_ai(message) and not greeting:

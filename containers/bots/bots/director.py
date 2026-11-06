@@ -2,7 +2,7 @@
 
 Only enabled explicitly in Phase 2. Queues, deduplication and numeric-player
 maps are bounded. Optional Phase 3 travel shares this owner's reservations;
-chat and social memory are never persisted here.
+short-term chat stays in RAM; optional Phase 4 notes use recall.sqlite.
 """
 import asyncio
 from collections import OrderedDict
@@ -18,6 +18,7 @@ import time
 from . import metrics, spend, text
 from .brain import Brain, asks_about_ai
 from .provider import SimulatedProvider
+from .recall import wants_forget
 
 logger = logging.getLogger('bots.director')
 _CACHE_LIMIT = 4096
@@ -56,10 +57,13 @@ class RoomQueue:
 
 
 class Director:
-    def __init__(self, config, sessions, world, rng=None, clock=time.monotonic, utcnow=None, ledger=None):
+    def __init__(self, config, sessions, world, rng=None, clock=time.monotonic, utcnow=None,
+                 ledger=None, recall=None):
         self.config, self.sessions, self.world = config, list(sessions), world
         self.settings = config.dialogue
         self.ledger = ledger
+        self.recall = recall
+        self._summarized = {}
         self.rng = rng or random.Random(config.service.life_seed)
         self.clock = clock
         self.utcnow = utcnow or (lambda: datetime.datetime.now(datetime.timezone.utc))
@@ -194,7 +198,19 @@ class Director:
         if pending:
             pending.cancel()  # a speaking human gets a reply, not a delayed second hello
         speaker = self.choose(room, sender, str(message))
+        if speaker is None and self.recall and wants_forget(str(message)):
+            last = self.continuity.get((room, sender))
+            if last:
+                speaker = next((s for s in self.active(room) if s.index == last[0]), None)
         if speaker is None:
+            return
+        if self.recall and wants_forget(str(message)):
+            self.recall.delete(speaker.index, int(sender))
+            self.brains[speaker.index].memory.forget(sender)
+            self._summarized.pop((speaker.index, int(sender)), None)
+            if not self._enqueue(Turn(room, (speaker,), (speaker.conn,), sender, str(message)[:300],
+                                      local='Listo, borre lo que recordaba de ti.')):
+                await speaker.metrics.skipped(speaker.index, metrics.SKIP_DIALOGUE_QUEUE)
             return
         allowed, reason = speaker.gate.try_reserve(speaker.index, sender)
         if not allowed:
@@ -444,8 +460,24 @@ class Director:
                 # Only this human's turns enter this bot's bounded short-term memory.
                 content = brain.messages(turn.sender, turn.message)[-1]['content']
                 brain.memory.add(turn.sender, content, answer.say)
+                if self.recall and self.config.recall.enabled:
+                    key = (session.index, int(turn.sender))
+                    turns = sum(1 for item in brain.memory.context(turn.sender) if item['role'] == 'user')
+                    if turns >= self.config.recall.min_turns and self._summarized.get(key, 0) < turns:
+                        self._summarized[key] = turns
+                        asyncio.create_task(self._summarize(session.index, turn.sender),
+                                            name=f'recall-{session.index}-{turn.sender}')
             if travel_ticket:
                 self.travel.start(travel_ticket)
+
+    async def _summarize(self, bot_index, sender_id):
+        brain = self.brains.get(bot_index)
+        if brain is None:
+            return
+        try:
+            await brain.summarize_relationship(sender_id)
+        except Exception:
+            logger.exception('relationship summary failed for bot %s player %s', bot_index, sender_id)
 
     def event(self, kind, room, key, speakers, minimum, maximum):
         if self.events is None or not speakers or not self.world.has_humans(room):

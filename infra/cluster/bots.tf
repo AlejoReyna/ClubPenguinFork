@@ -114,6 +114,7 @@ resource "kubernetes_deployment_v1" "bots" {
               var.bots_cast_enabled ? { BOTS_CAST_DIR = "/etc/bots-cast", BOTS_TZ = var.bots_timezone } : {},
               var.bots_dialogue_enabled ? { BOTS_DIALOGUE_ENABLED = "true" } : {},
               var.bots_life_enabled ? { BOTS_LIFE_ENABLED = "true" } : {},
+              var.bots_recall_enabled ? { BOTS_RECALL_ENABLED = "true" } : {},
               var.bots_daily_spend_cap_usd == null ? {} : { BOTS_DAILY_SPEND_CAP_USD = tostring(var.bots_daily_spend_cap_usd) },
               var.bots_monthly_spend_cap_usd == null ? {} : { BOTS_MONTHLY_SPEND_CAP_USD = tostring(var.bots_monthly_spend_cap_usd) },
               var.bots_max_concurrent == null ? {} : { BOTS_MAX_CONCURRENT = tostring(var.bots_max_concurrent) },

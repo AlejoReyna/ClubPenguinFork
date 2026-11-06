@@ -28,6 +28,7 @@ world_capacity = "60"
 # bots_cast_enabled          = true
 # bots_dialogue_enabled      = true # local validation first; api spending needs separate authorization
 # bots_life_enabled          = true # Phase 3 local travel/events; confirm BOTS_TZ first
+# bots_recall_enabled        = true # Phase 4 SQLite relationship notes on the budget PVC
 # bots_daily_spend_cap_usd    = 1.00
 # bots_monthly_spend_cap_usd  = 30.00
 # bots_max_concurrent        = 4

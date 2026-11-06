@@ -246,3 +246,19 @@ class DirectorTests(unittest.IsolatedAsyncioTestCase):
         await director.on_chat(observer, 999, 'Paco, donde anda Rayo?')
         await drain(director, 300)
         self.assertIn('no se', sent(manager)[-1][1])
+
+    async def test_recall_summarizes_after_three_turns_and_forget_clears_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'recall.sqlite'
+            manager, _provider, director = await self.make(
+                recall={'enabled': True, 'path': str(path), 'min_turns': 3})
+            observer = manager.sessions[0]
+            for line in ('Lola, hola uno', 'Lola, hola dos', 'Lola, hola tres'):
+                await director.on_chat(observer, 999, line)
+                await drain(director)
+            await asyncio.sleep(0.05)
+            self.assertIsNotNone(manager.recall.get(observer.index, 999))
+            await director.on_chat(observer, 999, 'Lola, borra mi memoria')
+            await drain(director)
+            self.assertIsNone(manager.recall.get(observer.index, 999))
+            self.assertIn('borre', sent(manager)[-1][1].lower())

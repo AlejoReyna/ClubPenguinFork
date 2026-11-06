@@ -49,7 +49,7 @@ class FakeVoice:
             self.active -= 1
 
 
-def fixture(usernames=('lolaritmo', 'titogroove', 'mambo'), provider=None, life=None, **dialogue):
+def fixture(usernames=('lolaritmo', 'titogroove', 'mambo'), provider=None, life=None, recall=None, **dialogue):
     settings = dict(enabled=True, greeting_chance=0, hello_chance=1, question_chance=1,
                     other_chance=1, room_gap=0, line_delay_min=0, line_delay_max=0,
                     scene_min_delay=3600, scene_max_delay=3600)
@@ -59,7 +59,12 @@ def fixture(usernames=('lolaritmo', 'titogroove', 'mambo'), provider=None, life=
                 'policy': {'player_cooldown': 0, 'bot_min_gap': 0, 'requests_per_minute': 100}}
     if life is not None:
         document['life'] = life
-    manager = BotManager(build_config(document, {'BOTS_CAST_DIR': str(CAST)}), Registry())
+    if recall is not None:
+        document['recall'] = recall
+    env = {'BOTS_CAST_DIR': str(CAST)}
+    if isinstance(recall, dict) and recall.get('path'):
+        env['BOTS_RECALL_PATH'] = recall['path']
+    manager = BotManager(build_config(document, env), Registry())
     for index, session in enumerate(manager.sessions):
         session.player_id = 100 + index
         session.conn = SimpleNamespace(closed=False, close=AsyncMock())

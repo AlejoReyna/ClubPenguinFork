@@ -76,10 +76,20 @@ class BotManager:
         for session in self.sessions:
             session.peer_bot_ids = lambda own=session: {
                 other.player_id for other in self.sessions if other is not own and other.player_id is not None}
+        self.recall = None
+        if config.recall.enabled:
+            from .recall import RecallStore
+            self.recall = RecallStore(
+                config.recall.path,
+                ttl_seconds=config.recall.ttl_seconds,
+                max_note_chars=int(config.recall.max_note_chars))
+            for session in self.sessions:
+                session.recall = self.recall
         self.director = None
         if config.dialogue.enabled:
             from .director import Director
-            self.director = Director(config, self.sessions, self.world, ledger=self.ledger)
+            self.director = Director(config, self.sessions, self.world, ledger=self.ledger,
+                                     recall=self.recall)
             for session in self.sessions:
                 session.director = self.director
         self._register_collectors()

@@ -155,6 +155,52 @@ class LifeConfig:
             setattr(self, key, values.get(key, default))
 
 
+class RecallConfig:
+    """Opt-in Phase 4. Short relationship notes keyed by numeric player id."""
+
+    DEFAULTS = {'ttl_days': 30.0, 'min_turns': 3.0, 'max_note_chars': 120.0}
+
+    def __init__(self, enabled=False, path='/var/lib/bots/recall.sqlite', **values):
+        self.enabled = enabled
+        self.path = str(path)
+        for key, default in self.DEFAULTS.items():
+            setattr(self, key, values.get(key, default))
+
+    @property
+    def ttl_seconds(self):
+        return float(self.ttl_days) * 86400.0
+
+
+def _parse_recall(raw, env, budget_path):
+    if not isinstance(raw, dict) or set(raw) - ({'enabled', 'path'} | set(RecallConfig.DEFAULTS)):
+        raise ConfigError('recall: unknown setting or not an object')
+    enabled = raw.get('enabled', False)
+    if 'BOTS_RECALL_ENABLED' in env:
+        flag = str(env['BOTS_RECALL_ENABLED']).lower()
+        if flag not in ('true', 'false'):
+            raise ConfigError('BOTS_RECALL_ENABLED must be true or false')
+        enabled = flag == 'true'
+    if not isinstance(enabled, bool):
+        raise ConfigError('recall.enabled must be true or false')
+    path = str(env.get('BOTS_RECALL_PATH', raw.get('path', budget_path)))
+    if not path:
+        raise ConfigError('recall.path must be set when recall is enabled')
+    values = {}
+    for key, default in RecallConfig.DEFAULTS.items():
+        minimum = 3 if key == 'min_turns' else 1
+        value = _number(raw, key, default, minimum, 'recall')
+        if key == 'min_turns':
+            if value != int(value):
+                raise ConfigError('recall.min_turns must be an integer')
+            value = int(value)
+        elif key == 'max_note_chars':
+            value = int(value)
+            if value > 200:
+                raise ConfigError('recall.max_note_chars must be at most 200')
+        values[key] = value
+    return RecallConfig(enabled, path=path, **values)
+
+
 def _parse_life(raw, env):
     if not isinstance(raw, dict) or set(raw) - ({'enabled', 'events', 'autonomous'} | set(LifeConfig.DEFAULTS)):
         raise ConfigError('life: unknown setting or not an object')
@@ -241,7 +287,8 @@ class BotConfig:
 
 class Config:
     def __init__(self, server, provider, policy, behavior, bots, metrics_port,
-                 service=None, catalog=None, output_filter=None, cast_unmatched=(), dialogue=None, life=None):
+                 service=None, catalog=None, output_filter=None, cast_unmatched=(),
+                 dialogue=None, life=None, recall=None):
         self.server = server
         self.provider = provider
         self.policy = policy
@@ -254,6 +301,7 @@ class Config:
         self.cast_unmatched = tuple(cast_unmatched)  # cards with no credentials yet
         self.dialogue = dialogue or DialogueConfig()
         self.life = life or LifeConfig()
+        self.recall = recall or RecallConfig()
 
 
 def _require(mapping, key, where):
@@ -544,8 +592,14 @@ def build_config(document, env=None):
     service = _parse_service(document.get('service') or {}, env)
     dialogue = _parse_dialogue(document.get('dialogue', {}), env)
     life = _parse_life(document.get('life', {}), env)
+    budget_default = str(env.get('BOTS_BUDGET_PATH', (document.get('provider') or {}).get(
+        'budget_path', '/var/lib/bots/budget.json')))
+    recall_path = str(Path(budget_default).with_name('recall.sqlite'))
+    recall = _parse_recall(document.get('recall', {}), env, recall_path)
     if life.enabled and not dialogue.enabled:
         raise ConfigError('life.enabled requires dialogue.enabled for shared reservations')
+    if recall.enabled and not dialogue.enabled:
+        raise ConfigError('recall.enabled requires dialogue.enabled')
     if dialogue.enabled and not service.cast_dir:
         raise ConfigError('dialogue.enabled requires BOTS_CAST_DIR or service.cast_dir')
     output_filter = _output_filter(service)
@@ -674,4 +728,5 @@ def build_config(document, env=None):
     return Config(server=server, provider=provider, policy=policy,
                   behavior=behavior, bots=bots, metrics_port=metrics_port,
                   service=service, catalog=catalog, output_filter=output_filter,
-                  cast_unmatched=sorted(set(cards) - matched), dialogue=dialogue, life=life)
+                  cast_unmatched=sorted(set(cards) - matched), dialogue=dialogue,
+                  life=life, recall=recall)

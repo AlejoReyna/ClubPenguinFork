@@ -71,6 +71,7 @@ class BotSession:
         self.catalog = catalog  # rooms.Catalog in cast mode, or None
         self.output_filter = output_filter  # safety.OutputFilter, or None for the default
         self.director = None  # opt-in Phase 2; otherwise the legacy reply pipeline owns chat
+        self.recall = None  # shared Phase 4 store, or None
         self.travel = None
         self.traveling = False
         self.body_lock = asyncio.Lock()

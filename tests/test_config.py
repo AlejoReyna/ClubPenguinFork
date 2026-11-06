@@ -151,6 +151,12 @@ class LoadConfigTests(unittest.TestCase):
         with self.assertRaises(ConfigError):
             load_config({})
 
+    def test_recall_requires_dialogue(self):
+        document = config_document_world(6112)
+        document['recall'] = {'enabled': True}
+        with self.assertRaises(ConfigError):
+            build_config(document, {})
+
 
 if __name__ == '__main__':
     unittest.main()

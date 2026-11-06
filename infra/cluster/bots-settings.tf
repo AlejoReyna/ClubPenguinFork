@@ -33,6 +33,16 @@ variable "bots_life_enabled" {
   }
 }
 
+variable "bots_recall_enabled" {
+  description = "Phase 4 SQLite relationship notes on the budget PVC; defaults off."
+  type        = bool
+  default     = false
+  validation {
+    condition     = !var.bots_recall_enabled || var.bots_dialogue_enabled
+    error_message = "Phase 4 recall needs the room director."
+  }
+}
+
 variable "bots_daily_spend_cap_usd" {
   type    = number
   default = null

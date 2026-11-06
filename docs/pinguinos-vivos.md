@@ -5,7 +5,8 @@ salas pendientes y aceptación humana/soak pendientes. **Desplegado: no.**
 La fase 2 tiene implementación local optativa probada en banco (§15), sin
 autorización ni consumo real; su aceptación con Kimi sigue pendiente. La fase 3
 tiene la misma clase de implementación local probada (§16); el soak **real** de
-48 h y la aceptación visual siguen pendientes. Registros locales en §14–§16.
+48 h y la aceptación visual siguen pendientes. La fase 4 tiene implementación
+local optativa (§17). Registros locales en §14–§17.
 Parte de `bots-002` ([bots.md](bots.md)): tres sesiones (Juanito en 110, DJ Cobra en 120
 y Viterbos en 330), modo `api` con `kimi-k2.6` y la clave en el Secret `moonshot-api`.
 
@@ -925,4 +926,49 @@ pendientes de §14, decidir `BOTS_TZ` y hora del dojo, publicar las imágenes
 autorizadas y revisar/aplicar un plan concreto con capacidad y recursos
 medidos. Después se necesita aceptación visual y soak **real** de 48 h.
 Las voces reales conservan además la autorización separada de consumo y
-aceptación de fase 2. La fase 4 necesita una solicitud posterior.
+aceptación de fase 2. La implementación local de fase 4 se registra en §17.
+
+## 17. Registro local de fase 4: memoria de relación
+
+| Capa | Estado |
+|---|---|
+| Solicitado | Nota breve por pingüino y jugador en el PVC, resumen P2 tras ≥3 turnos, borrado explícito |
+| Implementado | SQLite privado `recall.sqlite` junto al ledger USD; inyección en prompt; resumen P2; frases «borra/olvida mi memoria» |
+| Probado | 253 pruebas offline incl. TTL, reapertura, resumen simulado tras 3 turnos y borrado |
+| Pendiente | Aceptación humana («¿te acuerdas de mí?» al día siguiente), prueba con Kimi real y revisión de privacidad |
+| Desplegado | **No**. `bots_recall_enabled=false`; sin commit de imágenes ni apply |
+
+### Activación
+
+`recall.enabled=true` o `BOTS_RECALL_ENABLED=true` exige `dialogue.enabled=true`.
+El default sigue siendo **false**. Terraform expone `bots_recall_enabled=false`.
+La ruta por defecto es `/var/lib/bots/recall.sqlite` en el mismo PVC que
+`budget.json` (`BOTS_RECALL_PATH` opcional). TTL configurable (default 30 días);
+sólo ids numéricos de jugador, nunca apodos ni chats completos.
+
+```json
+{
+  "provider": {"mode": "simulated"},
+  "dialogue": {"enabled": true},
+  "recall": {"enabled": true, "min_turns": 3, "ttl_days": 30}
+}
+```
+
+Tras **tres** turnos humanos con respuesta en la memoria corta RAM, el director
+encola un resumen **P2** (una frase acotada, filtrada). En modo simulado el
+resumen es local a partir de los últimos mensajes del jugador. La nota se
+inyecta como bloque `NOTA_DE_RELACION (datos)` estable en el prompt. Si el
+SQLite no puede escribirse, no se guarda nada nuevo; el chat sigue funcionando.
+
+Un jugador puede pedir **«borra/olvida mi memoria/recuerdo»** (variantes
+españolas acotadas). El bot activo borra la fila SQLite, olvida la RAM corta y
+responde localmente. No hay exportación de historial.
+
+### Verificación local
+
+```bash
+bash scripts/run-bot-tests.sh clubpenguin/runtime:rt-origin-001
+```
+
+Incluye `tests/test_recall.py` y escena de director con resumen + borrado. No
+sustituye la aceptación humana ni el gasto P2 real autorizado.
