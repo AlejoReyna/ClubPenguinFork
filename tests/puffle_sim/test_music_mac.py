@@ -1,5 +1,4 @@
 """Offline Music app tests; no Apple events or music changes are sent."""
-import asyncio
 import base64
 import unittest
 

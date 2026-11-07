@@ -3,7 +3,7 @@
 One JSON file per penguin lives in ``containers/bots/cast/`` (Git) and reaches
 the pod through the optional ``bots-cast`` ConfigMap. Credentials stay in the
 ``bot-credentials`` Secret; a card never holds a password. See
-docs/pinguinos-vivos.md section 4 for the schema.
+docs/bots.md (Persona cards) for the schema.
 
 A card is a field-by-field override: what the card defines wins, what it omits
 falls back to the Secret entry (the older ``room``/``walk``/``personality``

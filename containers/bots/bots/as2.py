@@ -143,9 +143,9 @@ class AS2Connection:
             reader, writer = await asyncio.wait_for(
                 asyncio.open_connection(host, int(port)), timeout=timeout)
         except asyncio.TimeoutError:
-            raise Disconnected(f'timeout connecting to {host}:{int(port)}')
+            raise Disconnected(f'timeout connecting to {host}:{int(port)}') from None
         except OSError as error:
-            raise Disconnected(f'cannot connect to {host}:{int(port)}: {error}')
+            raise Disconnected(f'cannot connect to {host}:{int(port)}: {error}') from error
         return cls(reader, writer)
 
     @property
@@ -185,7 +185,7 @@ class AS2Connection:
             line = await asyncio.wait_for(
                 self._reader.readuntil(b'\x00'), timeout=timeout)
         except asyncio.TimeoutError:
-            raise TimeoutError('no frame arrived inside the deadline')
+            raise TimeoutError('no frame arrived inside the deadline') from None
         except asyncio.IncompleteReadError as error:
             raise Disconnected('server closed the connection') from error
         except (ConnectionError, OSError) as error:

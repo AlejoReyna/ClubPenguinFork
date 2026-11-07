@@ -5,7 +5,7 @@ included, first reserves an estimated cost; the reply's ``usage`` then
 replaces the estimate. A request that fails keeps its estimate: the provider
 may have processed it, so the ledger errs on the side of counting.
 
-Rules (docs/pinguinos-vivos.md section 7):
+Rules (docs/bots.md, Spend control):
 - daily and monthly caps in USD, plus a per-minute attempt window and an
   optional legacy requests-per-day cap (kept so an existing deployment keeps
   its old limits until its operator opts in to the USD ones);

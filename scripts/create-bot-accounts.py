@@ -9,7 +9,6 @@ import argparse
 import json
 import os
 from pathlib import Path
-import subprocess
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -108,7 +107,7 @@ def main():
             lablib.fail('An existing cast account has a different nickname; no rename or adoption performed.')
     if args.work_roles and not bot_accounts.legacy_work_nicknames_unchanged(existing):
         lablib.fail('A work account was renamed after legacy provisioning; no accounts or Secret changed.')
-    for name, account in existing.items():
+    for account in existing.values():
         if account['moderator'] or account['stealth_moderator'] or not account['active']:
             lablib.fail('A target bot account is privileged or inactive; no flags will be changed.')
     if existing and not path.exists():

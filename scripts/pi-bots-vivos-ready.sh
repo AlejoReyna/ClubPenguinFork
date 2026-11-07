@@ -8,7 +8,7 @@ if [[ "${1:-}" == "--expected-node" ]]; then
   NODE="${2:?pass --expected-node NAME}"
 fi
 if [[ -z "$NODE" ]]; then
-  echo "Usage: $0 --expected-node alexis" >&2
+  echo "Usage: $0 --expected-node <node-name>" >&2
   exit 1
 fi
 cd "$ROOT"

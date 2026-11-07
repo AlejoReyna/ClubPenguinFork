@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import AsyncMock
 
-from bots.brain import Brain, GLOBAL_RULES, asks_about_ai, parse_reply
+from bots.brain import GLOBAL_RULES, asks_about_ai, parse_reply
 from bots.config import build_config, ConfigError
 from bots.manager import BotManager
 from bots.metrics import Registry

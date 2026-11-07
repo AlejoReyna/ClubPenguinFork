@@ -1,5 +1,4 @@
 import asyncio
-import contextlib
 import socket
 import unittest
 

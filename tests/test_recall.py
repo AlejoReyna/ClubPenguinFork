@@ -1,6 +1,5 @@
 """Phase 4 relationship notes: TTL, upsert bounds and forget requests."""
 import tempfile
-import time
 import unittest
 
 from bots.recall import RecallStore, wants_forget

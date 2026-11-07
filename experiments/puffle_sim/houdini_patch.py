@@ -1,7 +1,7 @@
-"""Create opt-in Houdini test overlays for the pinned upstream revision.
+"""Create the puffle overlays for the pinned upstream Houdini revision.
 
-No running process, source checkout or image is modified by this module.
-Installing a bridge and arranging trusted player opt-in remain separate work.
+The runtime image build applies them to its own copy of the sources. This
+module never modifies a running process or a source checkout.
 """
 import argparse
 import hashlib

@@ -140,7 +140,7 @@ def load_config(phase=None, keys=(), environ=None, config_file=None):
     if problems:
         fail('Private configuration is incomplete:\n  - ' + '\n  - '.join(problems) +
              '\nProvide it through pipeline variables or ~/.config/clubpenguin-lab/deploy.env '
-             '(see docs/ci-cd/configuracion.md).')
+             '(see deploy.env.example).')
     result['CP_KUBECONFIG'] = str(Path(result['CP_KUBECONFIG']).expanduser())
     if result['CP_SSH_CONFIG']:
         result['CP_SSH_CONFIG'] = str(Path(result['CP_SSH_CONFIG']).expanduser())

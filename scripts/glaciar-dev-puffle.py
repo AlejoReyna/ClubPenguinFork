@@ -181,7 +181,7 @@ def main():
             mounts=[f'{p}-puffle-secret:/etc/puffle:ro'], user=world['Config'].get('User') or None, dry=dry)
 
     web_mounts = [m for m in (web['HostConfig'].get('Binds') or [])
-                  if not m.split(':')[1] in ('/etc/nginx/conf.d/default.conf', '/srv/play/puffle/index.html',
+                  if m.split(':')[1] not in ('/etc/nginx/conf.d/default.conf', '/srv/play/puffle/index.html',
                                              '/srv/play/index.html')]
     web_mounts += [f'{ROOT}/containers/web/index.html:/srv/play/index.html:ro',
                    f'{ROOT}/containers/web/puffle.html:/srv/play/puffle/index.html:ro',

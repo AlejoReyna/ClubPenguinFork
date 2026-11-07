@@ -7,8 +7,8 @@ the broker's two confirmations: the code typed in the owner's own igloo, and the
 
 Device tokens and Spotify credentials are stored AES-256-GCM encrypted in SQLite
 (associated data binds each row to its session or player id). The key comes from
-a file mounted only into this service. This is the single-operator lab mode of
-docs/puffle-sin-descarga.md, not the production design for third parties.
+a file mounted only into this service. This is the single-operator lab mode
+described in docs/puffle.md, not the production design for third parties.
 """
 import asyncio
 import contextlib
@@ -312,7 +312,7 @@ class Host:
             return {'url': self.auth(session['player']).start(state=state)}
         except SpotifyAuthError:
             self.oauth.pop(state, None)
-            raise Rejected(503, 'sin_app')
+            raise Rejected(503, 'sin_app') from None
 
     def spotify_callback(self, cookie, query):
         state = query.get('state', '')
@@ -497,7 +497,7 @@ def make_app(host):
         try:
             data = await request.json()
         except ValueError:
-            raise Rejected(400, 'invalid')
+            raise Rejected(400, 'invalid') from None
         if not isinstance(data, dict):
             raise Rejected(400, 'invalid')
         return reply(await host.bot_music(data.get('player'), data.get('text')))

@@ -4,7 +4,7 @@
 Downloads (or reads) a dump and its manifest, checks size and SHA-256 against the
 manifest, restores it into a throwaway `restore_*` database inside postgres-0, reads the
 data back and drops that database. The live `houdini` database is never written; replacing
-it is a separate, manual and explicit procedure (docs/ci-cd/respaldos-y-rollback.md).
+it is a separate, manual and explicit procedure (docs/operations.md).
 """
 import argparse
 import hashlib

@@ -9,7 +9,7 @@
 #
 # Real deployment is OFF by default. Writing this file does not create the Azure DevOps
 # pieces it relies on (GitHub connection, service connection, agent pool/agent, environment,
-# branch policies); see docs/ci-cd/. Private values (hostname, Azure names, Pi address) are
+# branch policies); see docs/operations.md. Private values (hostname, Azure names, Pi address) are
 # never in this file: they come from ~/.config/clubpenguin-lab/deploy.env on the agent.
 name: $(Date:yyyyMMdd)$(Rev:.r)
 
@@ -418,7 +418,7 @@ stages:
                   failure:
                     steps:
                       - bash: |
-                          echo "##vso[task.logissue type=error]Deployment failed. The previous release is recorded in Blob; see docs/ci-cd/respaldos-y-rollback.md (rollbackTo: previous). Data is NOT rolled back automatically."
+                          echo "##vso[task.logissue type=error]Deployment failed. The previous release is recorded in Blob; see docs/operations.md (Rollback). Data is NOT rolled back automatically."
                         displayName: Point to the rollback procedure
 
   # ---------------------------------------------------------------- always: remove the plan

@@ -10,6 +10,7 @@ TERRAFORM_VERSION=1.17.1
 HELM_VERSION=3.19.0
 ANSIBLE_SPEC='ansible-core==2.20.11'
 PYYAML_SPEC='pyyaml==6.0.2'
+RUFF_VERSION=0.17.4
 
 case "$(uname -s)-$(uname -m)" in
   Linux-x86_64)
@@ -47,7 +48,11 @@ if [ ! -x ansible/bin/ansible-playbook ]; then
   "${PYTHON:-python3}" -m venv ansible
   ansible/bin/pip install --quiet "$ANSIBLE_SPEC" "$PYYAML_SPEC"
 fi
+if ! ansible/bin/ruff --version 2>/dev/null | grep -q " ${RUFF_VERSION}$"; then
+  ansible/bin/pip install --quiet "ruff==${RUFF_VERSION}"
+fi
 echo "Tools ready in $dir"
 ./terraform version | head -1
 ./helm version --short
 ansible/bin/ansible-playbook --version | head -1
+ansible/bin/ruff --version
