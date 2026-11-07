@@ -6,6 +6,7 @@ COPY custom-clothing/ /srv/media/play/v2/content/global/clothing/
 COPY custom-media/ /srv/media/
 COPY --from=ruffle . /srv/ruffle
 COPY --from=puffle-client engine.swf /srv/media/play/v2/client/engine.swf
+COPY --from=puffle-client login.swf /srv/media/play/v2/client/login.swf
 COPY --from=puffle-client companion.zip /srv/play/puffle/companion.zip
 COPY --from=puffle-client build.json /srv/play/puffle/build.json
 COPY default.conf /etc/nginx/conf.d/default.conf

@@ -30,8 +30,9 @@ self.addEventListener('fetch', event => {
     event.respondWith(fetch(event.request, {cache: 'no-store'}));
     return;
   }
-  // The protocol renderer must match the deployed world, including after rollback.
-  if (url.pathname.endsWith('/engine.swf')) {
+  // The protocol renderer must match the deployed world, including after rollback; the patched
+  // login must match the page that frames it on phones (an old cached copy shows the banner again).
+  if (url.pathname.endsWith('/engine.swf') || url.pathname.endsWith('/login.swf')) {
     event.respondWith(fetch(event.request, {cache: 'no-store'}));
     return;
   }

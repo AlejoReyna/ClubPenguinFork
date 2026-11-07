@@ -213,6 +213,22 @@
     .globo{max-height:calc(100dvh - 16px);overflow:auto}
     .globo.lado::before{top:calc(var(--flecha,50%) - 8px);left:-8px;border-radius:0 0 0 3px}
   }
+
+  /* Teléfono en el login (vertical u horizontal): el login.swf parcheado informa qué vista se ve y
+     el escenario entero se escala y coloca (px calculados en JS) para que esa vista quepa completa;
+     lo que sobra es el azul del borde del SWF. Sin deslizador ni «juego completo»: no hay nada que
+     mirar a los lados. Solo se activa con mqVertical o mqRiel. */
+  :root.login-fit{--pan-h:0px}
+  .login-fit main{display:block}
+  .login-fit #game{position:absolute;left:0;top:0;width:var(--fit-w);height:auto;max-height:none;
+                   transform:translate(var(--fit-x),var(--fit-y));
+                   /* Bordes superior e inferior del escenario fundidos con el azul de alrededor (sin costura). */
+                   -webkit-mask-image:linear-gradient(#0000,#000 4%,#000 96%,#0000);
+                   mask-image:linear-gradient(#0000,#000 4%,#000 96%,#0000)}
+  /* El marco blanco inferior del SWF asoma ~5 px sobre el recorte normal; aquí se ve el borde: recortar más. */
+  .login-fit ruffle-player{clip-path:inset(1.25% .789474% 1.6% .789474%)}
+  .login-fit .pan{display:none}
+  .login-fit .bar #zoom:disabled{opacity:.45;cursor:default}
   @media(prefers-reduced-motion:reduce){
     .infra,html.infra-abierto .infra,main,.bar{transition:none!important}
   }
@@ -467,7 +483,109 @@
       }
     }
 
+    // Login en el teléfono: el login.swf parcheado (mobile_login.as) informa con
+    // fscommand("glaciarLogin", …) qué vista se ve («newplayer», «worldselection»…), o un diálogo
+    // encima con su rectángulo, o "" al terminar. Aquí se calcula cómo escalar y colocar el escenario
+    // entero para que esa vista quepa en la pantalla con su aspecto original.
+    // Rectángulos en el escenario de 760×480 [izquierda, arriba, derecha, abajo] medidos en Ruffle
+    // con 3 px de holgura (en los teléfonos el post-it «mantén tu contraseña…» va oculto). Por
+    // idioma cuando las etiquetas cambian el ancho; «es» es el de respaldo.
+    const VISTAS_LOGIN = {
+      // Formulario: etiquetas, campos, casillas, botón y enlaces; «Volver» abajo si se ve.
+      newplayer: {es: [184, 85, 521, 447], en: [218, 85, 521, 447]},
+      'newplayer-noback': {es: [184, 85, 521, 388], en: [218, 85, 521, 384]},
+      // Tarjeta del pingüino guardado + contraseña.
+      playerlogin: {es: [116, 43, 601, 449]},
+      // Las tarjetas llegan medidas desde el juego (dependen de cuántas hay); esto es el enlace
+      // «Entrar como otro pingüino» de abajo, y una tarjeta sola si la medida no llega.
+      playerselection: {es: [300, 418, 460, 449]},
+      'playerselection-solo': {es: [255, 36, 505, 449]},
+      // Título, servidores, leyenda inferior y el post-it «Más servidores» (es un botón): entero.
+      worldselection: {es: [114, 10, 746, 467]},
+      // Diálogos de «Recordar mi contraseña» (solo el panel, sin la capa que oscurece todo).
+      publiccomputer: {es: [196, 134, 565, 344]},
+      savepassword: {es: [114, 47, 648, 428]},
+    };
+    const rectVista = (view, lang) => {
+      const medidas = VISTAS_LOGIN[view];
+      return medidas ? medidas[lang] || medidas.es : null;
+    };
+    const unir = (a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[2], b[2]), Math.max(a[3], b[3])];
+    const ESCENARIO = [0, 0, ANCHO_SWF, 480];
+    const AMPLIACION_RUFFLE = 1.012;  // ruffle-player se dibuja 1.2 % más grande que #game (oculta el borde del SWF)
+    const MARGEN = 12;                // px libres alrededor de la vista
+    const ESCALA_MAX = 2;             // en tabletas verticales, no más del doble del tamaño original
+
+    // Posición de #game en un eje: «pos» centra la vista medida [desde, hasta]; el escenario dibujado
+    // (largo «dibujado», empieza «desfase» px después de #game) cubre la pantalla si es más grande y
+    // si no queda centrado. Manda la vista medida: siempre entera y con margen, aunque asome un borde.
+    const colocar = (pos, desfase, dibujado, vista, desde, hasta, escala) => {
+      const cubre = dibujado >= vista
+        ? Math.min(-desfase, Math.max(vista - dibujado - desfase, pos))
+        : (vista - dibujado) / 2 - desfase;
+      return Math.min(vista - MARGEN - desfase - hasta * escala, Math.max(MARGEN - desfase - desde * escala, cubre));
+    };
+
+    class GlaciarLoginFrame {
+      // "vista", "vista,box,…" (la vista midió su contenido), "vista,error,…" (la ventana de error la
+      // tapa), con …= izq,arriba,der,abajo, o "vista,dialog,nombre" (un diálogo de tamaño conocido)
+      // → {view, overlay, rect}; null fuera del login.
+      // Lo desconocido se encuadra entero: nunca se corta lo que no se midió.
+      static parse(payload, lang = 'es') {
+        if (typeof payload !== 'string' || !payload) return null;
+        const campos = payload.split(',');
+        const view = campos[0];
+        if (!/^[a-z]{1,40}(-[a-z]{1,20})?$/.test(view)) return null;
+        if (campos.length === 1) {
+          const rect = view === 'playerselection' ? rectVista('playerselection-solo', lang) : rectVista(view, lang);
+          return {view, overlay: null, rect: rect || ESCENARIO};
+        }
+        if (campos.length === 3 && campos[1] === 'dialog' && /^[a-z]{1,40}$/.test(campos[2])) {
+          return {view, overlay: campos[2], rect: rectVista(campos[2], lang) || ESCENARIO};
+        }
+        if (campos.length !== 6 || !['box', 'error'].includes(campos[1])) return null;
+        const overlay = campos[1] === 'box' ? null : campos[1];
+        const [izq, arriba, der, abajo] = campos.slice(2).map(Number);
+        let rect = [Math.max(0, izq), Math.max(0, arriba), Math.min(ANCHO_SWF, der), Math.min(480, abajo)];
+        if (!rect.every(Number.isFinite) || rect[2] <= rect[0] || rect[3] <= rect[1]) return {view, overlay, rect: ESCENARIO};
+        if (!overlay) {
+          const extra = rectVista(view, lang);
+          rect = extra ? unir(rect, extra) : rect;
+        }
+        return {view, overlay, rect};
+      }
+
+      // Ancho de #game y su posición (px dentro de <main>) para que rect quepa con margen, centrado.
+      // scale: px de pantalla por px del escenario, ya dibujado por Ruffle.
+      static layout(rect, {viewWidth, viewHeight}) {
+        if (!Array.isArray(rect) || rect.length !== 4 ||
+            ![viewWidth, viewHeight].every(n => Number.isFinite(n) && n > 2 * MARGEN)) return null;
+        const [izq, arriba, der, abajo] = rect;
+        const scale = Math.min(ESCALA_MAX, (viewWidth - 2 * MARGEN) / (der - izq), (viewHeight - 2 * MARGEN) / (abajo - arriba));
+        if (!(scale > 0)) return null;
+        const width = ANCHO_SWF * scale / AMPLIACION_RUFFLE;
+        const height = width * 480 / ANCHO_SWF;
+        const anchoDibujado = ANCHO_SWF * scale, altoDibujado = 480 * scale;
+        // Ruffle dibuja centrado en horizontal y apoyado abajo en #game (transform-origin: bottom center).
+        const desfaseX = (width - anchoDibujado) / 2, desfaseY = height - altoDibujado;
+        const x = viewWidth / 2 - desfaseX - ((izq + der) / 2) * scale;
+        const y = viewHeight / 2 - desfaseY - ((arriba + abajo) / 2) * scale;
+        return {
+          width, scale,
+          x: colocar(x, desfaseX, anchoDibujado, viewWidth, izq, der, scale),
+          y: colocar(y, desfaseY, altoDibujado, viewHeight, arriba, abajo, scale),
+        };
+      }
+
+      // Dónde queda un punto del escenario en la pantalla con este encuadre (para pruebas y medidas).
+      static toScreen([sx, sy], {width, x, y, scale}) {
+        const height = width * 480 / ANCHO_SWF;
+        return [x + (width - ANCHO_SWF * scale) / 2 + sx * scale, y + height - (480 - sy) * scale];
+      }
+    }
+
     globalThis.GlaciarMobileCamera = GlaciarMobileCamera;
+    globalThis.GlaciarLoginFrame = GlaciarLoginFrame;
   })();
 </script>
 <script src="/ruffle/ruffle.js" defer></script>
@@ -532,6 +650,8 @@
   const juego = document.getElementById('game');
   const escenario = document.querySelector('main');
   let encuadreCompleto = false;
+  // Pantalla del login que se ve ({view, overlay, rect}) mientras el login.swf parcheado la informa.
+  let vistaLogin = null;
   const movimientoReducido = matchMedia('(prefers-reduced-motion: reduce)');
   const camara = new GlaciarMobileCamera({
     geometry: () => ({
@@ -545,7 +665,7 @@
       const valor = String(Math.round(pan * 100));
       if (deslizador.value !== valor) deslizador.value = valor;
     },
-    active: () => mqVertical.matches && !encuadreCompleto && document.visibilityState !== 'hidden',
+    active: () => mqVertical.matches && !encuadreCompleto && vistaLogin === null && document.visibilityState !== 'hidden',
     reducedMotion: () => movimientoReducido.matches,
   });
   // ExternalInterface.call("glaciarHudView") del motor: el dock (con el chat) sigue a la vista, no a la sala.
@@ -583,6 +703,39 @@
   mqVertical.addEventListener('change', actualizarCamara);
   movimientoReducido.addEventListener('change', actualizarCamara);
   pintarEncuadre();
+
+  // Login en el teléfono (mobile_login.as): sin la portada, directo al formulario (o a los pingüinos
+  // guardados), y cada pantalla del login encuadrada para que etiquetas y campos quepan enteros.
+  // En escritorio el login queda como siempre.
+  const esTelefono = () => mqVertical.matches || mqRiel.matches;
+  // ExternalInterface.call("glaciarSkipStart") del login: se pregunta cada vez (puede girar).
+  window.glaciarSkipStart = () => esTelefono();
+  const pintarLogin = () => {
+    const activo = vistaLogin !== null && esTelefono();
+    raizDoc.classList.toggle('login-fit', activo);
+    zoomBoton.disabled = activo;
+    if (!activo) {
+      ['--fit-w', '--fit-x', '--fit-y'].forEach(v => juego.style.removeProperty(v));
+      return;
+    }
+    // Con la clase ya puesta (sin deslizador), <main> tiene su tamaño definitivo.
+    const encuadre = GlaciarLoginFrame.layout(vistaLogin.rect, {viewWidth: escenario.clientWidth, viewHeight: escenario.clientHeight});
+    if (!encuadre) return;
+    juego.style.setProperty('--fit-w', encuadre.width.toFixed(2) + 'px');
+    juego.style.setProperty('--fit-x', encuadre.x.toFixed(2) + 'px');
+    juego.style.setProperty('--fit-y', encuadre.y.toFixed(2) + 'px');
+  };
+  const verLogin = estado => {
+    const antes = vistaLogin;
+    vistaLogin = estado;
+    pintarLogin();
+    // Al salir del login, la cámara vuelve a llenar el alto (centrada hasta ver al pingüino).
+    if (antes && !vistaLogin) camara.refresh(true);
+  };
+  // Solo cambios reales de <main> (no el teclado de iOS, que no lo redimensiona).
+  new ResizeObserver(() => { if (vistaLogin) pintarLogin(); }).observe(escenario);
+  mqVertical.addEventListener('change', pintarLogin);
+  mqRiel.addEventListener('change', pintarLogin);
 
   selector.addEventListener('change', () => {
     try {
@@ -630,12 +783,25 @@
         /^(?:.*\/)?engine\.swf(?:\?.*)?$/,
         location.origin + '/media/play/v2/client/engine.swf?v=' + encodeURIComponent(build['engine.swf'])
       ]);
+      // The phone login (no start banner, framed views) is patched too and must match this page.
+      if (build['login.swf']) {
+        window.RufflePlayer.config.urlRewriteRules.unshift([
+          /^(?:.*\/)?login\.swf(?:\?.*)?$/,
+          location.origin + '/media/play/v2/client/login.swf?v=' + encodeURIComponent(build['login.swf'])
+        ]);
+      }
       const player = window.RufflePlayer.newest().createPlayer();
       player.id = 'penguin-player';
       player.style.backgroundColor = '#00529b';
       document.getElementById('game').appendChild(player);
       player.ruffle().addFSCommandHandler((command, payload) => {
+        if (typeof command === 'string' && command.toLowerCase() === 'glaciarlogin') {
+          verLogin(GlaciarLoginFrame.parse(payload ?? '', idioma));
+          return true;
+        }
         if (!camara.handleMessage(command, payload)) return false;
+        // El motor ya informa de tu pingüino: el login terminó aunque su último aviso se perdiera.
+        if (vistaLogin) verLogin(null);
         pintarSeguimiento();
         return true;
       });

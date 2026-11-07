@@ -22,6 +22,7 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     if args.stub:
         (args.output / 'engine.swf').write_bytes(b'test-only placeholder')
+        (args.output / 'login.swf').write_bytes(b'test-only placeholder')
     else:
         directory = ROOT / '.local/tools/ffdec-26.4.0'
         jar = directory / 'ffdec.jar'
@@ -43,6 +44,9 @@ def main():
         subprocess.run([sys.executable, str(ROOT / 'experiments/puffle_sim/client/build_engine.py'),
                         '--ffdec', str(jar), '--engine', str(ROOT / 'vendor/legacy-media/media/play/v2/client/engine.swf'),
                         '--output', str(args.output / 'engine.swf')], check=True)
+        subprocess.run([sys.executable, str(ROOT / 'experiments/puffle_sim/client/build_login.py'),
+                        '--ffdec', str(jar), '--login', str(ROOT / 'vendor/legacy-media/media/play/v2/client/login.swf'),
+                        '--output', str(args.output / 'login.swf')], check=True)
     with zipfile.ZipFile(args.output / 'companion.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
         files = list((ROOT / 'production/puffle').glob('*.py'))
         files += [p for p in (ROOT / 'experiments/puffle_sim').glob('*.py') if p.name != 'run_houdini_fixture.py']
@@ -52,7 +56,7 @@ def main():
             entry.external_attr = 0o100644 << 16
             archive.writestr(entry, path.read_bytes(), compress_type=zipfile.ZIP_DEFLATED)
     metadata = {name: hashlib.sha256((args.output / name).read_bytes()).hexdigest()
-                for name in ('engine.swf', 'companion.zip')}
+                for name in ('engine.swf', 'login.swf', 'companion.zip')}
     (args.output / 'build.json').write_text(json.dumps(metadata, sort_keys=True) + '\n')
     print('Puffle client prepared; companion contains code/assets only.')
 
