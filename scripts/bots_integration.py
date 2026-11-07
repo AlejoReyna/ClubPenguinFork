@@ -38,7 +38,7 @@ def check_bots(root, docker, exec_script, dash, postgres, world, network, label,
                 'password': secrets.token_urlsafe(16)}
     register_source = (root / 'scripts/bot_accounts.py').read_text()
     register_source += '''
-import sys
+import sys, json
 payload = json.load(sys.stdin)
 for bot in payload['bots']:
     register('http://dash:3000', bot['username'], bot['password'])
