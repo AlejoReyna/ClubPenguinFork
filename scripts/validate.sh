@@ -39,6 +39,9 @@ fi
 echo "== Unit tests of the CI/CD scripts"
 CP_TEST_QUIET=1 "$yaml_python" -I -m unittest discover -s scripts/tests -t scripts
 
+echo "== Web page unit tests"
+node --test tests/web/*.test.cjs
+
 echo "== Pipeline policy"
 "$yaml_python" -I scripts/lint_pipeline.py
 

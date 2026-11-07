@@ -41,9 +41,11 @@ def main():
       }
       this._shell.__puffleTalkHandler = this.handlePuffleChat;
       this._shell.AIRTOWER.addListener("puffletalk",this.handlePuffleChat,this);
+      this.setupMobileCamera();
       this._pathEngine'''
     insertion = '   function setupPathEngine()\n'
     renderer = Path(__file__).with_name('renderer.as').read_text(encoding='utf-8')
+    camera = Path(__file__).with_name('mobile_camera.as').read_text(encoding='utf-8')
     with tempfile.TemporaryDirectory(prefix='puffle-swf-') as tmp:
         tmp = Path(tmp)
         subprocess.run(java + ['-export', 'script', str(tmp / 'export'), str(args.engine.resolve())],
@@ -51,7 +53,7 @@ def main():
         source = (tmp / 'export' / CLASS_PATH).read_text(encoding='utf-8')
         if source.count(constructor) != 1 or source.count(insertion) != 1:
             raise SystemExit('Unexpected script structure; refusing to patch')
-        source = source.replace(constructor, registration, 1).replace(insertion, renderer + insertion, 1)
+        source = source.replace(constructor, registration, 1).replace(insertion, renderer + camera + insertion, 1)
         modified = tmp / 'PuffleManager.as'
         modified.write_text(source, encoding='utf-8')
         output = tmp / 'engine.swf'

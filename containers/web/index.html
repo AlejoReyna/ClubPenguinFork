@@ -95,11 +95,9 @@
         border-radius:999px;background:#063354f2;box-shadow:0 6px 20px #0005;font:700 14px/1.3 system-ui,sans-serif}
   .chip[hidden]{display:none}
   .chip p{margin:0}
-  .chip-ico{flex:none;width:22px;height:16px;border:2px solid #fff;border-radius:4px;animation:gira-aviso 2.4s ease-in-out infinite}
-  .chip-ico.fijo{animation:none}
+  .chip-ico{flex:none;width:22px;height:16px;border:2px solid #fff;border-radius:4px}
   .chip button{flex:none;width:36px;height:36px;border:0;border-radius:50%;background:transparent;color:#fff;font:400 22px/1 system-ui;cursor:pointer}
   .chip button:hover{background:#ffffff26}
-  @keyframes gira-aviso{0%,20%{transform:rotate(0)}55%,100%{transform:rotate(90deg)}}
   .pan{display:none}
 
   /* Panel de infraestructura: lateral oscuro. En escritorio reserva su ancho (main y .bar se
@@ -147,35 +145,54 @@
   .infra .infra-accion:hover{background:#8b5cf647}.infra .infra-accion:disabled{opacity:.6;cursor:progress}
   .infra :focus-visible{outline:2px solid #8b5cf6;outline-offset:2px}
 
-  /* ===== Móvil VERTICAL: juego entero arriba (ancho completo), dock de accesos y panel debajo. =====
-     El SWF es 760×480; a ancho completo en un teléfono sobra alto, así que ese alto se usa para el
-     dock y los paneles. «Zoom» agranda hasta 1.3× recortando los lados del mapa (ancla abajo: el HUD
-     del juego queda visible) y un deslizador mueve el recorte. Debe coincidir con mqVertical en JS. */
+  /* Vertical: el juego llena SIEMPRE el alto sobre los controles inferiores (760×480, sin deformar)
+     y la cámara sigue a tu pingüino; el deslizador mira hacia los lados. «Ver el juego completo» es
+     un vistazo temporal: al recargar vuelve a llenar el alto. Los paneles son hojas superpuestas,
+     sin reservar una zona vacía. Coincide con mqVertical. */
   @media(orientation:portrait) and (max-width:900px){
-    :root{--stage-h:calc(100vw * .631579 * var(--zoom,1));--pan-h:0px;--dock-h:72px;
-          --dock-top:calc(var(--bar-h) + var(--stage-h) + var(--pan-h));--panel-top:calc(var(--dock-top) + var(--dock-h))}
-    :root.zoom{--pan-h:34px}
-    main{top:var(--bar-h);left:0;right:0;bottom:auto;height:var(--stage-h);justify-content:flex-start;transition:none}
-    #game{width:calc(100cqw * var(--zoom,1));max-height:none;
-          transform:translateX(calc((var(--zoom,1) - 1) * -100cqw * var(--pan,.5)))}
-    .bar #zoom,.bar #fullscreen svg{display:block}
-    .bar #zoom{display:inline-flex}
-    .bar #fullscreen{width:44px;padding-inline:0}
-    #fs-txt,.bar label span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+    :root{--bar-h:calc(64px + env(safe-area-inset-bottom));--pan-h:30px}
+    :root.fit-game{--pan-h:0px}
+    /* Instalada (barra de estado translúcida), el HUD superior no queda bajo la hora ni el notch. */
+    main{top:env(safe-area-inset-top);left:0;right:0;bottom:calc(var(--bar-h) + var(--pan-h));height:auto;
+         align-items:center;justify-content:flex-start;transition:none}
+    #game{width:max(100cqw,158.333333cqh);height:100cqh;max-height:none;
+          transform:translateX(calc((100cqw - max(100cqw,158.333333cqh)) * var(--pan,.5)))}
+    .fit-game main{justify-content:center}
+    .fit-game #game{width:min(100cqw,158.333333cqh);height:auto;max-height:100cqh;transform:none}
+    .bar{top:auto;bottom:0;left:0;right:0;justify-content:space-evenly;gap:4px;
+         padding:8px max(8px,env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));
+         background:#086aa8;border-top:1px solid #ffffff26;transition:none}
+    .bar-actions,.dock{display:contents}
+    .bar button{flex:1;max-width:56px;width:44px;height:44px;padding:0;min-width:44px;border-radius:12px}
+    .bar #inicio{order:0}
+    .bar #infra{order:1}.bar #spotify{order:2}.bar #puffle{order:3}
+    .bar #fullscreen{order:4}.bar #zoom{order:5;display:inline-flex}
+    .bar #fullscreen svg,.bar #puffle svg{display:block}
+    .bar label{position:fixed;top:calc(10px + env(safe-area-inset-top));right:calc(10px + env(safe-area-inset-right));
+               filter:drop-shadow(0 2px 6px #003b6266)}
+    .bar select{min-height:36px;padding:0 8px;border-color:#ffffff66;border-radius:10px;font-size:.75rem}
+    #fs-txt,#puffle-txt,.bar label span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
     .bar #zoom[aria-pressed="true"]{background:#fff;color:#0758a5}
-    :root.zoom .pan{display:block;position:fixed;z-index:20;top:calc(var(--bar-h) + var(--stage-h));left:0;right:0;height:var(--pan-h);
-                    margin:0;padding:0 18px;background:transparent;accent-color:#fff}
-    .dock{position:fixed;top:var(--dock-top);left:0;right:0;height:var(--dock-h);gap:8px;padding:8px 12px;
-          background:#0b7ab9;border-block:1px solid #ffffff26}
-    .bar .dock button{flex:1;flex-direction:column;gap:2px;min-height:0;height:100%;padding:0 4px;font-size:.6875rem;width:auto}
-    .dock #infra::after,.dock #spotify::after{content:attr(data-lbl)}
-    .bar #puffle svg{display:block}
-    .dock [aria-expanded="true"]{background:#06447f;box-shadow:inset 0 0 0 2px #ffffff8c}
-    /* Globo y panel de infraestructura se acoplan bajo el dock (sin tapar el juego). */
-    .globo{position:fixed;z-index:34;left:8px!important;right:8px;top:var(--panel-top)!important;width:auto;
-           max-height:calc(100dvh - var(--panel-top) - 8px);overflow:auto}
+    .bar #zoom .zoom-plus{display:none}
+    .fit-game .bar #zoom .zoom-plus{display:block}
+    .bar [aria-expanded="true"]{background:#06447f;box-shadow:inset 0 0 0 2px #ffffff8c}
+    .pan{display:flex;align-items:center;gap:8px;position:fixed;z-index:30;bottom:var(--bar-h);left:0;right:0;width:100%;height:var(--pan-h);
+         margin:0;padding:0 12px;background:#086aa8}
+    .pan input{flex:1;min-width:0;height:100%;margin:0;accent-color:#fff;cursor:ew-resize}
+    .pan button{display:grid;place-items:center;flex:none;width:44px;height:28px;padding:0;border:0;border-radius:6px;
+                background:#fff;color:#0758a5;cursor:pointer}
+    /* Atenuado mientras la cámara ya te sigue; se enciende cuando miras hacia un lado. */
+    .pan button:disabled{background:transparent;color:#fff;opacity:.45;cursor:default}
+    .pan :focus-visible{outline:2px solid #fff;outline-offset:2px}
+    .fit-game .pan{display:none}
+    .chip{bottom:calc(var(--bar-h) + var(--pan-h) + 12px)}
+    .globo{position:fixed;z-index:40;left:8px!important;right:8px;top:auto!important;width:auto;
+           bottom:calc(var(--bar-h) + var(--pan-h) + 8px);
+           max-height:calc(100dvh - var(--bar-h) - var(--pan-h) - 24px - env(safe-area-inset-top));overflow:auto}
     .globo::before{display:none}
-    .infra{top:var(--panel-top);left:0;right:0;width:100%;border-left:0;border-top:1px solid #2a2a31;padding-top:0}
+    .infra{top:auto;left:8px;right:8px;bottom:calc(var(--bar-h) + var(--pan-h) + 8px);width:auto;
+           height:min(70dvh,42rem);max-height:calc(100dvh - var(--bar-h) - var(--pan-h) - 24px - env(safe-area-inset-top));
+           border:1px solid #2a2a31;border-radius:18px;padding-top:0;transform:translateY(calc(100% + var(--bar-h) + var(--pan-h) + 8px))}
   }
 
   /* ===== Móvil HORIZONTAL (poca altura): la barra pasa a un riel lateral y el juego usa TODA la altura.
@@ -198,7 +215,6 @@
   }
   @media(prefers-reduced-motion:reduce){
     .infra,html.infra-abierto .infra,main,.bar{transition:none!important}
-    .chip-ico{animation:none}
   }
 </style>
 </head>
@@ -221,8 +237,8 @@
       <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
       <span id="fs-txt">Pantalla completa</span>
     </button>
-    <button id="zoom" class="bar-icon" type="button" aria-pressed="false" aria-label="Acercar el mapa" title="Acercar el mapa">
-      <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l5 5M11 8v6M8 11h6"/></svg>
+    <button id="zoom" class="bar-icon" type="button" aria-pressed="false" aria-label="Ver el juego completo" title="Ver el juego completo">
+      <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l5 5M8 11h6"/><path class="zoom-plus" d="M11 8v6"/></svg>
     </button>
   </div>
   <div class="dock">
@@ -285,12 +301,155 @@
   <div id="game"></div>
   <p id="estado" role="status" class="on">Cargando el glaciar…</p>
 </main>
-<input id="pan" class="pan" type="range" min="0" max="100" value="50" aria-label="Mover el mapa">
+<div class="pan">
+  <input id="pan" type="range" min="0" max="100" value="50" aria-label="Mover la vista de lado a lado" title="Mover la vista de lado a lado">
+  <button id="camera-follow" type="button" aria-label="Volver a mi pingüino" title="Volver a mi pingüino" disabled>
+    <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+  </button>
+</div>
 <div id="rota" class="chip" role="status" hidden>
   <span class="chip-ico" id="rota-ico" aria-hidden="true"></span>
   <p></p>
   <button id="rota-x" type="button" aria-label="Cerrar">×</button>
 </div>
+<script id="camara-glaciar">
+  // Cámara vertical: mantiene a TU pingüino a la vista. El motor parcheado (mobile_camera.as) solo
+  // informa la posición del avatar propio en el escenario de 760×480 mediante
+  // fscommand("glaciarCamera", "x,y,reinicio") o "clear"; nunca chat, paquetes ni otros jugadores.
+  // Va en línea (no en un .js aparte) para que una copia vieja o fallida nunca rompa la página.
+  (() => {
+    'use strict';
+    const ANCHO_SWF = 760;
+    const PAUSA_MS = 250;   // sin reportes durante más tiempo: el pingüino estaba quieto
+    const SUAVE_MS = 90;    // constante de tiempo al volver a enganchar la vista
+    const ENGANCHE = .002;  // a esta distancia (fracción del recorrido) la vista queda fija a él
+
+    class GlaciarMobileCamera {
+      constructor({geometry, render, active, reducedMotion = () => false, now = () => performance.now(),
+                   requestFrame = callback => requestAnimationFrame(callback),
+                   cancelFrame = frame => cancelAnimationFrame(frame)}) {
+        Object.assign(this, {geometry, render, active, reducedMotion, now, requestFrame, cancelFrame});
+        this.position = null;    // {x, y} en el escenario; null sin avatar (carga, login, minijuego)
+        this.following = true;   // la vista acompaña al pingüino
+        this.attached = false;   // fijada a él en cada cuadro de Ruffle, sin retraso ni temblor
+        this.pan = this.target = .5;
+        this.lastReport = -Infinity;
+        this.manualAt = -Infinity;
+        this.frame = null;
+        this.lastTime = 0;
+        this.tick = this.tick.bind(this);
+      }
+
+      // Desplazamiento (0 = borde izquierdo, 1 = derecho) que centra x, acotado a los bordes de la sala.
+      static panForPosition(x, {viewWidth, gameWidth, renderWidth}) {
+        if (![x, viewWidth, gameWidth, renderWidth].every(Number.isFinite) ||
+            viewWidth <= 0 || gameWidth <= 0 || renderWidth <= 0) return null;
+        const sobrante = gameWidth - viewWidth;
+        if (sobrante <= 0) return .5;
+        // Ruffle se dibuja un poco más ancho que #game (oculta el borde del SWF), centrado.
+        const enJuego = gameWidth / 2 + (x / ANCHO_SWF - .5) * renderWidth;
+        return Math.max(0, Math.min(1, (enJuego - viewWidth / 2) / sobrante));
+      }
+
+      handleMessage(command, payload) {
+        if (typeof command !== 'string' || command.toLowerCase() !== 'glaciarcamera' ||
+            typeof payload !== 'string') return false;
+        if (payload === 'clear') {
+          this.position = null;
+          this.attached = false;
+          this.stop();
+          return true;
+        }
+        const campos = payload.split(',');
+        if (campos.length !== 3 || !campos[0].trim() || !campos[1].trim() ||
+            !['0', '1'].includes(campos[2])) return false;
+        const [x, y] = campos.map(Number);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+        const ahora = this.now();
+        const arranca = ahora - this.lastReport > PAUSA_MS;  // primer paso tras estar quieto
+        this.lastReport = ahora;
+        const nuevo = this.position === null || campos[2] === '1';
+        this.position = {x, y};
+        if (nuevo) {
+          // Sala nueva o primer avistamiento: corte directo al pingüino, como un cambio de escena.
+          this.following = true;
+          this.refresh(true);
+        } else if (!this.following && arranca && ahora - this.manualAt > PAUSA_MS) {
+          // Tras mirar con el deslizador, la siguiente caminata vuelve a seguirlo con suavidad.
+          this.setFollowing(true);
+        } else {
+          this.refresh();
+        }
+        return true;
+      }
+
+      setFollowing(enabled) {
+        this.following = Boolean(enabled);
+        this.attached = false;
+        this.refresh();
+      }
+
+      panManually(value) {
+        if (!Number.isFinite(value)) return;
+        this.following = false;
+        this.attached = false;
+        this.manualAt = this.now();
+        this.stop();
+        this.target = Math.max(0, Math.min(1, value));
+        this.show(this.target);
+      }
+
+      // snap: recolocar sin animación (sala nueva, cambio de tamaño o de encuadre).
+      refresh(snap = false) {
+        if (!this.following || !this.position || !this.active()) {
+          this.attached = false;
+          this.stop();
+          return;
+        }
+        const target = GlaciarMobileCamera.panForPosition(this.position.x, this.geometry());
+        if (target === null) { this.stop(); return; }
+        this.target = target;
+        if (snap || this.attached || this.reducedMotion()) {
+          this.stop();
+          this.attached = true;
+          this.show(target);
+        } else if (this.frame === null) {
+          this.frame = this.requestFrame(this.tick);
+        }
+      }
+
+      tick(time) {
+        this.frame = null;
+        if (!this.following || !this.position || !this.active()) { this.stop(); return; }
+        const dt = this.lastTime ? Math.min(64, Math.max(0, time - this.lastTime)) : 16.67;
+        this.lastTime = time;
+        const siguiente = this.pan + (this.target - this.pan) * (1 - Math.exp(-dt / SUAVE_MS));
+        if (Math.abs(this.target - siguiente) <= ENGANCHE) {
+          this.attached = true;
+          this.lastTime = 0;
+          this.show(this.target);
+        } else {
+          this.show(siguiente);
+          this.frame = this.requestFrame(this.tick);
+        }
+      }
+
+      show(pan) {
+        if (pan === this.pan) return;
+        this.pan = pan;
+        this.render(pan);
+      }
+
+      stop() {
+        if (this.frame !== null) this.cancelFrame(this.frame);
+        this.frame = null;
+        this.lastTime = 0;
+      }
+    }
+
+    globalThis.GlaciarMobileCamera = GlaciarMobileCamera;
+  })();
+</script>
 <script src="/ruffle/ruffle.js" defer></script>
 <script>
   // Spotify solo acepta 127.0.0.1 (no «localhost») y la cookie del puffle vive en ese origen.
@@ -322,9 +481,10 @@
     document.getElementById('etiqueta-idioma').textContent = 'Language';
     document.getElementById('fs-txt').textContent = 'Fullscreen';
     document.getElementById('puffle-txt').textContent = 'My puffle';
-    document.getElementById('zoom').setAttribute('aria-label', 'Zoom the map');
-    document.getElementById('zoom').title = 'Zoom the map';
-    document.getElementById('pan').setAttribute('aria-label', 'Move the map');
+    document.getElementById('pan').setAttribute('aria-label', 'Move the view from side to side');
+    document.getElementById('pan').title = 'Move the view from side to side';
+    document.getElementById('camera-follow').setAttribute('aria-label', 'Back to my penguin');
+    document.getElementById('camera-follow').title = 'Back to my penguin';
     const infraBtn = document.getElementById('infra');
     infraBtn.setAttribute('aria-label', 'Infrastructure');
     infraBtn.title = 'Infrastructure';
@@ -335,7 +495,7 @@
   }
   fsBoton.setAttribute('aria-label', document.getElementById('fs-txt').textContent);
 
-  // Modos de pantalla (idénticos a los @media del CSS): vertical = juego arriba + dock; riel = barra lateral.
+  // Modos de pantalla (idénticos a los @media del CSS): vertical = juego alto + controles abajo; riel = barra lateral.
   const mqVertical = matchMedia('(orientation: portrait) and (max-width: 900px)');
   const mqRiel = matchMedia('(orientation: landscape) and (max-height: 520px)');
   const raizDoc = document.documentElement;
@@ -344,24 +504,63 @@
   const fsApi = raizDoc.requestFullscreen || raizDoc.webkitRequestFullscreen;
   if (!fsApi) fsBoton.hidden = true;
 
-  // Zoom del mapa (solo vertical): 1× = todo el juego; 1.3× recorta los lados, anclado abajo (HUD visible).
+  // Vertical: el juego llena el alto y la cámara sigue a tu pingüino. «Ver el juego completo» es un
+  // vistazo temporal que no se guarda (al recargar vuelve a llenar el alto) y no recarga Ruffle.
   const zoomBoton = document.getElementById('zoom');
   const deslizador = document.getElementById('pan');
-  const ZOOM = 1.3;
-  let zoom = 1;
-  try { zoom = localStorage.getItem('glaciar-zoom') === '1' ? ZOOM : 1; } catch {}
-  const pintarZoom = () => {
-    raizDoc.style.setProperty('--zoom', zoom);
-    raizDoc.classList.toggle('zoom', zoom > 1);
-    zoomBoton.setAttribute('aria-pressed', String(zoom > 1));
+  const seguirBoton = document.getElementById('camera-follow');
+  const juego = document.getElementById('game');
+  const escenario = document.querySelector('main');
+  let encuadreCompleto = false;
+  const movimientoReducido = matchMedia('(prefers-reduced-motion: reduce)');
+  const camara = new GlaciarMobileCamera({
+    geometry: () => ({
+      viewWidth: escenario.clientWidth,
+      gameWidth: juego.clientWidth,
+      renderWidth: document.getElementById('penguin-player')?.getBoundingClientRect().width || 0,
+    }),
+    // Solo #game cambia de estilo en cada paso (no todo el documento).
+    render: pan => {
+      juego.style.setProperty('--pan', pan);
+      const valor = String(Math.round(pan * 100));
+      if (deslizador.value !== valor) deslizador.value = valor;
+    },
+    active: () => mqVertical.matches && !encuadreCompleto && document.visibilityState !== 'hidden',
+    reducedMotion: () => movimientoReducido.matches,
+  });
+  // «Volver a mi pingüino» solo se enciende cuando la vista se apartó de él.
+  const pintarSeguimiento = () => {
+    const apagado = camara.position === null || camara.following;
+    if (seguirBoton.disabled !== apagado) seguirBoton.disabled = apagado;
+  };
+  seguirBoton.addEventListener('click', () => {
+    camara.setFollowing(true);
+    pintarSeguimiento();
+  });
+  const pintarEncuadre = () => {
+    raizDoc.classList.toggle('fit-game', encuadreCompleto);
+    zoomBoton.setAttribute('aria-pressed', String(encuadreCompleto));
+    const etiqueta = encuadreCompleto ? (enIngles ? 'Fill the screen' : 'Llenar la pantalla')
+                                     : (enIngles ? 'Show the whole game' : 'Ver el juego completo');
+    zoomBoton.setAttribute('aria-label', etiqueta);
+    zoomBoton.title = etiqueta;
+    camara.refresh(true);
   };
   zoomBoton.addEventListener('click', () => {
-    zoom = zoom > 1 ? 1 : ZOOM;
-    try { localStorage.setItem('glaciar-zoom', zoom > 1 ? '1' : '0'); } catch {}
-    pintarZoom();
+    encuadreCompleto = !encuadreCompleto;
+    pintarEncuadre();
   });
-  deslizador.addEventListener('input', () => raizDoc.style.setProperty('--pan', deslizador.value / 100));
-  pintarZoom();
+  deslizador.addEventListener('input', () => {
+    camara.panManually(Number(deslizador.value) / 100);
+    pintarSeguimiento();
+  });
+  const actualizarCamara = () => camara.refresh(true);
+  window.addEventListener('resize', actualizarCamara);
+  window.visualViewport?.addEventListener('resize', actualizarCamara);
+  document.addEventListener('visibilitychange', actualizarCamara);
+  mqVertical.addEventListener('change', actualizarCamara);
+  movimientoReducido.addEventListener('change', actualizarCamara);
+  pintarEncuadre();
 
   selector.addEventListener('change', () => {
     try {
@@ -413,6 +612,11 @@
       player.id = 'penguin-player';
       player.style.backgroundColor = '#00529b';
       document.getElementById('game').appendChild(player);
+      player.ruffle().addFSCommandHandler((command, payload) => {
+        if (!camara.handleMessage(command, payload)) return false;
+        pintarSeguimiento();
+        return true;
+      });
       await player.ruffle().load({
         url: new URL('/media/boots.swf', location.href).href,
         parameters: {lang: idioma, base: location.origin + '/'}
@@ -442,12 +646,12 @@
     }
   });
 
-  // Avisos NO bloqueantes (el juego es jugable en ambas orientaciones): girar el teléfono, o instalar
-  // en la pantalla de inicio para tener pantalla completa real en iPhone. Cada uno sale una vez por sesión.
+  // Aviso NO bloqueante: en horizontal sin Fullscreen API (iPhone), instalar en la pantalla de inicio da
+  // pantalla completa real. En vertical no se pide girar el teléfono: ahí el juego ya llena el alto y te
+  // sigue (se ve MÁS grande que en horizontal). Sale una vez por sesión.
   const tactil = matchMedia('(pointer: coarse)');
   const instalada = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
   const AVISOS = {
-    rotar: enIngles ? 'Rotate your phone for a bigger game' : 'Gira el teléfono para ver el juego más grande',
     instalar: enIngles ? 'Fullscreen: Share → Add to Home Screen' : 'Pantalla completa: Compartir → Añadir a inicio',
   };
   const vistos = new Set();
@@ -456,12 +660,11 @@
   const marcarVisto = k => { vistos.add(k); try { sessionStorage.setItem('glaciar-aviso-' + k, '1'); } catch {} };
   const ocultarAviso = () => { avisoRotacion.hidden = true; clearTimeout(relojAviso); if (claveAviso) marcarVisto(claveAviso); claveAviso = ''; };
   const revisar = () => {
-    const k = !tactil.matches ? '' : mqVertical.matches ? 'rotar' : (mqRiel.matches && !fsApi && !instalada) ? 'instalar' : '';
+    const k = tactil.matches && mqRiel.matches && !fsApi && !instalada ? 'instalar' : '';
     if (k === claveAviso && !avisoRotacion.hidden) return;
     if (!k || visto(k)) { avisoRotacion.hidden = true; claveAviso = ''; clearTimeout(relojAviso); return; }
     claveAviso = k;
     avisoRotacion.querySelector('p').textContent = AVISOS[k];
-    document.getElementById('rota-ico').classList.toggle('fijo', k !== 'rotar');
     avisoRotacion.hidden = false;
     clearTimeout(relojAviso);
     relojAviso = setTimeout(ocultarAviso, 9000);
@@ -546,7 +749,7 @@
   };
   const colocar = () => {
     if (globo.hidden) return;
-    // Vertical: el CSS lo acopla bajo el dock (sin coordenadas).
+    // Vertical: el CSS abre la hoja sobre los controles inferiores.
     if (mqVertical.matches) { globo.classList.remove('lado'); return; }
     const r = enlaceSpotify.getBoundingClientRect();
     const ancho = globo.offsetWidth;
@@ -897,7 +1100,7 @@
     pintarInfra();
   }
 
-  const enOverlay = () => matchMedia('(max-width: 999.98px)').matches && !mqVertical.matches;
+  const enOverlay = () => matchMedia('(max-width: 999.98px)').matches;
   function abrirInfra() {
     if (infraAbierto) return;
     cerrar();                                   // el globo del puffle y el panel no comparten espacio
