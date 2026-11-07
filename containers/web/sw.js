@@ -1,5 +1,6 @@
 /* Service worker de Glaciar: precache mínimo y cache-first para media pesada. */
-const VERSION = 'glaciar-puffle-v1';
+// v2: the infrastructure panel summary (/infra/) must never be served from a cache.
+const VERSION = 'glaciar-puffle-v2';
 const ESTATICO = `pre-${VERSION}`;
 const MEDIA = `media-${VERSION}`;
 const PRECACHE = ['/', '/register.html', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/apple-touch-icon.png'];
@@ -24,6 +25,11 @@ self.addEventListener('fetch', event => {
   // Solo same-origin GET; nunca interfiere con sockets, salud, registro ni navegación offline.
   if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
   if (url.pathname.startsWith('/socket/') || url.pathname === '/healthz' || url.pathname.startsWith('/create/') || url.pathname.startsWith('/puffle/')) return;
+  // Monitoring summary: always live from the network, never cached, never a cached fallback.
+  if (url.pathname.startsWith('/infra/')) {
+    event.respondWith(fetch(event.request, {cache: 'no-store'}));
+    return;
+  }
   // The protocol renderer must match the deployed world, including after rollback.
   if (url.pathname.endsWith('/engine.swf')) {
     event.respondWith(fetch(event.request, {cache: 'no-store'}));
