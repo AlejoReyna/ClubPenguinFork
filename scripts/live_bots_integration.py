@@ -35,7 +35,7 @@ def check_live_bots(root, docker, exec_script, dash, postgres, world, network, l
     observers = [{'username': f'auditlive{i}', 'nickname': f'Auditlive{i}',
                   'password': secrets.token_urlsafe(16)} for i in range(10)]
     register = (root / 'scripts/bot_accounts.py').read_text() + '''
-import sys, json
+import json, sys
 for bot in json.load(sys.stdin)['bots']:
     register('http://dash:3000', bot['username'], bot['password'])
 print('registered')
