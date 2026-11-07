@@ -11,6 +11,12 @@
       var camera = this._engine.createEmptyMovieClip("__glaciarCamera",this._engine.getNextHighestDepth());
       camera.onEnterFrame = function()
       {
+         this.report();
+         // After the report: the page has already moved the view for this frame (fscommand is synchronous).
+         owner.updateMobileDock();
+      };
+      camera.report = function()
+      {
          var clip = owner._engine.getPlayerMovieClip(owner._shell.getMyPlayerId());
          if(clip == undefined || !clip._visible || !clip.is_ready)
          {

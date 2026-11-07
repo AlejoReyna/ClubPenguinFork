@@ -46,6 +46,7 @@ def main():
     insertion = '   function setupPathEngine()\n'
     renderer = Path(__file__).with_name('renderer.as').read_text(encoding='utf-8')
     camera = Path(__file__).with_name('mobile_camera.as').read_text(encoding='utf-8')
+    camera += Path(__file__).with_name('mobile_dock.as').read_text(encoding='utf-8')
     with tempfile.TemporaryDirectory(prefix='puffle-swf-') as tmp:
         tmp = Path(tmp)
         subprocess.run(java + ['-export', 'script', str(tmp / 'export'), str(args.engine.resolve())],

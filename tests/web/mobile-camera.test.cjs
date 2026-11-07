@@ -115,17 +115,41 @@ test('a new room cuts to the penguin and resumes following', () => {
   assert.equal(f.frames.size, 0);
 });
 
-test('without an avatar the view holds still, and the next sighting is a cut', () => {
+test('loading screens and mini-games are centered; the next room cuts back to the penguin', () => {
   const f = fixture();
   f.report(600, 300, 1);
-  const before = f.camera.pan;
+  assert.ok(f.camera.pan > .8);
   assert.equal(f.camera.handleMessage('glaciarCamera', 'clear'), true);
   assert.equal(f.camera.position, null);
-  assert.equal(f.camera.pan, before);
+  assert.equal(f.camera.pan, .5, 'cuts to the middle with the scene change, so the animation starts centered');
   assert.equal(f.frames.size, 0);
   f.report(200);
-  assert.equal(f.camera.pan, target(200));
+  assert.equal(f.camera.pan, target(200), 'a first sighting is a cut even without the reset flag');
   assert.equal(f.frames.size, 0);
+});
+
+test('a loading screen is centered even after looking aside, and the player can still look around', () => {
+  const f = fixture();
+  f.report(380, 300, 1);
+  f.camera.panManually(0);
+  f.camera.handleMessage('glaciarCamera', 'clear');
+  assert.equal(f.camera.pan, .5);
+  f.camera.panManually(.2);
+  f.camera.refresh(true);
+  assert.equal(f.camera.pan, .2, 'a resize does not undo a manual look at a wide mini-game');
+  f.report(300, 300, 1);
+  assert.equal(f.camera.following, true);
+  assert.equal(f.camera.pan, target(300));
+});
+
+test('before the first sighting (login, server list) the view stays centered unless moved', () => {
+  const f = fixture();
+  f.camera.refresh(true);
+  assert.equal(f.camera.pan, .5);
+  assert.deepEqual(f.rendered, []);
+  f.camera.panManually(.8);
+  f.camera.refresh(true);
+  assert.equal(f.camera.pan, .8);
 });
 
 test('whole-game, landscape and hidden views never move; reduced motion never glides', () => {
@@ -142,6 +166,45 @@ test('whole-game, landscape and hidden views never move; reduced motion never gl
   f.camera.setFollowing(true);
   assert.equal(f.frames.size, 0);
   assert.equal(f.camera.pan, target(604));
+  f.camera.handleMessage('glaciarCamera', 'clear');
+  assert.equal(f.camera.pan, .5);
+  assert.equal(f.frames.size, 0);
+  f.setActive(false);
+  f.report(100, 300, 1);
+  assert.equal(f.camera.pan, .5, 'inactive views ignore new rooms too');
+});
+
+test('the visible stage strip matches the screen edges, so the engine can center the chat in it', () => {
+  for (const x of [120, 380, 520, 700]) {
+    const pan = target(x);
+    const strip = Camera.visibleStage(pan, geometry);
+    assert.ok(Math.abs(onScreen(strip.left, pan)) < 1e-6, 'left edge of the screen');
+    assert.ok(Math.abs(onScreen(strip.right, pan) - geometry.viewWidth) < 1e-6, 'right edge of the screen');
+    assert.ok(Math.abs(strip.right - strip.left - geometry.viewWidth / geometry.renderWidth * 760) < 1e-6);
+  }
+  // Not clamped at a room edge, the strip is centered on the penguin.
+  const strip = Camera.visibleStage(target(520), geometry);
+  assert.ok(Math.abs((strip.left + strip.right) / 2 - 520) < 1e-6);
+  assert.equal(Camera.visibleStage(.5, {...geometry, viewWidth: 1200}), null, 'the whole game fits');
+  assert.equal(Camera.visibleStage(NaN, geometry), null);
+  assert.equal(Camera.visibleStage(.5, {...geometry, renderWidth: 0}), null);
+});
+
+test('the engine gets "left,right" while the view is cropped and "" when the whole game shows', () => {
+  const f = fixture();
+  f.report(520, 300, 1);
+  const [left, right] = f.camera.hudView().split(',').map(Number);
+  const strip = Camera.visibleStage(f.camera.pan, geometry);
+  assert.ok(Math.abs(left - strip.left) < .01 && Math.abs(right - strip.right) < .01);
+  f.camera.panManually(0);
+  assert.ok(Number(f.camera.hudView().split(',')[0]) < left, 'follows a manual look aside too');
+  f.setActive(false);
+  assert.equal(f.camera.hudView(), '');
+});
+
+test('the page exposes the strip to the engine as a global ExternalInterface function', () => {
+  assert.match(html, /window\.glaciarHudView = \(\) => camara\.hudView\(\);/);
+  assert.ok(html.indexOf('window.glaciarHudView') < html.indexOf('player.ruffle().load('));
 });
 
 test('ignores unrelated commands and malformed reports; the command matches in any case', () => {
