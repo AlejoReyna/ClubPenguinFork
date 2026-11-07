@@ -313,8 +313,9 @@
   <button id="rota-x" type="button" aria-label="Cerrar">×</button>
 </div>
 <script id="camara-glaciar">
-  // Cámara vertical: mantiene a TU pingüino a la vista. El motor parcheado (mobile_camera.as) solo
-  // informa la posición del avatar propio en el escenario de 760×480 mediante
+  // Cámara vertical: mantiene a TU pingüino a la vista y, mientras no hay avatar (pantallas de carga
+  // entre salas, minijuegos), centra la escena, que el juego dibuja al centro. El motor parcheado
+  // (mobile_camera.as) solo informa la posición del avatar propio en el escenario de 760×480 mediante
   // fscommand("glaciarCamera", "x,y,reinicio") o "clear"; nunca chat, paquetes ni otros jugadores.
   // Va en línea (no en un .js aparte) para que una copia vieja o fallida nunca rompa la página.
   (() => {
@@ -330,7 +331,7 @@
                    cancelFrame = frame => cancelAnimationFrame(frame)}) {
         Object.assign(this, {geometry, render, active, reducedMotion, now, requestFrame, cancelFrame});
         this.position = null;    // {x, y} en el escenario; null sin avatar (carga, login, minijuego)
-        this.following = true;   // la vista acompaña al pingüino
+        this.following = true;   // la vista se mueve sola: al pingüino o, sin avatar, al centro
         this.attached = false;   // fijada a él en cada cuadro de Ruffle, sin retraso ni temblor
         this.pan = this.target = .5;
         this.lastReport = -Infinity;
@@ -355,9 +356,11 @@
         if (typeof command !== 'string' || command.toLowerCase() !== 'glaciarcamera' ||
             typeof payload !== 'string') return false;
         if (payload === 'clear') {
+          // El motor quitó la sala y mostró la pantalla de carga en el mismo cuadro (o abrió un
+          // minijuego): corte al centro, como un cambio de escena, hasta el pingüino en la sala nueva.
           this.position = null;
-          this.attached = false;
-          this.stop();
+          this.following = true;
+          this.refresh(true);
           return true;
         }
         const campos = payload.split(',');
@@ -399,14 +402,15 @@
         this.show(this.target);
       }
 
+      // Objetivo: tu pingüino o, sin avatar, el centro (carga, minijuego, login).
       // snap: recolocar sin animación (sala nueva, cambio de tamaño o de encuadre).
       refresh(snap = false) {
-        if (!this.following || !this.position || !this.active()) {
+        if (!this.following || !this.active()) {
           this.attached = false;
           this.stop();
           return;
         }
-        const target = GlaciarMobileCamera.panForPosition(this.position.x, this.geometry());
+        const target = this.position ? GlaciarMobileCamera.panForPosition(this.position.x, this.geometry()) : .5;
         if (target === null) { this.stop(); return; }
         this.target = target;
         if (snap || this.attached || this.reducedMotion()) {
@@ -420,7 +424,7 @@
 
       tick(time) {
         this.frame = null;
-        if (!this.following || !this.position || !this.active()) { this.stop(); return; }
+        if (!this.following || !this.active()) { this.stop(); return; }
         const dt = this.lastTime ? Math.min(64, Math.max(0, time - this.lastTime)) : 16.67;
         this.lastTime = time;
         const siguiente = this.pan + (this.target - this.pan) * (1 - Math.exp(-dt / SUAVE_MS));

@@ -115,17 +115,41 @@ test('a new room cuts to the penguin and resumes following', () => {
   assert.equal(f.frames.size, 0);
 });
 
-test('without an avatar the view holds still, and the next sighting is a cut', () => {
+test('loading screens and mini-games are centered; the next room cuts back to the penguin', () => {
   const f = fixture();
   f.report(600, 300, 1);
-  const before = f.camera.pan;
+  assert.ok(f.camera.pan > .8);
   assert.equal(f.camera.handleMessage('glaciarCamera', 'clear'), true);
   assert.equal(f.camera.position, null);
-  assert.equal(f.camera.pan, before);
+  assert.equal(f.camera.pan, .5, 'cuts to the middle with the scene change, so the animation starts centered');
   assert.equal(f.frames.size, 0);
   f.report(200);
-  assert.equal(f.camera.pan, target(200));
+  assert.equal(f.camera.pan, target(200), 'a first sighting is a cut even without the reset flag');
   assert.equal(f.frames.size, 0);
+});
+
+test('a loading screen is centered even after looking aside, and the player can still look around', () => {
+  const f = fixture();
+  f.report(380, 300, 1);
+  f.camera.panManually(0);
+  f.camera.handleMessage('glaciarCamera', 'clear');
+  assert.equal(f.camera.pan, .5);
+  f.camera.panManually(.2);
+  f.camera.refresh(true);
+  assert.equal(f.camera.pan, .2, 'a resize does not undo a manual look at a wide mini-game');
+  f.report(300, 300, 1);
+  assert.equal(f.camera.following, true);
+  assert.equal(f.camera.pan, target(300));
+});
+
+test('before the first sighting (login, server list) the view stays centered unless moved', () => {
+  const f = fixture();
+  f.camera.refresh(true);
+  assert.equal(f.camera.pan, .5);
+  assert.deepEqual(f.rendered, []);
+  f.camera.panManually(.8);
+  f.camera.refresh(true);
+  assert.equal(f.camera.pan, .8);
 });
 
 test('whole-game, landscape and hidden views never move; reduced motion never glides', () => {
@@ -142,6 +166,12 @@ test('whole-game, landscape and hidden views never move; reduced motion never gl
   f.camera.setFollowing(true);
   assert.equal(f.frames.size, 0);
   assert.equal(f.camera.pan, target(604));
+  f.camera.handleMessage('glaciarCamera', 'clear');
+  assert.equal(f.camera.pan, .5);
+  assert.equal(f.frames.size, 0);
+  f.setActive(false);
+  f.report(100, 300, 1);
+  assert.equal(f.camera.pan, .5, 'inactive views ignore new rooms too');
 });
 
 test('ignores unrelated commands and malformed reports; the command matches in any case', () => {
