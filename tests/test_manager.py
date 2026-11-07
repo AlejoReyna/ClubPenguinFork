@@ -36,7 +36,7 @@ class ReadinessTests(unittest.IsolatedAsyncioTestCase):
     async def test_ready_flips_at_the_threshold(self):
         manager = make_manager(10, ready_ratio=0.8)
         self.assertFalse(manager.ready())
-        for index, session in enumerate(manager.sessions[:7]):
+        for session in manager.sessions[:7]:
             session.conn, session.joined_room = _OpenConn(), True
         self.assertEqual(manager.sessions_in_room(), 7)
         self.assertFalse(manager.ready())

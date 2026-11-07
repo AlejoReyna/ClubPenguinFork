@@ -126,7 +126,7 @@ class FakeWorld:
             self._purge(conn)
 
     def _purge(self, conn):
-        for room_id, members in list(self.rooms.items()):
+        for members in list(self.rooms.values()):
             for player_id, player in list(members.items()):
                 if player['conn'] is conn:
                     del members[player_id]

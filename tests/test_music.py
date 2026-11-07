@@ -51,7 +51,7 @@ class HostProtocolTests(unittest.IsolatedAsyncioTestCase):
 
         async def handler(reader, writer):
             head = await reader.readuntil(b'\r\n\r\n')
-            length = int([l for l in head.split(b'\r\n') if l.lower().startswith(b'content-length')][0].split(b':')[1])
+            length = int([line for line in head.split(b'\r\n') if line.lower().startswith(b'content-length')][0].split(b':')[1])
             seen['head'] = head.decode()
             seen['body'] = json.loads(await reader.readexactly(length))
             answer = json.dumps({'handled': True, 'text': 'Puse «Despacito».'}).encode()
@@ -93,7 +93,7 @@ class BotFlowTests(unittest.IsolatedAsyncioTestCase):
             await wait_until(lambda: session.joined_room)
             for count, (player, line) in enumerate(lines, 1):
                 await world.broadcast_human_chat(100, player, line)
-                await wait_until(lambda: len(chats_from(world, session.player_id)) >= count, timeout=8)
+                await wait_until(lambda count=count: len(chats_from(world, session.player_id)) >= count, timeout=8)
                 await asyncio.sleep(0.3)  # player cooldown in the test policy
             return chats_from(world, session.player_id), provider
         finally:

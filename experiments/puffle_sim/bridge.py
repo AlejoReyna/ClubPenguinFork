@@ -1,7 +1,8 @@
-"""Experimental server-side bridge; disabled until an operator installs it.
+"""Server-side bridge between accepted Houdini chat and the puffle engine.
 
-The classifier must be a trusted server-side source of human opt-in, not a
-name supplied by a client. This prototype is not registered with Houdini yet.
+production/puffle/world.py installs it in the world server, behind the
+``puffle_enabled`` switch. The classifier must be a trusted server-side source
+of human opt-in, not a name supplied by a client.
 """
 from experiments.puffle_sim.authority import select_owned_puffle, validate_binding
 from experiments.puffle_sim.client.protocol import puffle_talk_fields

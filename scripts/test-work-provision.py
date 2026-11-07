@@ -594,4 +594,4 @@ if __name__ == '__main__':
     except (RuntimeError, subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError,
             json.JSONDecodeError, AssertionError) as error:
         print('FAIL: ' + str(error)[-1500:], file=sys.stderr)
-        raise SystemExit(1)
+        raise SystemExit(1) from None

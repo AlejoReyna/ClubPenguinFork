@@ -1,6 +1,6 @@
 # Cloudflare Tunnel connector for club.example.com.
 # The tunnel token is NOT managed here: create the Secret by hand so it never
-# reaches the Terraform state or Git (see docs/acceso-publico.md).
+# reaches the Terraform state or Git (see docs/architecture.md).
 variable "cloudflared_enabled" {
   type    = bool
   default = false

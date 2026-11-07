@@ -364,7 +364,7 @@ class ProviderTests(unittest.TestCase):
 
     def test_success_requires_completed(self):
         self.responses.append((200, sse({'type': 'response.output_text.delta', 'delta': 'hola'})))
-        with self.assertRaises(Exception):
+        with self.assertRaises(ProviderError):
             self.run_eval()
 
     def test_silence_means_no_reply(self):
@@ -396,7 +396,7 @@ class ProviderTests(unittest.TestCase):
         self.assertEqual(self.sleeps, [1.0, 2.0])
         self.responses += [err, err, err]
         self.sent.clear()
-        with self.assertRaises(Exception):
+        with self.assertRaises(ProviderError):
             self.run_eval()
         self.assertEqual(len(self.sent), 3)
 
@@ -469,7 +469,7 @@ class ServerTests(unittest.TestCase):
         threading.Thread(target=srv.serve_forever, daemon=True).start()
         self.addCleanup(srv.server_close)
         self.addCleanup(srv.shutdown)
-        origin = f'http://127.0.0.1:8080'
+        origin = 'http://127.0.0.1:8080'
 
         def req(path, origin_header=origin):
             c = http.client.HTTPConnection('127.0.0.1', port)

@@ -252,7 +252,7 @@ def cmd_adopt(args):
         terraform(env, 'import', *flags, address, ident)
         print(f'imported {address}')
     evidence(ws, 'adopt.json', {'imported': [a for a, _ in todo], 'created_utc': time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())})
-    print('Now run a plan and review it before any apply (see docs/ci-cd/adopcion-cloudflared.md).')
+    print('Now run a plan and review it before any apply (see docs/operations.md).')
 
 
 # --- apply ---------------------------------------------------------------------
@@ -297,7 +297,7 @@ def cmd_apply(args):
     evidence(ws, 'apply.json', outcome)
     if result.returncode != 0:
         print(lablib.redact(result.stderr[-1500:]))
-        lablib.log_issue('error', 'terraform apply failed; see docs/ci-cd/respaldos-y-rollback.md')
+        lablib.log_issue('error', 'terraform apply failed; see docs/operations.md (Rollback)')
         raise SystemExit(1)
     print(f'Applied the reviewed plan in {outcome["seconds"]}s.')
 
@@ -417,7 +417,7 @@ def cmd_verify(args):
         probe = (ROOT / 'scripts/ws_probe.py').read_text()
         exec_in_dash(cfg, probe, '--url', 'ws://web:8080/socket/login', '--origin', f'https://{host}')
         exec_in_dash(cfg, probe, '--url', 'ws://web:8080/socket/login', '--origin', 'https://not-allowed.invalid', '--expect-reject')
-        return f'proxy accepts the public origin and refuses an unknown one'
+        return 'proxy accepts the public origin and refuses an unknown one'
 
     def puffle():
         exists = kubectl(cfg, '-n', NAMESPACE, 'get', 'deployment', 'puffle', '-o', 'name', check=False)

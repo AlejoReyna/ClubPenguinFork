@@ -117,7 +117,7 @@ class MoonshotClient:
                 return parsed
             except asyncio.TimeoutError:
                 error = ProviderError('timeout', 'request exceeded timeout')
-            except (OSError, asyncio.IncompleteReadError) as cause:
+            except (OSError, asyncio.IncompleteReadError):
                 error = ProviderError('network', 'connection failed')
             except (ValueError, UnicodeError, asyncio.LimitOverrunError):
                 error = ProviderError('empty', 'invalid or oversized response')

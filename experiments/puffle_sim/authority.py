@@ -1,4 +1,4 @@
-"""Experimental Houdini-side checks. This module is not wired into handlers.
+"""Houdini-side ownership checks for the puffle bridge; registers no handlers itself.
 
 The caller must invoke these checks only for chat already accepted by Houdini,
 with a trusted server-side human classification and explicit opt-in. It must

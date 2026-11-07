@@ -6,12 +6,11 @@ Sources, in increasing precedence:
 3. environment overrides for infra values (hosts, ports, metrics, provider
    endpoint, API key, spend caps, time zone, cast directory).
 
-The JSON document matches the format of ``containers/bots/configs/`` and the
-one-time output of scripts/create-bot-accounts.py. Bot credentials (user and
-password) live only there, never in code, logs or Terraform. No default file
-contains a real secret.
+The JSON document matches the one-time output of scripts/create-bot-accounts.py.
+Bot credentials (user and password) live only there, never in code, logs or
+Terraform. No default file contains a real secret.
 
-Live penguins (docs/pinguinos-vivos.md) are opt-in: only when ``BOTS_CAST_DIR``
+Live penguins (docs/bots.md) are opt-in: only when ``BOTS_CAST_DIR``
 points at a directory of persona cards do bots with a card (matched to the
 Secret entry by ``username``) become cast-driven. Without it, or for a bot
 without a card, the entry is parsed exactly as before.
@@ -316,7 +315,7 @@ def _port(env, env_key, raw_section, key, default):
     try:
         return int(value)
     except (TypeError, ValueError):
-        raise ConfigError(f'server: "{key}" must be a port number, got {value!r}')
+        raise ConfigError(f'server: "{key}" must be a port number, got {value!r}') from None
 
 
 def _number(mapping, key, default, minimum, where):
@@ -324,7 +323,7 @@ def _number(mapping, key, default, minimum, where):
     try:
         value = float(value)
     except (TypeError, ValueError):
-        raise ConfigError(f'{where}: "{key}" must be a number, got {value!r}')
+        raise ConfigError(f'{where}: "{key}" must be a number, got {value!r}') from None
     if not math.isfinite(value) or value < minimum:
         raise ConfigError(f'{where}: "{key}" must be >= {minimum}, got {value}')
     return value
@@ -338,7 +337,7 @@ def parse_area(raw, where, *, allow_point=False):
                                       int(raw['min_y']), int(raw['max_y']))
     except (KeyError, TypeError, ValueError):
         raise ConfigError(f'{where}: walk area needs integers '
-                          'min_x, max_x, min_y, max_y')
+                          'min_x, max_x, min_y, max_y') from None
     if max_x < min_x or max_y < min_y:
         raise ConfigError(f'{where}: walk area upper bounds must not be below lower')
     if not allow_point and (max_x == min_x or max_y == min_y):
@@ -468,7 +467,7 @@ def parse_bot(index, raw):
         try:
             ax, ay = int(anchor['x']), int(anchor['y'])
         except (KeyError, TypeError, ValueError):
-            raise ConfigError(f'{where}: anchor needs integer x and y')
+            raise ConfigError(f'{where}: anchor needs integer x and y') from None
         area = parse_area({'min_x': ax, 'max_x': ax, 'min_y': ay, 'max_y': ay},
                           where, allow_point=True)
         spawn = (ax, ay)
@@ -514,7 +513,7 @@ def _load_document(env):
         try:
             document = json.loads(inline)
         except json.JSONDecodeError as error:
-            raise ConfigError(f'BOTS_CONFIG is not valid JSON: {error}')
+            raise ConfigError(f'BOTS_CONFIG is not valid JSON: {error}') from None
         if not isinstance(document, dict):
             raise ConfigError('BOTS_CONFIG must be a JSON object')
         logger.info('Loaded bot configuration from BOTS_CONFIG (in-memory)')
@@ -537,7 +536,7 @@ def _read_json_file(path, origin):
     try:
         document = json.loads(path.read_text(encoding='utf-8'))
     except json.JSONDecodeError as error:
-        raise ConfigError(f'{origin}: {path} is not valid JSON: {error}')
+        raise ConfigError(f'{origin}: {path} is not valid JSON: {error}') from None
     if not isinstance(document, dict):
         raise ConfigError(f'{origin}: {path} must contain a JSON object')
     logger.info('Loaded bot configuration from %s', path)

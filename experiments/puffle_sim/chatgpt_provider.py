@@ -59,7 +59,7 @@ def build_request(model, context, allow_actions=False):
 
 
 def _error_code(lines):
-    raw = b''.join(l if isinstance(l, bytes) else l.encode() for l in lines)[:4096]
+    raw = b''.join(line if isinstance(line, bytes) else line.encode() for line in lines)[:4096]
     try:
         data = json.loads(raw)
     except ValueError:
@@ -158,7 +158,7 @@ class ChatGPTProvider:
         try:
             token = self.auth.access_token()
         except AuthError:
-            raise ProviderError('no conectado')
+            raise ProviderError('no conectado') from None
         model = self._pick_model(token)
         body = json.dumps(build_request(model, context, self.allow_actions), ensure_ascii=False).encode()
         for attempt in range(self.retries + 1):
@@ -181,7 +181,7 @@ class ChatGPTProvider:
                 raise
             except Retryable:
                 if attempt >= self.retries:
-                    raise ProviderError('uso no disponible, reintentos agotados')
+                    raise ProviderError('uso no disponible, reintentos agotados') from None
                 self.sleep(self.backoff * (2 ** attempt))
         else:
             raise ProviderError('sin respuesta')

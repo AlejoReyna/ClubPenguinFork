@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 """Private backup of external Secrets, bot ledger and device pairing database."""
-import base64
 from datetime import datetime, timezone
 import hashlib
-import json
 import os
 from pathlib import Path
 import subprocess

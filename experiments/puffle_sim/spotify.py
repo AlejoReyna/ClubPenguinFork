@@ -1,6 +1,6 @@
-"""Owner-only Spotify control for the conversational puffle (experimental).
+"""Owner-only Spotify control for the conversational puffle.
 
-Design (see docs/puffle-spotify.md):
+Design (see docs/puffle.md):
 - The command comes ONLY from the latest chat line of the igloo owner, after the
   bridge/authority layer accepted it (visitors, bots and other rooms never reach
   the engine). This module never trusts the model for actions: a deterministic,
@@ -9,7 +9,7 @@ Design (see docs/puffle-spotify.md):
   with what the parser reads from the owner's latest message.
 - Spotify metadata and the owner's command are not sent to the language model:
   confirmations are replaced by a neutral marker in the context passed on.
-- Each player maps to HIS OWN backend (Web API with his token, or simulator).
+- Each player maps to their own backend (Web API with their token, or simulator).
   Tokens never leave the host/server process; the client only gets the bubble.
 """
 import asyncio
@@ -210,7 +210,7 @@ class SpotifyWebAPI:
         try:
             return json.loads(raw)
         except ValueError:
-            raise SpotifyError('error')
+            raise SpotifyError('error') from None
 
     def _device(self):
         devices = (self._call('GET', '/me/player/devices') or {}).get('devices') or []

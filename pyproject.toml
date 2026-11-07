@@ -1,0 +1,34 @@
+# Tooling configuration only: this repository is not an installable package.
+# Each service ships in its own container image (containers/*/Dockerfile).
+
+[tool.ruff]
+# Operator scripts run on the Mac's system Python (3.9); the services run on 3.11.
+# Targeting the oldest interpreter keeps every suggestion valid for both.
+target-version = "py39"
+extend-exclude = ["vendor", ".local"]
+
+[tool.ruff.lint]
+# Correctness-focused rules. Formatting and import order are not enforced.
+select = [
+    "E4", "E7", "E9",  # pycodestyle: imports, statements, syntax errors
+    "F",               # pyflakes: unused names, undefined names, bad f-strings
+    "B",               # flake8-bugbear: likely bugs and error-handling pitfalls
+    "ASYNC",           # asyncio pitfalls (blocking calls inside coroutines)
+    "PIE",             # unnecessary or redundant code
+    "PLE",             # pylint errors
+    "SIM115",          # open() without a context manager
+    "T10",             # leftover debugger breakpoints
+]
+ignore = [
+    "ASYNC240",  # one-off pathlib stat calls are cheap; not worth a thread hop
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Scripts and tests put the repository on sys.path before importing from it.
+"scripts/**" = ["E402"]
+"experiments/puffle_sim/run_houdini_fixture.py" = ["E402"]
+"tests/**" = ["E402", "ASYNC"]
+# Executed with exec() inside a disposable container; the caller injects `ns`.
+"tests/production/socket_journey.py" = ["F821"]
+# Settings overlay on top of the pinned upstream dash settings module.
+"containers/runtime/lab_config.py" = ["F403"]

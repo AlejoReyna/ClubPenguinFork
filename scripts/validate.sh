@@ -27,6 +27,10 @@ python3 -I -m compileall -q "${python_dirs[@]}"
 for script in scripts/*.sh; do bash -n "$script"; done
 python3 -I -m json.tool monitoring/dashboard.json > /dev/null
 
+echo "== Python lint"
+command -v ruff >/dev/null || { echo "ruff not found: run scripts/install-tools.sh and add its ansible/bin to PATH" >&2; exit 1; }
+ruff check .
+
 # PyYAML is needed by the pipeline policy checks and their tests; never skip them silently.
 if python3 -I -c 'import yaml' 2>/dev/null; then
   yaml_python=python3

@@ -120,7 +120,7 @@ def verify_id_token(token, jwks, *, issuer, audience, nonce, now=None, leeway=60
         claims = json.loads(b64url_decode(p64))
         sig = b64url_decode(s64)
     except Exception:
-        raise AuthError('ID token mal formado')
+        raise AuthError('ID token mal formado') from None
     if header.get('alg') != 'RS256':
         raise AuthError('algoritmo de ID token no permitido')
     keys = [k for k in jwks.get('keys', []) if k.get('kty') == 'RSA'
