@@ -36,6 +36,7 @@ COPY --chown=10001:10001 run.py /app/run.py
 COPY --chown=10001:10001 lab_config.py /app/dash/lab_config.py
 COPY --chown=10001:10001 exporter.py /app/exporter.py
 COPY --chown=10001:10001 socket_proxy.py /app/socket_proxy.py
+COPY --chown=10001:10001 panel_summary.py /app/panel_summary.py
 RUN mkdir -p /app/houdini/logs /var/lib/puffle && chown -R 10001:10001 /app /var/lib/puffle
 USER 10001:10001
 WORKDIR /app

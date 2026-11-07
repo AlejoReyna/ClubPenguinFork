@@ -148,6 +148,9 @@ flowchart LR
   PG -->|pg_dump, verificación de restore desde Mac| Backup[Blob: clubpenguin-backups]
 ```
 
+Diagramas detallados de Kubernetes, instalación, configuración, Prometheus/Grafana y Ansible:
+[`docs/infraestructura-kubernetes.md`](docs/infraestructura-kubernetes.md).
+
 Ansible configura archivos
 del operador, Terraform administra recursos de Azure dedicados y recursos Kubernetes,
 y Helm instala monitoreo a través de Terraform. No se usa Docker Compose.
