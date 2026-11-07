@@ -174,6 +174,39 @@ test('whole-game, landscape and hidden views never move; reduced motion never gl
   assert.equal(f.camera.pan, .5, 'inactive views ignore new rooms too');
 });
 
+test('the visible stage strip matches the screen edges, so the engine can center the chat in it', () => {
+  for (const x of [120, 380, 520, 700]) {
+    const pan = target(x);
+    const strip = Camera.visibleStage(pan, geometry);
+    assert.ok(Math.abs(onScreen(strip.left, pan)) < 1e-6, 'left edge of the screen');
+    assert.ok(Math.abs(onScreen(strip.right, pan) - geometry.viewWidth) < 1e-6, 'right edge of the screen');
+    assert.ok(Math.abs(strip.right - strip.left - geometry.viewWidth / geometry.renderWidth * 760) < 1e-6);
+  }
+  // Not clamped at a room edge, the strip is centered on the penguin.
+  const strip = Camera.visibleStage(target(520), geometry);
+  assert.ok(Math.abs((strip.left + strip.right) / 2 - 520) < 1e-6);
+  assert.equal(Camera.visibleStage(.5, {...geometry, viewWidth: 1200}), null, 'the whole game fits');
+  assert.equal(Camera.visibleStage(NaN, geometry), null);
+  assert.equal(Camera.visibleStage(.5, {...geometry, renderWidth: 0}), null);
+});
+
+test('the engine gets "left,right" while the view is cropped and "" when the whole game shows', () => {
+  const f = fixture();
+  f.report(520, 300, 1);
+  const [left, right] = f.camera.hudView().split(',').map(Number);
+  const strip = Camera.visibleStage(f.camera.pan, geometry);
+  assert.ok(Math.abs(left - strip.left) < .01 && Math.abs(right - strip.right) < .01);
+  f.camera.panManually(0);
+  assert.ok(Number(f.camera.hudView().split(',')[0]) < left, 'follows a manual look aside too');
+  f.setActive(false);
+  assert.equal(f.camera.hudView(), '');
+});
+
+test('the page exposes the strip to the engine as a global ExternalInterface function', () => {
+  assert.match(html, /window\.glaciarHudView = \(\) => camara\.hudView\(\);/);
+  assert.ok(html.indexOf('window.glaciarHudView') < html.indexOf('player.ruffle().load('));
+});
+
 test('ignores unrelated commands and malformed reports; the command matches in any case', () => {
   const f = fixture();
   for (const [command, payload] of [

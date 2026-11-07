@@ -352,6 +352,22 @@
         return Math.max(0, Math.min(1, (enJuego - viewWidth / 2) / sobrante));
       }
 
+      // Franja del escenario (x de 0 a 760) que se ve con este desplazamiento; null si se ve entero.
+      static visibleStage(pan, {viewWidth, gameWidth, renderWidth}) {
+        if (![pan, viewWidth, gameWidth, renderWidth].every(Number.isFinite) ||
+            viewWidth <= 0 || renderWidth <= 0 || gameWidth <= viewWidth) return null;
+        const aEscenario = px => ((px - (viewWidth - gameWidth) * pan - gameWidth / 2) / renderWidth + .5) * ANCHO_SWF;
+        const left = aEscenario(0), right = aEscenario(viewWidth);
+        return left <= 0 && right >= ANCHO_SWF ? null : {left, right};
+      }
+
+      // El motor (mobile_dock.as) la pide en cada cuadro para dejar el dock dentro de lo visible,
+      // con el chat al centro: «izquierda,derecha» o «» cuando se ve el juego entero.
+      hudView() {
+        const franja = this.active() ? GlaciarMobileCamera.visibleStage(this.pan, this.geometry()) : null;
+        return franja ? `${franja.left.toFixed(2)},${franja.right.toFixed(2)}` : '';
+      }
+
       handleMessage(command, payload) {
         if (typeof command !== 'string' || command.toLowerCase() !== 'glaciarcamera' ||
             typeof payload !== 'string') return false;
@@ -532,6 +548,8 @@
     active: () => mqVertical.matches && !encuadreCompleto && document.visibilityState !== 'hidden',
     reducedMotion: () => movimientoReducido.matches,
   });
+  // ExternalInterface.call("glaciarHudView") del motor: el dock (con el chat) sigue a la vista, no a la sala.
+  window.glaciarHudView = () => camara.hudView();
   // «Volver a mi pingüino» solo se enciende cuando la vista se apartó de él.
   const pintarSeguimiento = () => {
     const apagado = camara.position === null || camara.following;
