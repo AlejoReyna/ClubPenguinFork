@@ -1,7 +1,7 @@
-"""Build an experimental SWF copy; never writes to the source SWF.
+"""Build the patched engine.swf (puffle renderer); never writes to the source SWF.
 
-Requires the complete, locally supplied FFDec 26.4.0 distribution. This tool
-does not download software or deploy anything. Visual/game tests are pending.
+Requires the complete FFDec 26.4.0 distribution; scripts/build-puffle-client.py
+downloads it and verifies it by SHA-256. This tool downloads and deploys nothing.
 """
 import argparse
 import hashlib

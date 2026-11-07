@@ -52,7 +52,7 @@ class FingerprintTests(unittest.TestCase):
     def test_tags_are_stable_and_never_latest(self):
         first = tags(self.repo)
         self.assertEqual(first, tags(self.repo))
-        for name, tag in first.items():
+        for tag in first.values():
             self.assertRegex(tag, r'^(rt|db|web)-[0-9a-f]{12}$')
             self.assertNotEqual(tag, 'latest')
 

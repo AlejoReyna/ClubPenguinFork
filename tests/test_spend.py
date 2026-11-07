@@ -1,6 +1,5 @@
 """The USD spend ledger: reserve/settle, caps, priority classes, fail-closed, legacy file."""
 import json
-import os
 import stat
 import tempfile
 import unittest
@@ -25,7 +24,7 @@ class PriceTests(unittest.TestCase):
 
     def test_design_figures_per_call(self):
         prices = Prices()  # 0.95 / 0.16 / 4.00 USD per million tokens
-        # Typical call of docs/pinguinos-vivos.md: ~1000 input and ~40 output tokens.
+        # Typical call (docs/bots.md, Spend control): ~1000 input and ~40 output tokens.
         self.assertEqual(prices.cost_micros(1000, 0, 40), 1110)       # ~ $0.0011
         self.assertEqual(prices.cost_micros(1000, 600, 40), 636)      # ~ $0.0006 with 60 % cached
 

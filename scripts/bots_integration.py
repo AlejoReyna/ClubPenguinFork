@@ -92,7 +92,7 @@ with urllib.request.urlopen('http://bots:9102/metrics',timeout=3) as r:
 
     def samples(text, metric):
         return [float(line.rsplit(' ', 1)[1]) for line in text.splitlines()
-                if line.startswith(metric + '{') or line.startswith(metric + ' ')]
+                if line.startswith((metric + '{', metric + ' '))]
 
     def wait_metric(metric, predicate, seconds=30):
         deadline = time.monotonic() + seconds
@@ -296,9 +296,9 @@ asyncio.run(main())
             docker(['exec', service, 'python', '-c',
                     'import socket; socket.create_connection(("127.0.0.1",18991),1).close()'])
             break
-        except Exception:
+        except Exception as error:
             if attempt == 29:
-                raise RuntimeError('Fake HTTP provider did not start')
+                raise RuntimeError('Fake HTTP provider did not start') from error
             time.sleep(0.2)
     wait_metric('bots_connected', connected)
     observe_api = protocol + '''

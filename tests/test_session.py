@@ -68,7 +68,7 @@ async def stop_running(stop_event, task, timeout=6.0):
         await asyncio.wait_for(task, timeout=timeout)
     except asyncio.TimeoutError:
         task.cancel()
-        raise AssertionError('the session loop did not stop cleanly')
+        raise AssertionError('the session loop did not stop cleanly') from None
 
 
 class LoginAndChatTests(unittest.IsolatedAsyncioTestCase):

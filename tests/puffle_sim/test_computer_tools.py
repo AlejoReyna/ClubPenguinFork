@@ -1,9 +1,8 @@
-import asyncio
 import json
 import unittest
 from unittest.mock import patch
 
-from experiments.puffle_sim.chatgpt_provider import build_request, parse_stream
+from experiments.puffle_sim.chatgpt_provider import ProviderError, build_request, parse_stream
 from experiments.puffle_sim.computer_tools import confirm_and_open, requested_action
 from experiments.puffle_sim.host_relay import Relay
 
@@ -34,7 +33,7 @@ class ToolTests(unittest.TestCase):
         text, items = parse_stream(events, allow_actions=True)
         self.assertEqual(text, '')
         self.assertEqual(len(items), 1)
-        with self.assertRaises(Exception):
+        with self.assertRaises(ProviderError):
             parse_stream(events[:1], allow_actions=True)
         self.assertNotIn('tools', build_request('test', [('player', 'hola')]))
         self.assertEqual(build_request('test', [('player', 'abre calculadora')], True)['tools'][0]['type'],

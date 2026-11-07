@@ -1,7 +1,6 @@
 """Atomic reservations, safe map travel, following and a virtual 48-hour run."""
 import asyncio
 import datetime as dt
-import random
 import unittest
 from unittest.mock import AsyncMock
 

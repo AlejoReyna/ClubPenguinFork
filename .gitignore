@@ -9,6 +9,10 @@ vendor/
 !*.tfvars.example
 *.retry
 __pycache__/
+.ruff_cache/
+.venv/
+node_modules/
+.claude/
 .env
 *.pem
 *.key

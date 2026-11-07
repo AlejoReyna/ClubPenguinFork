@@ -1,4 +1,4 @@
-"""Experimental server-to-client packet fields, without authorization.
+"""Server-to-client puffle packet fields; performs no authorization itself.
 
 Houdini must revalidate the room, puffle, session and recipients immediately
 before delivering these fields. This function does not do that or send data.

@@ -12,7 +12,7 @@ depends on, so a careless edit fails in CI instead of reaching the Pi:
   * plan/apply/verify jobs are pinned to one agent; every job has a timeout;
   * the cloudflared enablement stays explicit in the deploy scripts.
 
-The real validation of the YAML is Azure DevOps itself (see docs/ci-cd/primera-ejecucion.md).
+The real validation of the YAML is Azure DevOps itself (see docs/operations.md).
 """
 import re
 import sys

@@ -17,7 +17,6 @@ Checks, in order:
 Cleanup removes only containers, volumes and the network carrying this run's label.
 """
 import argparse
-import os
 from pathlib import Path
 import re
 import secrets
@@ -233,7 +232,7 @@ except (subprocess.CalledProcessError, RuntimeError, subprocess.TimeoutExpired) 
     print(lablib.redact(((getattr(exc, 'stderr', '') or '') + detail)[-2000:]) or str(exc))
     show_logs()
     cleanup()
-    raise SystemExit(1)
+    raise SystemExit(1) from None
 except BaseException:
     cleanup()
     raise

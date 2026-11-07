@@ -1,7 +1,6 @@
 """Player-owned companion. OAuth and music run locally; outbound HTTPS only."""
 import argparse
 import asyncio
-import contextlib
 import fcntl
 import json
 import os
@@ -154,13 +153,13 @@ def main():
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            raise SystemExit('Another companion process is running')
+            raise SystemExit('Another companion process is running') from None
         try:
             asyncio.run(args.func(args))
         except KeyboardInterrupt:
             pass
         except (ValueError, OSError, ConnectionError, TimeoutError):
-            raise SystemExit('No se pudo completar la operación. Revisa la conexión y la configuración privada.')
+            raise SystemExit('No se pudo completar la operación. Revisa la conexión y la configuración privada.') from None
 
 
 if __name__ == '__main__':

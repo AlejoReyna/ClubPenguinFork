@@ -91,7 +91,7 @@ print('registered')
 
     def values(text, name):
         return [float(line.rsplit(' ', 1)[1]) for line in text.splitlines()
-                if line.startswith(name + '{') or line.startswith(name + ' ')]
+                if line.startswith((name + '{', name + ' '))]
 
     def wait_all(sessions=1, seconds=180):
         deadline = time.monotonic() + seconds

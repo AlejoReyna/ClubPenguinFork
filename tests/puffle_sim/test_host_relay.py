@@ -9,7 +9,7 @@ import unittest
 
 from experiments.puffle_sim.chatgpt_process import ProcessChatGPTProvider
 from experiments.puffle_sim.engine import QuotaExhausted
-from experiments.puffle_sim.host_relay import MAX_REQUEST, Relay, RelayClient, serve
+from experiments.puffle_sim.host_relay import MAX_REQUEST, Relay, RelayClient
 
 SECRET = 's' * 43
 CHAT = 'secreto-del-chat-12345'

@@ -1,4 +1,4 @@
-"""Host-side inference relay for the disposable fixture.
+"""Host-side inference relay, shared by the bench fixture and the device worker.
 
 The world container never gets internet or OpenAI credentials. It sends one
 newline-delimited JSON request {secret, context} (<= 16 KiB) and receives only
@@ -10,9 +10,7 @@ import argparse
 import asyncio
 import hmac
 import json
-import os
 from pathlib import Path
-import secrets
 import sys
 
 MAX_REQUEST = 16384

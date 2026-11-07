@@ -10,7 +10,7 @@ import random
 import re
 from dataclasses import dataclass
 
-from . import actions, metrics, safety, spend, text
+from . import actions, safety, spend, text
 from .provider import ProviderError, SimulatedProvider
 
 GLOBAL_RULES = (

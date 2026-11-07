@@ -1,4 +1,4 @@
-"""Bounded in-memory conversation prototype, deliberately not a game adapter.
+"""Bounded in-memory conversation engine, deliberately not a game adapter.
 
 The caller must establish and revalidate game authority. This module does not
 authenticate users, classify bots, deliver packets, or persist credentials.

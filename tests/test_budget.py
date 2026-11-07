@@ -3,7 +3,6 @@
 The ledger itself (USD caps, priorities, fail-closed, the legacy file) is in
 test_spend.py; this file covers how the manager and the provider client use it.
 """
-import asyncio
 import tempfile
 import unittest
 from pathlib import Path

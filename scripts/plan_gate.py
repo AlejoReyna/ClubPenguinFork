@@ -162,7 +162,7 @@ def render(changes, verdict):
     symbols = {'create': '+', 'update': '~', 'delete': '-', 'replace': '-/+'}
     for item in changes:
         lines.append(f'{symbols.get(item["kind"], "?"):>3} {item["address"]}  [{item["kind"]}]')
-        for path, (old, new) in item['images'].items():
+        for old, new in item['images'].values():
             lines.append(f'      image {old} -> {new}')
         others = [p for p in item['paths'] if not p.endswith('.image')]
         if others:
@@ -188,7 +188,7 @@ def main():
     parser.add_argument('--expect', choices=['images-only'])
     parser.add_argument('--out', help='write the sanitized summary JSON here')
     args = parser.parse_args()
-    plan = json.load(sys.stdin if args.plan == '-' else open(args.plan))
+    plan = json.load(sys.stdin) if args.plan == '-' else json.loads(Path(args.plan).read_text())
     live = json.loads(Path(args.live).read_text()) if args.live else None
     changes = summarize(plan)
     verdict = classify(changes, live, [a for a in args.allow_destructive.split(',') if a], args.expect)

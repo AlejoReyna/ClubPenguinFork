@@ -7,7 +7,7 @@ manifest to Blob. The live database is never written to.
 
 A backup taken *after* a change does not protect against that change, so the
 deploy flow runs this *before* applying any plan that touches data
-(see docs/ci-cd/respaldos-y-rollback.md).
+(see docs/operations.md).
 
 Must run under an Azure identity with data access to the backup container (in a
 pipeline: inside an AzureCLI@2 task).

@@ -1,6 +1,5 @@
 """Account/bootstrap helpers. The running bots never register or access SQL."""
 import http.cookiejar
-import json
 import secrets
 import urllib.parse
 import urllib.request

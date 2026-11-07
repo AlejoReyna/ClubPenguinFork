@@ -18,7 +18,6 @@ import os
 import socket
 import ssl
 import struct
-import sys
 import time
 from urllib.parse import urlparse
 
@@ -151,7 +150,7 @@ def main():
         verdict, detail = probe(args.url, args.origin, args.expect, args.timeout, args.text)
     except (ProbeError, OSError, ssl.SSLError) as exc:
         print(f'FAIL: {type(exc).__name__}: {exc}')
-        raise SystemExit(1)
+        raise SystemExit(1) from None
     if args.expect_reject:
         if verdict == 'rejected':
             print(f'PASS: origin refused as expected ({detail})')

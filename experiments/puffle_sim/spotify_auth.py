@@ -1,10 +1,10 @@
 """Spotify Authorization Code + PKCE for ONE local owner (no client secret).
 
 The client ID is not secret: it is read from $PUFFLE_SPOTIFY_CLIENT_ID or from
-~/.config/puffle-lab/spotify-client-id (a file Alexis edits). Tokens live in
+~/.config/puffle-lab/spotify-client-id (edited by the operator). Tokens live in
 ~/.config/puffle-lab/spotify-credentials.json (0600, atomic), never in the repo,
 logs, the game client or the browser. Python 3.9 compatible (connect_server).
-Production needs per-player encrypted storage instead (docs/puffle-spotify.md).
+Production needs per-player encrypted storage instead (docs/puffle.md).
 """
 import contextlib
 import hmac
