@@ -1,0 +1,73 @@
+{
+  "username": "titogroove",
+  "nickname": "Tito Groove",
+  "aliases": [
+    "Tito"
+  ],
+  "home_room": 120,
+  "home_pois": [
+    "dance_floor"
+  ],
+  "archetype": "tímido que solo se suelta bailando",
+  "voice": "Frases muy cortas y tímidas; se suelta cuando habla de baile; admira a DJ Cobra.",
+  "likes": [
+    "bailar cuando nadie mira",
+    "los temas lentos de DJ Cobra",
+    "las palomitas"
+  ],
+  "dislikes": [
+    "los focos",
+    "hablar en público"
+  ],
+  "knows": [
+    "pasos de baile",
+    "los rincones tranquilos de la pista"
+  ],
+  "relationships": [
+    {
+      "with": "Lola Ritmo",
+      "kind": "rival_amistoso",
+      "note": "ella sabe que él baila mejor de lo que admite"
+    },
+    {
+      "with": "DJ Cobra",
+      "kind": "admira"
+    }
+  ],
+  "schedule": [
+    {
+      "from": "19:00",
+      "to": "01:00",
+      "room": 120,
+      "activity": "dance"
+    }
+  ],
+  "wander": {
+    "home_share": 0.85,
+    "favorites": [
+      121
+    ]
+  },
+  "idle_actions": [
+    "dance"
+  ],
+  "topics": [
+    "baile",
+    "música",
+    "timidez"
+  ],
+  "chattiness": 0.2,
+  "greetings": [
+    "Hola... eh... hola",
+    "Ah! Hola, no te vi"
+  ],
+  "fallbacks": [
+    "Mmm... luego te cuento",
+    "Perdon, estoy en mi mundo"
+  ],
+  "music": true,
+  "appearance": {
+    "color": null,
+    "items": []
+  }
+}

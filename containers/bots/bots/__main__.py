@@ -29,8 +29,8 @@ async def _amain():
 
     registry = Registry()
     manager = BotManager(config, registry)
-    metrics_server = MetricsServer(registry, config.metrics_port,
-        ready=lambda: all(s.conn is not None and not s.conn.closed and s.joined_room for s in manager.sessions))
+    # Ready when at least ceil(ratio x N) sessions are in a room (default 0.8). /healthz is unchanged.
+    metrics_server = MetricsServer(registry, config.metrics_port, ready=manager.ready)
     await metrics_server.start()
     facade = BotMetrics(registry)
     await facade.mark_up()

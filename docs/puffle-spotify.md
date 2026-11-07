@@ -4,6 +4,13 @@ El dueño de un iglú le escribe a su puffle en el chat («pon Despacito»,
 «siguiente», «pausa») y el puffle controla **el Spotify de ese dueño**. La
 confirmación sale como globo `puffletalk` de 48 caracteres o menos.
 
+> **Camino sin descarga (5 de noviembre de 2026):** en `glaciar-dev` el
+> servidor hace de dispositivo (`production/puffle/host.py`, modo lab con lista
+> de jugadores) y Spotify se conecta desde `/puffle/` con el redirect
+> `http://127.0.0.1:8080/puffle/spotify/callback`. Ver
+> [puffle-sin-descarga.md](puffle-sin-descarga.md). La sección «Laboratorio
+> local» de abajo describe el camino anterior (companion + `:1455`).
+
 ## Estado (4 de noviembre de 2026)
 
 | Pieza | Implementado | Declarado en Terraform | Desplegado | Probado funcionalmente |

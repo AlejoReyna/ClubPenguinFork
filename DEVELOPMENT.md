@@ -13,6 +13,14 @@ La extensión de NPC conectados se documenta en [docs/bots.md](docs/bots.md):
 servicio Python independiente, prueba con Houdini desechable y modo simulado por
 defecto. Su implementación local no implica despliegue ni inferencia real probada.
 
+En las salas con personajes de IA, los mensajes del chat pueden enviarse
+a Moonshot/Kimi, un proveedor externo, si el operador activa el modo API,
+incluso cuando no mencionan a un personaje por su nombre.
+No compartas contraseñas, datos de contacto ni otros datos personales por chat.
+La memoria de conversación de los bots es temporal y no se guarda en disco.
+El reparto y el director de diálogo se describen en
+[Pingüinos vivos](docs/pinguinos-vivos.md); el modo simulado no envía mensajes a ese proveedor.
+
 ## Estado comprobado
 
 Comprobación por SSH y API de Azure, 3 de noviembre de 2026:

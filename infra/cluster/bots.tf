@@ -76,10 +76,12 @@ resource "kubernetes_deployment_v1" "bots" {
     template {
       metadata {
         labels = merge(local.game_labels, { app = "bots" })
-        annotations = {
+        annotations = merge({
           "prometheus.io/scrape" = "true"
           "prometheus.io/port"   = "9102"
-        }
+          }, var.bots_cast_enabled ? {
+          "checksum/cast" = sha256(jsonencode(kubernetes_config_map_v1.bots_cast[0].data))
+        } : {})
       }
       spec {
         automount_service_account_token  = false
@@ -108,6 +110,22 @@ resource "kubernetes_deployment_v1" "bots" {
             value = var.bots_provider_mode
           }
           dynamic "env" {
+            for_each = merge(
+              var.bots_cast_enabled ? { BOTS_CAST_DIR = "/etc/bots-cast", BOTS_TZ = var.bots_timezone } : {},
+              var.bots_dialogue_enabled ? { BOTS_DIALOGUE_ENABLED = "true" } : {},
+              var.bots_life_enabled ? { BOTS_LIFE_ENABLED = "true" } : {},
+              var.bots_recall_enabled ? { BOTS_RECALL_ENABLED = "true" } : {},
+              var.bots_daily_spend_cap_usd == null ? {} : { BOTS_DAILY_SPEND_CAP_USD = tostring(var.bots_daily_spend_cap_usd) },
+              var.bots_monthly_spend_cap_usd == null ? {} : { BOTS_MONTHLY_SPEND_CAP_USD = tostring(var.bots_monthly_spend_cap_usd) },
+              var.bots_max_concurrent == null ? {} : { BOTS_MAX_CONCURRENT = tostring(var.bots_max_concurrent) },
+              var.bots_blocklist_config_map == null ? {} : { BOTS_BLOCKLIST_FILE = "/etc/bots-filter/blocklist.txt" }
+            )
+            content {
+              name  = env.key
+              value = env.value
+            }
+          }
+          dynamic "env" {
             for_each = var.bots_provider_mode == "api" ? [1] : []
             content {
               name = "MOONSHOT_API_KEY"
@@ -126,7 +144,7 @@ resource "kubernetes_deployment_v1" "bots" {
           }
           resources {
             requests = { cpu = "25m", memory = "48Mi" }
-            limits   = { cpu = "250m", memory = "192Mi" }
+            limits   = { cpu = var.bots_cpu_limit, memory = var.bots_memory_limit }
           }
           volume_mount {
             name       = "credentials"
@@ -136,6 +154,22 @@ resource "kubernetes_deployment_v1" "bots" {
           volume_mount {
             name       = "budget"
             mount_path = "/var/lib/bots"
+          }
+          dynamic "volume_mount" {
+            for_each = var.bots_cast_enabled ? [1] : []
+            content {
+              name       = "cast"
+              mount_path = "/etc/bots-cast"
+              read_only  = true
+            }
+          }
+          dynamic "volume_mount" {
+            for_each = var.bots_blocklist_config_map == null ? [] : [1]
+            content {
+              name       = "filter"
+              mount_path = "/etc/bots-filter"
+              read_only  = true
+            }
           }
           readiness_probe {
             http_get {
@@ -163,6 +197,20 @@ resource "kubernetes_deployment_v1" "bots" {
         volume {
           name = "budget"
           persistent_volume_claim { claim_name = kubernetes_persistent_volume_claim_v1.bots_budget[0].metadata[0].name }
+        }
+        dynamic "volume" {
+          for_each = var.bots_cast_enabled ? [1] : []
+          content {
+            name = "cast"
+            config_map { name = kubernetes_config_map_v1.bots_cast[0].metadata[0].name }
+          }
+        }
+        dynamic "volume" {
+          for_each = var.bots_blocklist_config_map == null ? [] : [1]
+          content {
+            name = "filter"
+            config_map { name = var.bots_blocklist_config_map }
+          }
         }
       }
     }

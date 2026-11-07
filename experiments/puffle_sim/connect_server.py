@@ -8,6 +8,7 @@ email: it only sees a status word. Run from the repo root:
 import sys
 import argparse
 import hmac
+import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import html
 import secrets
@@ -85,6 +86,16 @@ def form(action, label, cls, csrf):
             f'<button class="{cls}">{label}</button></form>')
 
 
+def cors_origin(header_value):
+    """Allow read-only status from the local game tab (127.0.0.1 / localhost only)."""
+    if not header_value:
+        return None
+    parsed = urllib.parse.urlsplit(header_value)
+    if parsed.scheme != 'http' or parsed.hostname not in ('127.0.0.1', 'localhost'):
+        return None
+    return header_value
+
+
 def make_handler(auth, port, csrf, spotify=None):
     spotify = spotify or SpotifyAuth()
     allowed_hosts = {f'127.0.0.1:{port}'}
@@ -96,12 +107,14 @@ def make_handler(auth, port, csrf, spotify=None):
         def log_message(self, *args):  # callback URLs carry codes; log nothing
             pass
 
-        def _send(self, status, body=b'', ctype='text/html; charset=utf-8', location=None):
+        def _send(self, status, body=b'', ctype='text/html; charset=utf-8', location=None, cors=None):
             self.send_response(status)
             self.send_header('Content-Type', ctype)
             self.send_header('Cache-Control', 'no-store')
             self.send_header('Referrer-Policy', 'same-origin')
             self.send_header('X-Frame-Options', 'DENY')
+            if cors:
+                self.send_header('Access-Control-Allow-Origin', cors)
             self.send_header('Content-Security-Policy',
                              "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; form-action 'self' https://auth.openai.com https://accounts.spotify.com")
             if location:
@@ -150,6 +163,12 @@ def make_handler(auth, port, csrf, spotify=None):
             if url.path == '/puffle.png':
                 self._send(200, PUFFLE_PNG.read_bytes(), 'image/png')
                 return
+            if url.path == '/api/local-status':
+                origin = cors_origin(self.headers.get('Origin'))
+                if not origin:
+                    return self._send(403, b'forbidden', 'text/plain')
+                payload = json.dumps({'chatgpt': auth.status(), 'spotify': spotify.status()}).encode()
+                return self._send(200, payload, 'application/json; charset=utf-8', cors=origin)
             if url.path != '/':
                 return self._send(404, b'no encontrado', 'text/plain')
             status = auth.status()

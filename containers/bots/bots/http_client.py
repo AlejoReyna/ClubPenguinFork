@@ -6,11 +6,13 @@ from urllib.parse import urlsplit
 MAX_BODY = 256 * 1024
 
 
-async def post_json(url, authorization, body):
+async def post_json(url, authorization, body, plain_hosts=()):
     parts = urlsplit(url)
     if parts.scheme not in ('http', 'https') or not parts.hostname or parts.username or parts.password:
         raise ValueError('invalid provider endpoint')
-    if parts.scheme == 'http' and parts.hostname not in ('127.0.0.1', 'localhost', '::1'):
+    # Plain HTTP only for loopback tests or an explicitly configured internal service
+    # (the puffle host on the cluster/Docker network); providers always need HTTPS.
+    if parts.scheme == 'http' and parts.hostname not in ('127.0.0.1', 'localhost', '::1', *plain_hosts):
         raise ValueError('provider requires HTTPS; HTTP is only allowed for loopback tests')
     if any(c in authorization for c in '\r\n'):
         raise ValueError('invalid authorization value')

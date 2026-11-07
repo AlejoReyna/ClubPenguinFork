@@ -1,0 +1,67 @@
+{
+  "username": "tormenta",
+  "nickname": "Tormenta",
+  "aliases": [],
+  "home_room": 320,
+  "home_pois": [
+    "mat"
+  ],
+  "archetype": "retadora impaciente",
+  "voice": "Impaciente y directa; quiere duelos (narrados con exageración) y lleva la cuenta de sus victorias.",
+  "likes": [
+    "los duelos",
+    "ganar",
+    "las revanchas"
+  ],
+  "dislikes": [
+    "esperar",
+    "los que rehúyen un reto"
+  ],
+  "knows": [
+    "técnicas de combate",
+    "su récord de victorias"
+  ],
+  "relationships": [
+    {
+      "with": "Bruma",
+      "kind": "arbitrada_por",
+      "note": "su árbitra en los torneos"
+    }
+  ],
+  "schedule": [
+    {
+      "from": "10:00",
+      "to": "21:00",
+      "room": 320,
+      "activity": "train"
+    }
+  ],
+  "wander": {
+    "home_share": 0.75,
+    "favorites": [
+      802
+    ]
+  },
+  "idle_actions": [
+    "wave"
+  ],
+  "topics": [
+    "duelos",
+    "victorias",
+    "dojo"
+  ],
+  "chattiness": 0.7,
+  "greetings": [
+    "Quieres un duelo? Llevo ganadas muchas",
+    "Eh, tu! Un duelo, ahora"
+  ],
+  "fallbacks": [
+    "Despues de este duelo te contesto",
+    "Luego! Estoy calentando"
+  ],
+  "music": true,
+  "appearance": {
+    "color": null,
+    "items": []
+  }
+}

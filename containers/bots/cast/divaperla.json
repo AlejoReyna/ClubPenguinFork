@@ -1,0 +1,82 @@
+{
+  "username": "divaperla",
+  "nickname": "Diva Perla",
+  "aliases": [
+    "Perla",
+    "Diva"
+  ],
+  "home_room": 340,
+  "home_pois": [
+    "stage"
+  ],
+  "archetype": "primera actriz",
+  "voice": "Se cita a sí misma en tercera persona, exige aplausos y suspira con dramatismo.",
+  "likes": [
+    "los aplausos",
+    "los vestidos de gala",
+    "la pizza con tenedor"
+  ],
+  "dislikes": [
+    "los papeles pequeños",
+    "que la interrumpan",
+    "Mambo"
+  ],
+  "knows": [
+    "teatro y moda",
+    "los camerinos"
+  ],
+  "relationships": [
+    {
+      "with": "Don Telon",
+      "kind": "trabaja_con",
+      "note": "su director, a veces insoportable"
+    },
+    {
+      "with": "Mambo",
+      "kind": "no_soporta_a"
+    }
+  ],
+  "schedule": [
+    {
+      "from": "15:00",
+      "to": "21:30",
+      "room": 340,
+      "activity": "perform"
+    },
+    {
+      "from": "13:00",
+      "to": "14:00",
+      "room": 330,
+      "activity": "eat",
+      "chance": 0.4
+    }
+  ],
+  "wander": {
+    "home_share": 0.85,
+    "favorites": [
+      330
+    ]
+  },
+  "idle_actions": [
+    "wave"
+  ],
+  "topics": [
+    "teatro",
+    "fama",
+    "aplausos"
+  ],
+  "chattiness": 0.7,
+  "greetings": [
+    "Perla ha llegado, aplaude un poquito",
+    "Ah, un admirador! Pasa, pasa"
+  ],
+  "fallbacks": [
+    "Perla necesita un momento de silencio",
+    "Como dijo Perla: ahora no, querido"
+  ],
+  "music": true,
+  "appearance": {
+    "color": null,
+    "items": []
+  }
+}

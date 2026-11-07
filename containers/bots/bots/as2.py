@@ -12,6 +12,10 @@ handlers under vendor/houdini):
 - chat out: ``%xt%s%m#sm%-1%<id>%<message>%`` (the id must match the session
   or the server closes the connection);
 - movement: ``%xt%s%u#sp%-1%<x>%<y>%`` broadcast as ``%xt%sp%-1%<id>%<x>%<y>%``;
+- emote: ``%xt%s%u#se%-1%<emote>%`` broadcast as ``%xt%se%-1%<id>%<emote>%``;
+- action (wave, dance, …): ``%xt%s%u#sa%-1%<action>%`` as ``%xt%sa%-1%<id>%<action>%``;
+- frame (dance, sit): ``%xt%s%u#sf%-1%<frame>%`` as ``%xt%sf%-1%<id>%<frame>%``; the
+  client's own dance/sit buttons send this one (see actions.py), Houdini keeps it;
 - presence: ``%xt%ap%-1%<player string>`` and ``%xt%rp%-1%<id>%``;
 - roster refresh: ``%xt%grs%-1%<room>%<strings...>%``;
 - errors: ``%xt%e%-1%<code>%``.
@@ -293,6 +297,18 @@ class AS2Connection:
 
     async def send_move(self, x, y):
         await self.send_line(f'%xt%s%u#sp%-1%{int(x)}%{int(y)}%')
+
+    async def send_emote(self, emote):
+        await self.send_line(f'%xt%s%u#se%-1%{int(emote)}%')
+
+    async def send_action(self, action):
+        await self.send_line(f'%xt%s%u#sa%-1%{int(action)}%')
+
+    async def send_frame(self, frame):
+        await self.send_line(f'%xt%s%u#sf%-1%{int(frame)}%')
+
+    async def send_snowball(self, x, y):
+        await self.send_line(f'%xt%s%u#sb%-1%{int(x)}%{int(y)}%')
 
     async def send_heartbeat(self):
         await self.send_line('%xt%s%u#h%-1%')

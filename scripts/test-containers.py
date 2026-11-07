@@ -40,9 +40,21 @@ def parse_args():
     parser.add_argument('--component-tag', action='append', default=[], metavar='NAME=TAG')
     parser.add_argument('--web-tag', help='also test the web image (nginx + proxy + registration route)')
     parser.add_argument('--bots-tag', help='also test a separate bots service against real, disposable Houdini')
+    parser.add_argument('--live-cast', action='store_true', help='26 simulated sessions and 10 protocol clients; requires --bots-tag')
+    parser.add_argument('--voices', action='store_true', help='also test opt-in Phase 2 with a synthetic loopback HTTP provider')
+    parser.add_argument('--life', action='store_true', help='also test Phase 3 invitations, following and returns with simulated providers')
+    parser.add_argument('--recall', action='store_true', help='also test Phase 4 relationship notes on a writable PVC slice (simulated summaries)')
     parser.add_argument('--puffle', action='store_true', help='test the production world and two isolated companions')
     parser.add_argument('--keep-logs', action='store_true', help='print container logs even when tests pass')
     args = parser.parse_args()
+    if args.live_cast and not args.bots_tag:
+        parser.error('--live-cast requires --bots-tag')
+    if args.voices and not args.live_cast:
+        parser.error('--voices requires --live-cast')
+    if args.life and not args.live_cast:
+        parser.error('--life requires --live-cast')
+    if args.recall and not args.live_cast:
+        parser.error('--recall requires --live-cast')
     tags = {name: args.tag for name in ('runtime', 'database')}
     for item in args.component_tag:
         name, _, value = item.partition('=')
@@ -133,12 +145,18 @@ try:
         else:
             raise RuntimeError('Postgres did not start')
         for alias, mode in [('login', 'login'), ('glaciar', 'world'), ('dash', 'dash')]:
-            start(alias, runtime, mode, extra=puffle_extra if mode == 'world' else [])
+            extra = list(puffle_extra if mode == 'world' else [])
+            if args.live_cast and mode in ('login', 'world'):
+                extra += ['-e', 'WORLD_CAPACITY=60']
+            start(alias, runtime, mode, extra=extra)
         start('proxy', runtime, 'proxy')
-        start('puffle', runtime, 'puffle', extra=puffle_extra or ['-e', 'PUFFLE_ENABLED=false'])
+        if not args.live_cast or args.puffle:
+            start('puffle', runtime, 'puffle', extra=puffle_extra or ['-e', 'PUFFLE_ENABLED=false'])
         dash = prefix + '-dash'
 
-        waits = [('login', 6112), ('glaciar', 9876), ('dash', 3000), ('proxy', 8765), ('puffle', 9103)]
+        waits = [('login', 6112), ('glaciar', 9876), ('dash', 3000), ('proxy', 8765)]
+        if not args.live_cast or args.puffle:
+            waits.append(('puffle', 9103))
         if args.web_tag:
             web = start('web', f'clubpenguin/web:{tags["web"]}')
             # Like the Kubernetes pod: the proxy shares the web container's network namespace,
@@ -170,6 +188,24 @@ try:
                     'body=r.read().decode()\nassert r.status==200,r.status\nassert sys.argv[2] in body,"unexpected body"\n')
             exec_script(dash, http, 'http://web:8080/healthz', 'ok')
             exec_script(dash, http, 'http://web:8080/servers.xml', 'id="3101"')
+            asset_check = ('import hashlib,sys,urllib.request\n'
+                           'data=urllib.request.urlopen(sys.argv[1],timeout=10).read()\n'
+                           'assert hashlib.sha256(data).hexdigest()==sys.argv[2],"custom background mismatch"\n')
+            for kind, digest in (
+                ('photos', '2e197285cb8146c2dfbd5d2f4411cd861ce680f90bbfd31444a925ca9294c3cf'),
+                ('icons', '9152b4ae337a035b373971e0143ed022ccfb95107ecaca96981fa2fc3f08f159'),
+            ):
+                exec_script(dash, asset_check,
+                            f'http://web:8080/media/play/v2/content/global/clothing/{kind}/19155.swf', digest)
+            for path, digest in (
+                ('global/crumbs/global_crumbs.swf', '9469d222decbafc44328afd753d92d471c9998861901af69699b5a8f7592a156'),
+                ('local/en/crumbs/local_crumbs.swf', '5ab86f8913da6e006b4f047ec330ed8f3926217d668bd20e6762400a9a4ba358'),
+                ('local/es/crumbs/local_crumbs.swf', '63f786625090a3e1e93151d7fdf49ecfc8347e7e7e6a3676e0d7b2bcd8110cd3'),
+                ('local/fr/crumbs/local_crumbs.swf', '09fca30e27bf5a241ff7f752f11cc0f3825cdba8110ac2d4db31382ae41e8aa5'),
+                ('local/pt/crumbs/local_crumbs.swf', '945d13095090b25cfa7d446a9f60f99d6e099a6b6c2f95ad8978e81a6f494791'),
+            ):
+                exec_script(dash, asset_check, f'http://web:8080/media/play/v2/content/{path}', digest)
+            print('PASS: custom background 19155 assets match the published files.')
             print('PASS: nginx serves /healthz and /servers.xml.')
             web_url = 'ws://web:8080/socket/login'
             exec_script(dash, probe, '--url', web_url, '--origin', 'http://localhost')
@@ -179,9 +215,14 @@ try:
             print('PASS: nginx -> proxy -> login accepts allowed origins and refuses other origins and paths.')
             print(exec_script(dash, smoke, '--dash-url', 'http://web:8080').stdout.strip().replace('PASS:', 'PASS (via nginx):', 1))
         if args.bots_tag:
-            from bots_integration import check_bots
+            if args.live_cast:
+                from live_bots_integration import check_live_bots as check_bots
+            else:
+                from bots_integration import check_bots
             check_bots(root, docker, exec_script, dash, postgres, prefix + '-glaciar',
-                       prefix, label, tags['bots'], Path(temp))
+                       prefix, label, tags['bots'], Path(temp),
+                       **(dict(voices=args.voices, life=args.life, recall=args.recall)
+                          if args.live_cast else {}))
         if args.puffle:
             from puffle_integration import check_puffle
             check_puffle(root, docker, exec_script, dash, postgres)

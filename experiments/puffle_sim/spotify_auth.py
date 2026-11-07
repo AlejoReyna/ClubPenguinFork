@@ -35,11 +35,13 @@ def redirect_uri(port):
 
 
 class SpotifyAuth:
-    def __init__(self, config_dir=None, http=None, clock=time.time, client_id=None):
+    def __init__(self, config_dir=None, http=None, clock=time.time, client_id=None, redirect=None):
         self.dir = Path(config_dir) if config_dir else DEFAULT_DIR
         self.http = http or default_http
         self.clock = clock
         self._client_id = client_id
+        # A fixed same-origin redirect (puffle-host) instead of the :PORT loopback page.
+        self._redirect = redirect
         self._pending = {}
         self._lock = threading.Lock()
 
@@ -56,19 +58,20 @@ class SpotifyAuth:
             return value
         return None
 
-    def start(self, port):
+    def start(self, port=None, state=None):
         cid = self.client_id()
         if not cid:
             raise SpotifyAuthError('falta el Client ID de Spotify')
+        uri = self._redirect or redirect_uri(port)
         verifier, challenge = pkce_pair()
-        state = secrets.token_urlsafe(24)
+        state = state or secrets.token_urlsafe(24)
         with self._lock:
             now = self.clock()
             self._pending = {k: v for k, v in self._pending.items() if v['at'] > now - PENDING_TTL}
-            self._pending[state] = {'verifier': verifier, 'port': port, 'at': now}
+            self._pending[state] = {'verifier': verifier, 'uri': uri, 'at': now}
         return AUTHORIZE_URL + '?' + urllib.parse.urlencode({
             'response_type': 'code', 'client_id': cid, 'scope': SCOPE,
-            'redirect_uri': redirect_uri(port), 'state': state,
+            'redirect_uri': uri, 'state': state,
             'code_challenge_method': 'S256', 'code_challenge': challenge})
 
     def complete(self, query):
@@ -86,7 +89,7 @@ class SpotifyAuth:
         if not code:
             raise SpotifyAuthError('falta el código')
         tok = self._token({'grant_type': 'authorization_code', 'code': code,
-                           'redirect_uri': redirect_uri(pending['port']),
+                           'redirect_uri': pending['uri'],
                            'code_verifier': pending['verifier']})
         granted = set((tok.get('scope') or '').split())
         if 'user-modify-playback-state' not in granted:
@@ -106,9 +109,20 @@ class SpotifyAuth:
             raise SpotifyAuthError('falló el canje (HTTP %d%s)' % (status, ', ' + err if isinstance(err, str) and err.isidentifier() else ''))
         return data
 
+    # Credential storage hooks: a 0600 file locally; puffle-host stores encrypted rows.
+    def _load(self):
+        return read_json(self.cred_path)
+
+    def _store(self, data):
+        atomic_write_json(self.cred_path, data)
+
+    def _erase(self):
+        with contextlib.suppress(FileNotFoundError):
+            self.cred_path.unlink()
+
     def _save(self, tok, previous=None):
         previous = previous or {}
-        atomic_write_json(self.cred_path, {
+        self._store({
             'access_token': tok['access_token'],
             'refresh_token': tok.get('refresh_token') or previous.get('refresh_token'),
             'expires_at': self.clock() + int(tok.get('expires_in', 3600)) - 60,
@@ -116,7 +130,7 @@ class SpotifyAuth:
 
     def access_token(self, force_refresh=False):
         with self._lock:
-            cred = read_json(self.cred_path)
+            cred = self._load()
             if not cred:
                 return None
             if not force_refresh and cred.get('expires_at', 0) > self.clock():
@@ -133,10 +147,10 @@ class SpotifyAuth:
     def disconnect(self):
         # Spotify has no token-revocation endpoint: delete locally and tell the
         # owner to remove the app at spotify.com/account/apps.
-        with contextlib.suppress(FileNotFoundError):
-            self.cred_path.unlink()
+        with self._lock:
+            self._erase()
 
     def status(self):
         if not self.client_id():
             return 'sin_app'
-        return 'conectado' if read_json(self.cred_path) else 'desconectado'
+        return 'conectado' if self._load() else 'desconectado'

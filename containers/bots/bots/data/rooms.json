@@ -1,0 +1,286 @@
+{
+  "version": 1,
+  "scene": {
+    "width": 1520,
+    "height": 960
+  },
+  "rooms": {
+    "100": {
+      "name": "Town Center",
+      "swf": "town.swf",
+      "bot_cap": 3,
+      "measured": false,
+      "client_checked": false,
+      "source": "pending: block_mc has not been measured; bots homed here hold one fixed post (docs/bots.md \"Zonas medidas\" describes the method)",
+      "spawn": {
+        "x": 380,
+        "y": 330
+      },
+      "spawn_source": "start_x/start_y in the room SWF frame script (designer value), read with FFDec 26.4.0",
+      "walk": [],
+      "pois": {},
+      "exits": []
+    },
+    "110": {
+      "name": "Coffee Shop",
+      "swf": "coffee.swf",
+      "bot_cap": 3,
+      "measured": true,
+      "client_checked": true,
+      "source": "block_mc of coffee.swf exported with FFDec and the zone checked in Ruffle with a penguin at every corner and the centre, 2026-11-04 (docs/bots.md \"Zonas medidas\"; scripts/bot_accounts.py MEASURED_WORK_AREAS)",
+      "spawn": {
+        "x": 330,
+        "y": 320
+      },
+      "spawn_source": "centre of the measured zone (the bot_accounts post for BaristaIA)",
+      "walk": [
+        {
+          "min_x": 300,
+          "max_x": 360,
+          "min_y": 290,
+          "max_y": 350
+        }
+      ],
+      "pois": {
+        "counter": {
+          "min_x": 300,
+          "max_x": 360,
+          "min_y": 290,
+          "max_y": 350,
+          "action": null
+        }
+      },
+      "exits": []
+    },
+    "111": {
+      "name": "Book Room",
+      "swf": "book.swf",
+      "bot_cap": 3,
+      "measured": false,
+      "client_checked": false,
+      "source": "pending: block_mc has not been measured; bots homed here hold one fixed post (docs/bots.md \"Zonas medidas\" describes the method)",
+      "spawn": {
+        "x": 630,
+        "y": 280
+      },
+      "spawn_source": "start_x/start_y in the room SWF frame script (designer value), read with FFDec 26.4.0",
+      "walk": [],
+      "pois": {},
+      "exits": []
+    },
+    "120": {
+      "name": "Night Club",
+      "swf": "dance.swf",
+      "bot_cap": 6,
+      "measured": true,
+      "client_checked": true,
+      "source": "block_mc of dance.swf exported with FFDec and the zone checked in Ruffle with a penguin at every corner and the centre, 2026-11-04 (docs/bots.md \"Zonas medidas\"; scripts/bot_accounts.py MEASURED_WORK_AREAS)",
+      "spawn": {
+        "x": 330,
+        "y": 247
+      },
+      "spawn_source": "centre of the measured zone (dance floor, in front of the DJ booth)",
+      "walk": [
+        {
+          "min_x": 280,
+          "max_x": 380,
+          "min_y": 230,
+          "max_y": 265
+        }
+      ],
+      "pois": {
+        "dance_floor": {
+          "min_x": 280,
+          "max_x": 380,
+          "min_y": 230,
+          "max_y": 265,
+          "action": "dance"
+        },
+        "booth": {
+          "min_x": 322,
+          "max_x": 322,
+          "min_y": 168,
+          "max_y": 168,
+          "action": null,
+          "source": "DJ booth post tuned in-room by the owner on 2026-11-05 (bot_accounts.MEASURED_WORK_POSTS[\"DJIA\"])"
+        }
+      },
+      "exits": []
+    },
+    "121": {
+      "name": "Lounge",
+      "swf": "lounge.swf",
+      "bot_cap": 4,
+      "measured": false,
+      "client_checked": false,
+      "source": "pending: block_mc has not been measured; bots homed here hold one fixed post (docs/bots.md \"Zonas medidas\" describes the method)",
+      "spawn": {
+        "x": 560,
+        "y": 320
+      },
+      "spawn_source": "start_x/start_y in the room SWF frame script (designer value), read with FFDec 26.4.0",
+      "walk": [],
+      "pois": {},
+      "exits": []
+    },
+    "230": {
+      "name": "Ski Hill",
+      "swf": "mtn.swf",
+      "bot_cap": 7,
+      "measured": false,
+      "client_checked": false,
+      "source": "pending: block_mc has not been measured; bots homed here hold one fixed post (docs/bots.md \"Zonas medidas\" describes the method)",
+      "spawn": {
+        "x": 380,
+        "y": 220
+      },
+      "spawn_source": "start_x/start_y in the room SWF frame script (designer value), read with FFDec 26.4.0",
+      "walk": [],
+      "pois": {},
+      "exits": []
+    },
+    "300": {
+      "name": "The Plaza",
+      "swf": "plaza.swf",
+      "bot_cap": 3,
+      "measured": false,
+      "client_checked": false,
+      "source": "pending: block_mc has not been measured; bots homed here hold one fixed post (docs/bots.md \"Zonas medidas\" describes the method)",
+      "spawn": {
+        "x": 380,
+        "y": 340
+      },
+      "spawn_source": "start_x/start_y in the room SWF frame script (designer value), read with FFDec 26.4.0",
+      "walk": [],
+      "pois": {},
+      "exits": []
+    },
+    "310": {
+      "name": "Pet Shop",
+      "swf": "pet.swf",
+      "bot_cap": 3,
+      "measured": false,
+      "client_checked": false,
+      "source": "pending: block_mc has not been measured; bots homed here hold one fixed post (docs/bots.md \"Zonas medidas\" describes the method)",
+      "spawn": {
+        "x": 414,
+        "y": 260
+      },
+      "spawn_source": "start_x/start_y in the room SWF frame script (designer value), read with FFDec 26.4.0",
+      "walk": [],
+      "pois": {},
+      "exits": []
+    },
+    "320": {
+      "name": "The Dojo",
+      "swf": "dojo.swf",
+      "bot_cap": 5,
+      "measured": false,
+      "client_checked": false,
+      "source": "pending: block_mc has not been measured; bots homed here hold one fixed post (docs/bots.md \"Zonas medidas\" describes the method)",
+      "spawn": {
+        "x": 200,
+        "y": 340
+      },
+      "spawn_source": "start_x/start_y in the room SWF frame script (designer value), read with FFDec 26.4.0",
+      "walk": [],
+      "pois": {},
+      "exits": []
+    },
+    "330": {
+      "name": "Pizza Parlor",
+      "swf": "pizza.swf",
+      "bot_cap": 4,
+      "measured": true,
+      "client_checked": true,
+      "source": "block_mc of pizza.swf exported with FFDec and the zone checked in Ruffle with a penguin at every corner and the centre, 2026-11-04 (docs/bots.md \"Zonas medidas\"; scripts/bot_accounts.py MEASURED_WORK_AREAS)",
+      "spawn": {
+        "x": 400,
+        "y": 278
+      },
+      "spawn_source": "start_x/start_y of pizza.swf (400,278); it lies inside the measured zone",
+      "walk": [
+        {
+          "min_x": 365,
+          "max_x": 430,
+          "min_y": 258,
+          "max_y": 290
+        }
+      ],
+      "pois": {
+        "counter": {
+          "min_x": 365,
+          "max_x": 430,
+          "min_y": 258,
+          "max_y": 290,
+          "action": null
+        }
+      },
+      "exits": []
+    },
+    "340": {
+      "name": "The Mall",
+      "swf": "stage.swf",
+      "bot_cap": 6,
+      "measured": false,
+      "client_checked": false,
+      "source": "pending: block_mc has not been measured; bots homed here hold one fixed post (docs/bots.md \"Zonas medidas\" describes the method)",
+      "spawn": {
+        "x": 105,
+        "y": 330
+      },
+      "spawn_source": "start_x/start_y in the room SWF frame script (designer value), read with FFDec 26.4.0",
+      "walk": [],
+      "pois": {},
+      "exits": []
+    },
+    "800": {
+      "name": "The Dock",
+      "swf": "dock.swf",
+      "bot_cap": 3,
+      "measured": false,
+      "client_checked": false,
+      "source": "pending: block_mc has not been measured; bots homed here hold one fixed post (docs/bots.md \"Zonas medidas\" describes the method)",
+      "spawn": {
+        "x": 400,
+        "y": 200
+      },
+      "spawn_source": "start_x/start_y in the room SWF frame script (designer value), read with FFDec 26.4.0",
+      "walk": [],
+      "pois": {},
+      "exits": []
+    },
+    "801": {
+      "name": "Snow Forts",
+      "swf": "forts.swf",
+      "bot_cap": 3,
+      "measured": false,
+      "client_checked": false,
+      "source": "pending: block_mc has not been measured; bots homed here hold one fixed post (docs/bots.md \"Zonas medidas\" describes the method)",
+      "spawn": {
+        "x": 480,
+        "y": 310
+      },
+      "spawn_source": "start_x/start_y in the room SWF frame script (designer value), read with FFDec 26.4.0",
+      "walk": [],
+      "pois": {},
+      "exits": []
+    },
+    "802": {
+      "name": "Ice Rink",
+      "swf": "rink.swf",
+      "bot_cap": 4,
+      "measured": false,
+      "client_checked": false,
+      "source": "pending: block_mc has not been measured; bots homed here hold one fixed post (docs/bots.md \"Zonas medidas\" describes the method)",
+      "spawn": {
+        "x": 390,
+        "y": 280
+      },
+      "spawn_source": "start_x/start_y in the room SWF frame script (designer value), read with FFDec 26.4.0",
+      "walk": [],
+      "pois": {},
+      "exits": []
+    }
+  }
+}

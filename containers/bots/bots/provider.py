@@ -20,9 +20,12 @@ import random
 from .http_client import post_json
 
 from . import metrics as metrics_mod
+from . import spend as spend_mod
 
 BASE_PATH = '/chat/completions'
 RETRIABLE_KINDS = frozenset({'http_429', 'http_5xx', 'network'})
+# Refusals made locally by the spend ledger: nothing was sent to the provider.
+LOCAL_KINDS = frozenset({'budget', 'budget_state'})
 
 
 class ProviderError(Exception):
@@ -48,7 +51,7 @@ class MoonshotClient:
     def __init__(self, base_url, api_key, model='kimi-k2.6',
                  max_completion_tokens=120, timeout=30.0, retries=2,
                  retry_wait=2.0, thinking='disabled', max_concurrent=2,
-                 registry=None, metrics=None, budget=None):
+                 registry=None, metrics=None, ledger=None):
         if not api_key:
             raise ValueError('Moonshot API key is required in api mode')
         self.base_url = base_url.rstrip('/')
@@ -62,38 +65,53 @@ class MoonshotClient:
         self.semaphore = asyncio.Semaphore(max(1, int(max_concurrent)))
         # Metrics facade for this client: never None in the service.
         self.metrics = metrics
-        self.budget = budget
+        # spend.SpendLedger: every attempt reserves a cost first (None in unit tests).
+        self.ledger = ledger
 
-    def _payload(self, messages):
+    def _payload(self, messages, max_completion_tokens=None):
         payload = {
             'model': self.model,
             'messages': messages,
-            'max_completion_tokens': self.max_completion_tokens,
+            'max_completion_tokens': self.max_completion_tokens if max_completion_tokens is None else max_completion_tokens,
         }
         if self.thinking in ('enabled', 'disabled'):
             payload['thinking'] = {'type': self.thinking}
         return payload
 
-    async def _request(self, messages):
+    async def _reserve(self, messages, priority, max_completion_tokens=None):
+        """Hold the estimated cost of one attempt, or raise a ``budget*`` ProviderError."""
+        if self.ledger is None:
+            return None
+        try:
+            estimate = self.ledger.estimate_micros(messages, self.max_completion_tokens if max_completion_tokens is None else max_completion_tokens)
+            return self.ledger.reserve(priority, estimate)
+        except spend_mod.SpendDenied as denied:
+            kind = 'budget_state' if denied.reason == 'state' else 'budget'
+            if self.metrics:
+                await self.metrics.spend_denied(denied.reason)
+                await self.metrics.ledger_state(self.ledger.state_ok)
+            raise ProviderError(kind, f'spend ledger refused ({denied.reason})') from None
+        except (OSError, TypeError, ValueError):
+            raise ProviderError('budget_state', 'budget ledger unavailable') from None
+
+    async def _request(self, messages, priority, max_completion_tokens=None):
         attempt = 0
         while True:
             attempt += 1
             started = _loop_time()
+            reservation = None
+            usage = None
             try:
-                if self.budget is not None:
-                    try:
-                        permitted = self.budget.reserve()
-                    except (OSError, ValueError, TypeError):
-                        raise ProviderError('budget_state', 'budget ledger unavailable') from None
-                    if not permitted:
-                        raise ProviderError('budget', 'global request quota reached')
+                # A retry is a new request: it reserves (and may be refused) again.
+                reservation = await self._reserve(messages, priority, max_completion_tokens)
                 status, body = await asyncio.wait_for(
                     post_json(self.base_url + BASE_PATH, 'Bearer ' + self.api_key,
-                              json.dumps(self._payload(messages), ensure_ascii=True).encode()),
+                              json.dumps(self._payload(messages, max_completion_tokens), ensure_ascii=True).encode()),
                     timeout=self.timeout)
                 if status != 200:
                     raise ProviderError(_classify_http(status), 'provider rejected request')
                 parsed = self._parse(body)
+                usage = parsed[1]
                 if self.metrics:
                     await self.metrics.provider_ok(_loop_time() - started)
                 return parsed
@@ -105,7 +123,17 @@ class MoonshotClient:
                 error = ProviderError('empty', 'invalid or oversized response')
             except ProviderError as cause:
                 error = cause
-            if self.metrics:
+            finally:
+                if reservation is not None:
+                    # Failed attempts (and cancellation) retain their estimate:
+                    # the remote service may already have processed the request.
+                    charged = self.ledger.settle(reservation, usage)
+                    if self.metrics:
+                        await self.metrics.spend(priority, charged)
+                        await self.metrics.ledger_state(self.ledger.state_ok)
+            # Our own refusals never reached the provider: they are counted by
+            # the ledger metrics, not as provider failures.
+            if self.metrics and error.kind not in LOCAL_KINDS:
                 await self.metrics.provider_error(error.kind)
             if error.kind in RETRIABLE_KINDS and attempt <= self.retries:
                 await asyncio.sleep(_jittered(self.retry_wait, attempt))
@@ -127,10 +155,18 @@ class MoonshotClient:
             usage = {}
         return message['content'], usage
 
-    async def complete(self, messages):
-        """Return (reply_text, usage) or raise ProviderError."""
+    async def complete(self, messages, priority=spend_mod.P0, max_completion_tokens=None):
+        """Return (reply_text, usage) or raise ProviderError.
+
+        ``priority`` is the spend class (P0 a human addressed the bot, P1 a model
+        greeting, P2 bot-to-bot chatter); lower classes are switched off first.
+        """
+        if priority not in spend_mod.PRIORITIES:
+            raise ValueError(f'unknown spend priority {priority!r}')
+        if max_completion_tokens is not None and (type(max_completion_tokens) is not int or not 16 <= max_completion_tokens <= 2048):
+            raise ValueError('event completion limit must be an integer from 16 to 2048')
         async with self.semaphore:
-            reply, usage = await self._request(messages)
+            reply, usage = await self._request(messages, priority, max_completion_tokens)
         if self.metrics and usage:
             def count(key):
                 try:
@@ -177,7 +213,7 @@ class SimulatedProvider:
         index = (self.calls - 1 - len(self.fail_kinds)) % len(self.replies)
         return self.replies[index]
 
-    async def complete(self, messages):
+    async def complete(self, messages, priority=spend_mod.P0, max_completion_tokens=None):
         self.calls += 1
         if self.record_messages:
             self.messages_received.append([dict(item) for item in messages])

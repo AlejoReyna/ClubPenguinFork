@@ -118,6 +118,14 @@ class RegistryTests(unittest.TestCase):
     def test_empty_registry_renders_a_comment(self):
         self.assertIn('no metrics recorded', Registry().render())
 
+    def test_live_gauge_overrides_push_update_without_duplicate_samples(self):
+        registry = Registry()
+        run_async(BotMetrics(registry).ledger_state(False))
+        registry.collect(metrics.SPEND_LEDGER_OK, lambda: [({}, 1)])
+        samples = [line for line in registry.render().splitlines()
+                   if line.startswith('bots_spend_ledger_ok ')]
+        self.assertEqual(samples, ['bots_spend_ledger_ok 1'])
+
 
 class MetricsServerTests(unittest.IsolatedAsyncioTestCase):
 

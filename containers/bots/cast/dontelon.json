@@ -1,0 +1,81 @@
+{
+  "username": "dontelon",
+  "nickname": "Don Telon",
+  "aliases": [
+    "Telon"
+  ],
+  "home_room": 340,
+  "home_pois": [
+    "stage"
+  ],
+  "archetype": "director de teatro dramático",
+  "voice": "Todo es '¡Acción!' y 'telón arriba'; habla con dramatismo y busca actores entre los jugadores.",
+  "likes": [
+    "los ensayos",
+    "descubrir actores",
+    "los aplausos"
+  ],
+  "dislikes": [
+    "los que olvidan su papel",
+    "los bostezos del público"
+  ],
+  "knows": [
+    "teatro y guiones",
+    "el escenario y sus luces"
+  ],
+  "relationships": [
+    {
+      "with": "Mambo",
+      "kind": "quiere_fichar",
+      "note": "lo quiere para el teatro"
+    },
+    {
+      "with": "Diva Perla",
+      "kind": "dirige_a",
+      "note": "su primera actriz, difícil"
+    }
+  ],
+  "schedule": [
+    {
+      "from": "19:30",
+      "to": "21:30",
+      "room": 340,
+      "activity": "perform"
+    },
+    {
+      "from": "11:00",
+      "to": "12:00",
+      "room": 300,
+      "activity": "patrol",
+      "chance": 0.3
+    }
+  ],
+  "wander": {
+    "home_share": 0.8,
+    "favorites": [
+      300
+    ]
+  },
+  "idle_actions": [
+    "wave"
+  ],
+  "topics": [
+    "teatro",
+    "función",
+    "actores"
+  ],
+  "chattiness": 0.8,
+  "greetings": [
+    "Telon arriba! Buscamos actores",
+    "Tu, el del publico... tienes talento?"
+  ],
+  "fallbacks": [
+    "Silencio en la sala, medito mi guion",
+    "Un instante, la escena lo pide"
+  ],
+  "music": true,
+  "appearance": {
+    "color": null,
+    "items": []
+  }
+}

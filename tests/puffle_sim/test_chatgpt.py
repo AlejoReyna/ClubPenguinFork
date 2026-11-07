@@ -11,6 +11,7 @@ import tempfile
 import threading
 import unittest
 import urllib.parse
+from pathlib import Path
 from contextlib import redirect_stderr, redirect_stdout
 
 from experiments.puffle_sim import chatgpt_auth as ca
@@ -448,6 +449,44 @@ class ServerTests(unittest.TestCase):
         self.assertIn('Conectado', page)
         for leak in ('AT-secret', 'RT-secret', 'x@y.z', 'oaiapp_x'):
             self.assertNotIn(leak, page)
+
+    def test_local_status_cors(self):
+        import http.client
+        import json
+        from http.server import ThreadingHTTPServer
+        from experiments.puffle_sim.connect_server import make_handler
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        auth = ca.ChatGPTAuth(tmp.name, http=lambda *a: (500, b''))
+        spotify_dir = Path(tmp.name) / 'spotify'
+        spotify_dir.mkdir()
+        (spotify_dir / 'spotify-client-id').write_text('a' * 32)
+        from experiments.puffle_sim.spotify_auth import SpotifyAuth
+        spotify = SpotifyAuth(spotify_dir)
+        srv = ThreadingHTTPServer(('127.0.0.1', 0), None)
+        port = srv.server_address[1]
+        srv.RequestHandlerClass = make_handler(auth, port, 'csrf-token', spotify=spotify)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        self.addCleanup(srv.server_close)
+        self.addCleanup(srv.shutdown)
+        origin = f'http://127.0.0.1:8080'
+
+        def req(path, origin_header=origin):
+            c = http.client.HTTPConnection('127.0.0.1', port)
+            c.request('GET', path, headers={'Host': f'127.0.0.1:{port}', 'Origin': origin_header})
+            r = c.getresponse()
+            body = r.read()
+            headers = {k.lower(): v for k, v in r.getheaders()}
+            c.close()
+            return r.status, headers, body
+
+        self.assertEqual(req('/api/local-status', 'https://evil.test')[0], 403)
+        status, headers, body = req('/api/local-status')
+        self.assertEqual(status, 200)
+        self.assertEqual(headers.get('access-control-allow-origin'), origin)
+        data = json.loads(body)
+        self.assertEqual(data['chatgpt'], 'desconectado')
+        self.assertEqual(data['spotify'], 'desconectado')
 
 
 if __name__ == '__main__':

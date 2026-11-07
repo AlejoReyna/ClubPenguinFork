@@ -11,3 +11,34 @@ serverFiles:
           # Samples arrive at different times. This is an estimate, not a capacity test.
           - record: clubpenguin_human_players_estimated
             expr: clamp_min(clubpenguin_players - on(world) group_left() clubpenguin_bot_players, 0)
+  alerting_rules.yml:
+    groups:
+      - name: clubpenguin-live-penguins
+        rules:
+          - alert: BotsSessionsBelowTarget
+            expr: sum by (namespace, job, instance) (bots_in_room) / sum by (namespace, job, instance) (bots_planned) < 0.8
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Less than 80% of planned bot sessions are in a room"
+          - alert: BotsDailySpendHigh
+            expr: bots_spend_cap_ratio > 0.8
+            labels:
+              severity: warning
+            annotations:
+              summary: "Bots have reserved or spent more than 80% of the daily USD cap"
+          - alert: BotsProviderErrorRateHigh
+            expr: sum by (namespace, job, instance) (rate(bots_provider_requests_total{result="error"}[5m])) / sum by (namespace, job, instance) (rate(bots_provider_requests_total[5m])) > 0.3
+            for: 15m
+            labels:
+              severity: warning
+            annotations:
+              summary: "More than 30% of provider attempts fail"
+          - alert: BotsPlannedRoomEmpty
+            expr: (bots_in_room == 0) and on (namespace, job, instance, room) (bots_planned > 0)
+            for: 30m
+            labels:
+              severity: warning
+            annotations:
+              summary: "A planned room has no bot sessions"

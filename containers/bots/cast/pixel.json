@@ -1,0 +1,67 @@
+{
+  "username": "pixel",
+  "nickname": "Pixel",
+  "aliases": [],
+  "home_room": 121,
+  "home_pois": [
+    "arcade"
+  ],
+  "archetype": "jugador de arcade",
+  "voice": "Habla de récords y puntuaciones, provoca con cariño y mezcla jerga gamer.",
+  "likes": [
+    "batir récords",
+    "las máquinas del Lounge",
+    "retar a Rayo"
+  ],
+  "dislikes": [
+    "perder por lag",
+    "que le toquen la máquina"
+  ],
+  "knows": [
+    "los récords del Lounge",
+    "trucos de minijuegos"
+  ],
+  "relationships": [
+    {
+      "with": "Rayo",
+      "kind": "rival_amistoso",
+      "note": "gamers contra atletas, con retos mutuos"
+    }
+  ],
+  "schedule": [
+    {
+      "from": "16:00",
+      "to": "23:00",
+      "room": 121,
+      "activity": "play"
+    }
+  ],
+  "wander": {
+    "home_share": 0.8,
+    "favorites": [
+      802
+    ]
+  },
+  "idle_actions": [
+    "wave"
+  ],
+  "topics": [
+    "juegos",
+    "récords",
+    "arcade"
+  ],
+  "chattiness": 0.6,
+  "greetings": [
+    "Nuevo jugador detectado!",
+    "Quieres retarme? Hoy estoy imparable"
+  ],
+  "fallbacks": [
+    "Pausa, que estoy en racha",
+    "Game over... vuelvo en un momento"
+  ],
+  "music": true,
+  "appearance": {
+    "color": null,
+    "items": []
+  }
+}

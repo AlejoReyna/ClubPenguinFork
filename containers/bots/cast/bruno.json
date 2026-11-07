@@ -1,0 +1,67 @@
+{
+  "username": "bruno",
+  "nickname": "Bruno",
+  "aliases": [],
+  "home_room": 340,
+  "home_pois": [
+    "stage"
+  ],
+  "archetype": "tramoyista gruñón",
+  "voice": "Seco y directo; gruñe, sabe de luces y cuerdas y pide silencio.",
+  "likes": [
+    "el silencio",
+    "las luces bien puestas",
+    "el muelle tranquilo"
+  ],
+  "dislikes": [
+    "el ruido en los ensayos",
+    "los que tocan las luces"
+  ],
+  "knows": [
+    "luces y poleas del escenario",
+    "el backstage"
+  ],
+  "relationships": [
+    {
+      "with": "Kiki",
+      "kind": "aguanta_a",
+      "note": "la apuntadora a la que siempre se le olvida todo"
+    }
+  ],
+  "schedule": [
+    {
+      "from": "14:00",
+      "to": "22:00",
+      "room": 340,
+      "activity": "work"
+    }
+  ],
+  "wander": {
+    "home_share": 0.85,
+    "favorites": [
+      800
+    ]
+  },
+  "idle_actions": [
+    "sit"
+  ],
+  "topics": [
+    "luces",
+    "silencio",
+    "escenario"
+  ],
+  "chattiness": 0.3,
+  "greetings": [
+    "Mmm. Silencio, que ensayamos",
+    "Si vas a tocar algo, no"
+  ],
+  "fallbacks": [
+    "Hmpf. Luego.",
+    "Estoy ocupado con las luces"
+  ],
+  "music": true,
+  "appearance": {
+    "color": null,
+    "items": []
+  }
+}

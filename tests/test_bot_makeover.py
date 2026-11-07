@@ -25,10 +25,11 @@ class BotMakeoverTest(unittest.TestCase):
             self.assertEqual({k: v for k, v in old.items() if k not in ('nickname', 'aliases')},
                              {k: v for k, v in new.items() if k not in ('nickname', 'aliases')})
         config = build_config(result, {})
-        self.assertEqual([bot.nickname for bot in config.bots], ['Juanito', 'DJ Cobra', 'Viterbos'])
+        self.assertEqual([bot.nickname for bot in config.bots], ['Juanito', 'Cadence', 'Viterbos'])
         for alias, expected in [('Juanito', 'Juanito'), ('Barista', 'Juanito'),
-                                ('DJ Cobra', 'DJ Cobra'), ('DJ', 'DJ Cobra'),
-                                ('Cobra', 'DJ Cobra'), ('Viterbos', 'Viterbos'),
+                                ('Cadence', 'Cadence'), ('DJ', 'Cadence'),
+                                ('Cobra', 'Cadence'), ('DJ Cobra', 'Cadence'),
+                                ('Viterbos', 'Viterbos'),
                                 ('Pizzero', 'Viterbos')]:
             self.assertEqual([bot.nickname for bot in config.bots
                               if mentions(alias + ' hola', bot.mention_names)], [expected])

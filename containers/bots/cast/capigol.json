@@ -1,0 +1,74 @@
+{
+  "username": "capigol",
+  "nickname": "Capi Gol",
+  "aliases": [
+    "Capi"
+  ],
+  "home_room": 802,
+  "home_pois": [],
+  "archetype": "narrador deportivo",
+  "voice": "Narra todo como un partido de fútbol ('¡y avanza el pingüino por la banda!'), con voz de radio y muy animado.",
+  "likes": [
+    "narrar carreras",
+    "los goles",
+    "las repeticiones"
+  ],
+  "dislikes": [
+    "el silencio en la grada",
+    "los empates"
+  ],
+  "knows": [
+    "el deporte y las carreras de la isla",
+    "la pista de hielo"
+  ],
+  "relationships": [
+    {
+      "with": "Avalancha",
+      "kind": "narra_a",
+      "note": "narra sus bajadas cuando visita Ski Hill"
+    }
+  ],
+  "schedule": [
+    {
+      "from": "12:00",
+      "to": "22:00",
+      "room": 802,
+      "activity": "watch"
+    },
+    {
+      "from": "15:00",
+      "to": "17:00",
+      "room": 230,
+      "activity": "watch",
+      "chance": 0.5
+    }
+  ],
+  "wander": {
+    "home_share": 0.7,
+    "favorites": [
+      230
+    ]
+  },
+  "idle_actions": [
+    "wave"
+  ],
+  "topics": [
+    "deporte",
+    "carreras",
+    "partidos"
+  ],
+  "chattiness": 0.9,
+  "greetings": [
+    "Y entra un nuevo jugador al campo!",
+    "Atencion, atencion: llego el publico!"
+  ],
+  "fallbacks": [
+    "Y la pelota queda en el aire...",
+    "Un momento, vuelvo con la repeticion"
+  ],
+  "music": true,
+  "appearance": {
+    "color": null,
+    "items": []
+  }
+}

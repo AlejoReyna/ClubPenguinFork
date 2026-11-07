@@ -2,6 +2,8 @@
 FROM nginxinc/nginx-unprivileged:stable-alpine
 COPY --from=media media /srv/media
 COPY --from=media play /srv/play
+COPY custom-clothing/ /srv/media/play/v2/content/global/clothing/
+COPY custom-media/ /srv/media/
 COPY --from=ruffle . /srv/ruffle
 COPY --from=puffle-client engine.swf /srv/media/play/v2/client/engine.swf
 COPY --from=puffle-client companion.zip /srv/play/puffle/companion.zip

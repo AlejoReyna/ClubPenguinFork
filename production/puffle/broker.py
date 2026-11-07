@@ -287,6 +287,16 @@ def main():
     enabled = os.environ.get('PUFFLE_ENABLED') == 'true'
     secret = Path(os.environ['PUFFLE_SECRET_FILE']).read_text().strip() if enabled else secrets.token_hex(32)
     broker = Broker(secret, str(path), enabled=enabled)
+    if enabled and os.environ.get('PUFFLE_HOST_MODE'):
+        # Lab: the server-side device (production/puffle/host.py) shares this container,
+        # so nginx keeps a single upstream name; it talks to the broker over loopback.
+        from . import host
+        server = host.from_environment()
+
+        async def both():
+            await asyncio.gather(serve(broker, args.host, args.port), host.serve(server))
+        asyncio.run(both())
+        return
     asyncio.run(serve(broker, args.host, args.port))
 
 

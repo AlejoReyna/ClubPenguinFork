@@ -24,9 +24,22 @@ PROVIDER_ERRORS = 'bots_provider_errors_total'
 PROVIDER_LATENCY = 'bots_provider_latency_seconds'
 PROVIDER_PROMPT_TOKENS = 'bots_provider_prompt_tokens_total'
 PROVIDER_COMPLETION_TOKENS = 'bots_provider_completion_tokens_total'
+# Live penguins. Labels are bounded: priority P0|P1|P2, source llm|local, room
+# ids from the room catalog (or "other"), fixed reason/result words.
+BOTS_REPLIES = 'bots_replies_total'
+SPEND_MICROS = 'bots_spend_usd_micros_total'
+SPEND_RATIO = 'bots_spend_cap_ratio'
+SPEND_DENIED = 'bots_spend_denied_total'
+SPEND_LEDGER_OK = 'bots_spend_ledger_ok'
+OUTPUT_FILTERED = 'bots_output_filtered_total'
+BOTS_IN_ROOM = 'bots_in_room'
+BOTS_PLANNED = 'bots_planned'
+BOTS_TRAVEL = 'bots_travel_total'
+TRAVEL_DENIED = 'bots_travel_denied_total'
 
 # Bounded skip reasons (never free text).
 SKIP_SELF = 'self'
+SKIP_DIALOGUE_QUEUE = 'dialogue_queue'
 SKIP_BOT = 'bot'
 SKIP_NOT_MENTIONED = 'not_mentioned'
 SKIP_BOT_GAP = 'bot_gap'
@@ -51,6 +64,16 @@ HELP_TEXTS = {
     PROVIDER_LATENCY: 'Successful provider round-trip duration seconds',
     PROVIDER_PROMPT_TOKENS: 'Prompt tokens reported by the provider',
     PROVIDER_COMPLETION_TOKENS: 'Completion tokens reported by the provider',
+    BOTS_REPLIES: 'Chat replies sent, by spend priority and source (llm or local)',
+    SPEND_MICROS: 'Provider spend in micro-USD after reconciling with usage, by priority',
+    SPEND_RATIO: 'Share of the daily USD cap already spent or reserved',
+    SPEND_DENIED: 'Provider requests refused by the spend ledger, by bounded reason',
+    SPEND_LEDGER_OK: 'Whether the spend ledger could be saved the last time (1) or not (0)',
+    OUTPUT_FILTERED: 'Model replies replaced by a local line, by bounded filter reason',
+    BOTS_IN_ROOM: 'Bot sessions currently inside each room',
+    BOTS_PLANNED: 'Bot sessions whose home is each room',
+    BOTS_TRAVEL: 'Room changes attempted mid-session, by result',
+    TRAVEL_DENIED: 'Local travel refusals by bounded policy reason',
 }
 
 HISTOGRAM_BUCKETS = (0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 30.0, 60.0)
@@ -63,6 +86,10 @@ _STANDARD_SERIES = (
     (BOTS_FALLBACK, 'counter'), (PROVIDER_REQUESTS, 'counter'),
     (PROVIDER_ERRORS, 'counter'), (PROVIDER_LATENCY, 'histogram'),
     (PROVIDER_PROMPT_TOKENS, 'counter'), (PROVIDER_COMPLETION_TOKENS, 'counter'),
+    (BOTS_REPLIES, 'counter'), (SPEND_MICROS, 'counter'), (SPEND_RATIO, 'gauge'),
+    (SPEND_DENIED, 'counter'), (SPEND_LEDGER_OK, 'gauge'), (OUTPUT_FILTERED, 'counter'),
+    (BOTS_IN_ROOM, 'gauge'), (BOTS_PLANNED, 'gauge'), (BOTS_TRAVEL, 'counter'),
+    (TRAVEL_DENIED, 'counter'),
 )
 
 
@@ -93,10 +120,24 @@ class Registry:
 
     def __init__(self, buckets=HISTOGRAM_BUCKETS):
         self._buckets = buckets
-        self._help = HELP_TEXTS
+        self._help = dict(HELP_TEXTS)
         self._type = dict(_STANDARD_SERIES)
         self._values = {}      # (name, labels_key) -> [labels, value]
         self._histograms = {}  # (name, labels_key) -> [labels, buckets, sum]
+        self._collectors = []  # (name, callable) evaluated at scrape time
+
+    def collect(self, name, sample_fn, help_text=None, kind=None):
+        """Register a gauge computed at scrape time.
+
+        ``sample_fn()`` returns ``[(labels, value), ...]``. Used for state that
+        lives elsewhere (rooms, spend ledger) so it can never go stale. A
+        failing collector drops its series for that scrape instead of the scrape.
+        """
+        if help_text:
+            self._help[name] = help_text
+        if kind:
+            self._type[name] = kind
+        self._collectors.append((name, sample_fn))
 
     async def add(self, name, by=1.0, labels=None):
         key = (name, _labels_key(labels))
@@ -134,6 +175,19 @@ class Registry:
             grouped.setdefault(name, []).append((labels, value))
         for (name, _key), (labels, buckets, total) in sorted(self._histograms.items()):
             grouped.setdefault(name, []).append((labels, (buckets, total)))
+        for name, sample_fn in self._collectors:
+            try:
+                samples = list(sample_fn())
+            except Exception:  # a broken collector must not take the scrape down
+                continue
+            # A live gauge supersedes a push update with identical labels. For
+            # example ledger_state() also updates SPEND_LEDGER_OK after requests.
+            # Emitting both would make Prometheus reject duplicate samples.
+            current = {_labels_key(labels): (labels, value)
+                       for labels, value in grouped.get(name, [])}
+            for labels, value in samples:
+                current[_labels_key(labels)] = (dict(labels), float(value))
+            grouped[name] = [current[key] for key in sorted(current)]
         for name, samples in sorted(grouped.items()):
             lines.append(f'# HELP {name} {self._help.get(name, "")}')
             lines.append(f'# TYPE {name} {self._type.get(name, "gauge")}')
@@ -209,6 +263,27 @@ class BotMetrics:
     async def provider_error(self, kind):
         await self.registry.add(PROVIDER_REQUESTS, labels={'result': 'error'})
         await self.registry.add(PROVIDER_ERRORS, labels={'kind': kind})
+
+    async def reply(self, priority, source):
+        await self.registry.add(BOTS_REPLIES, labels={'priority': priority, 'source': source})
+
+    async def spend(self, priority, micros):
+        await self.registry.add(SPEND_MICROS, micros, labels={'priority': priority})
+
+    async def spend_denied(self, reason):
+        await self.registry.add(SPEND_DENIED, labels={'reason': reason})
+
+    async def ledger_state(self, ok):
+        await self.registry.set(SPEND_LEDGER_OK, 1.0 if ok else 0.0)
+
+    async def output_filtered(self, reason):
+        await self.registry.add(OUTPUT_FILTERED, labels={'reason': reason})
+
+    async def travel(self, result):
+        await self.registry.add(BOTS_TRAVEL, labels={'result': result})
+
+    async def travel_denied(self, reason):
+        await self.registry.add(TRAVEL_DENIED, labels={'reason': reason})
 
     async def add(self, name, by=1.0, labels=None):
         await self.registry.add(name, by, labels)

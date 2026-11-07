@@ -17,6 +17,12 @@ _WHITESPACE_RE = re.compile(r'\s+')
 _NONPRINT_RE = re.compile(r'[\x00-\x1f\x7f\x9f]+')
 
 
+def fold(value):
+    """Case/accent-insensitive matching without treating text as instructions."""
+    return ''.join(c for c in unicodedata.normalize('NFKD', str(value).casefold())
+                   if not unicodedata.combining(c))
+
+
 def sanitize(text, max_length=54):
     """Return a chat-safe string or '' when nothing meaningful survives.
 
@@ -45,9 +51,26 @@ def mentions(message, names):
     """True when any of ``names`` (case-insensitive) appears in the message."""
     if not message:
         return False
-    def normalize(value):
-        return ''.join(c for c in unicodedata.normalize('NFKD', value.casefold())
-                       if not unicodedata.combining(c))
-    lowered = normalize(message)
-    return any(name and re.search(r'(?<!\w)' + re.escape(normalize(name)) + r'(?!\w)', lowered)
+    lowered = fold(message)
+    return any(name and re.search(r'(?<!\w)' + re.escape(fold(name)) + r'(?!\w)', lowered)
                for name in names)
+
+
+_LEADING_FILLER = re.compile(r'^(?:oye|hey|ey|hola|porfa)(?!\w)[\s,:;!¡.]*', re.IGNORECASE)
+
+
+def strip_mention(message, names):
+    """Remove the bot's own names so «Cobra, pon despacito» reads «pon despacito».
+
+    Used only to hand the speaker's words to the music parser (which expects the
+    order itself); greetings in front of the name («oye Cobra, ...») go too.
+    """
+    text = str(message or '')
+    for name in sorted({n for n in names if n}, key=len, reverse=True):
+        text = re.sub(r'(?<!\w)' + re.escape(name) + r'(?!\w)', ' ', text, flags=re.IGNORECASE)
+    text = ' '.join(text.split()).strip(' ,:;!¡¿.')
+    previous = None
+    while previous != text:
+        previous = text
+        text = _LEADING_FILLER.sub('', text).strip(' ,:;!¡¿.')
+    return text

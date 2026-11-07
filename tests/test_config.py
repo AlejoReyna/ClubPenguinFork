@@ -109,9 +109,22 @@ class BuildConfigTests(unittest.TestCase):
                             'nickname': 'GuiaIA', 'aliases': ['Guia']})
         self.assertEqual(bot.mention_names, ['GuiaIA', 'guiaia', 'Guia'])
 
+    def test_stationary_anchor_parses(self):
+        bot = parse_bot(0, {'username': 'djia', 'password': 'clave123',
+                            'nickname': 'DJ Cobra', 'room': 120,
+                            'stationary': True, 'anchor': {'x': 322, 'y': 168},
+                            'repeat_action': 11})
+        self.assertTrue(bot.stationary)
+        self.assertEqual(bot.spawn, (322, 168))
+        self.assertEqual(bot.repeat_action, 11)
+
     def test_area_bounds(self):
         with self.assertRaises(ConfigError):
             parse_area({'min_x': 200, 'max_x': 100, 'min_y': 0, 'max_y': 10}, 'x')
+        with self.assertRaises(ConfigError):
+            parse_area({'min_x': 10, 'max_x': 10, 'min_y': 20, 'max_y': 30}, 'x')
+        self.assertEqual(parse_area({'min_x': 10, 'max_x': 10, 'min_y': 20, 'max_y': 20},
+                                    'x', allow_point=True), (10, 10, 20, 20))
         with self.assertRaises(ConfigError):
             parse_area({'min_x': 0, 'max_x': 9000, 'min_y': 0, 'max_y': 10}, 'x')
         with self.assertRaises(ConfigError):
@@ -137,6 +150,12 @@ class LoadConfigTests(unittest.TestCase):
             load_config({'BOTS_CONFIG_PATH': '/nonexistent/bots.json'})
         with self.assertRaises(ConfigError):
             load_config({})
+
+    def test_recall_requires_dialogue(self):
+        document = config_document_world(6112)
+        document['recall'] = {'enabled': True}
+        with self.assertRaises(ConfigError):
+            build_config(document, {})
 
 
 if __name__ == '__main__':

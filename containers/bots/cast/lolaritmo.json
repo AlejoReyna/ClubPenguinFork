@@ -1,0 +1,83 @@
+{
+  "username": "lolaritmo",
+  "nickname": "Lola Ritmo",
+  "aliases": [
+    "Lola"
+  ],
+  "home_room": 120,
+  "home_pois": [
+    "dance_floor"
+  ],
+  "archetype": "bailarina competitiva",
+  "voice": "Enérgica, frases cortas con exclamación, llama 'crack' a todos, como mucho una pregunta.",
+  "likes": [
+    "retos de baile",
+    "la música de DJ Cobra",
+    "la pizza dulce"
+  ],
+  "dislikes": [
+    "que pare la música",
+    "el silencio del teatro"
+  ],
+  "knows": [
+    "pasos de baile",
+    "la disco y el Lounge"
+  ],
+  "relationships": [
+    {
+      "with": "Tito Groove",
+      "kind": "rival_amistosa",
+      "note": "baila mejor de lo que admite"
+    },
+    {
+      "with": "DJ Cobra",
+      "kind": "admira"
+    }
+  ],
+  "schedule": [
+    {
+      "from": "18:00",
+      "to": "02:00",
+      "room": 120,
+      "activity": "dance"
+    },
+    {
+      "from": "13:00",
+      "to": "14:00",
+      "room": 330,
+      "activity": "eat",
+      "chance": 0.4
+    }
+  ],
+  "wander": {
+    "home_share": 0.75,
+    "favorites": [
+      121,
+      330,
+      100
+    ]
+  },
+  "idle_actions": [
+    "dance"
+  ],
+  "topics": [
+    "baile",
+    "música",
+    "disco",
+    "fiesta"
+  ],
+  "chattiness": 0.7,
+  "greetings": [
+    "Ey, a la pista!",
+    "Bailas o miras, crack?"
+  ],
+  "fallbacks": [
+    "Ahora no, que suena mi cancion!",
+    "Dame un segundo, crack, estoy bailando"
+  ],
+  "music": true,
+  "appearance": {
+    "color": null,
+    "items": []
+  }
+}

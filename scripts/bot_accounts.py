@@ -37,6 +37,30 @@ MEASURED_WORK_AREAS = {
     'PizzeroIA': {'min_x': 365, 'max_x': 430, 'min_y': 258, 'max_y': 290},
 }
 
+# Fixed posts (centre of each measured zone). DJ Cobra / Cadence and Viterbos stay put.
+MEASURED_WORK_POSTS = {
+    'BaristaIA': None,
+    # Cadence: fixed DJ booth post (tuned in-room 2026-11-05). stationary, no auto-dance.
+    'DJIA': {'x': 322, 'y': 168},
+    'PizzeroIA': {'x': 397, 'y': 274},
+}
+
+# u#sa action id for the client dance button (Houdini forwards as xt sa).
+DANCE_ACTION_ID = 11
+
+# Visible names after the work-bot makeover (username keys stay baristaia/djia/pizzeroia).
+WORK_VISIBLE = {
+    'BaristaIA': ('Juanito', ['Barista']),
+    'DJIA': ('Cadence', ['DJ', 'Cobra', 'DJ Cobra', 'Cadence']),
+    'PizzeroIA': ('Viterbos', ['Pizzero']),
+}
+
+WORK_NICKNAME_ALIASES = {
+    'baristaia': {'BaristaIA', 'Juanito', 'Baristaia'},
+    'djia': {'DJIA', 'DJ Cobra', 'Cadence', 'Djia'},
+    'pizzeroia': {'PizzeroIA', 'Viterbos', 'Pizzeroia'},
+}
+
 
 def work_config_document(areas=None):
     """Build a fresh configuration; never register accounts or change a Secret.
@@ -55,12 +79,20 @@ def work_config_document(areas=None):
 
     doc = config_document()
     doc['bots'] = []
-    for name, aliases, room, personality in WORK_ROLES:
+    for name, _legacy_aliases, room, personality in WORK_ROLES:
         area = areas[name]
         parse_area(area, name)
-        doc['bots'].append({'username': name.lower(), 'password': secrets.token_urlsafe(16),
-                            'nickname': name, 'aliases': aliases,
-                            'personality': personality, 'room': room, 'walk': dict(area)})
+        nickname, aliases = WORK_VISIBLE[name]
+        entry = {'username': name.lower(), 'password': secrets.token_urlsafe(16),
+                 'nickname': nickname, 'aliases': aliases,
+                 'personality': personality, 'room': room}
+        post = MEASURED_WORK_POSTS.get(name)
+        if post is not None:
+            entry['stationary'] = True
+            entry['anchor'] = dict(post)
+        else:
+            entry['walk'] = dict(area)
+        doc['bots'].append(entry)
     return doc
 
 
@@ -73,12 +105,64 @@ def config_document():
                    'player_cooldown': 6, 'bot_min_gap': 2, 'queue_size': 8,
                    'memory_turns': 8, 'memory_ttl': 600},
         'behavior': {'respond_to_bots': False, 'walk_min_delay': 12,
-                     'walk_max_delay': 28, 'max_message_length': 54},
+                     'walk_max_delay': 28, 'max_message_length': 54,
+                     'first_move_delay_min': 0.3, 'first_move_delay_max': 0.8},
         'bots': [{'username': name.lower(), 'nickname': name, 'aliases': aliases,
                   'personality': personality, 'room': 100,
                   'password': secrets.token_urlsafe(16)}
                  for name, aliases, personality in PERSONAS],
     }
+
+
+def cast_config_document(cast_path):
+    """Fresh synthetic/local credentials for N cards; no existing identities adopted."""
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'containers/bots'))
+    from bots.cast import load_cards
+    from bots.rooms import load_catalog
+    cards = load_cards(cast_path)
+    catalog = load_catalog()
+    doc = config_document()
+    doc['bots'] = []
+    for card in cards.values():
+        if not card.enabled:
+            continue
+        if card.missing_for_new_character():
+            raise ValueError('New cast characters need complete cards')
+        if card.appearance_items or card.appearance_color is not None:
+            raise ValueError('Phase 1 does not provision appearance items or colors')
+        room = catalog.require(card.home_room)
+        if room.spawn is None:
+            raise ValueError('The home room needs a documented spawn')
+        # A safe legacy representation also exists in the credential file. Cast
+        # activation still requires BOTS_CAST_DIR at runtime.
+        doc['bots'].append({'username': card.username, 'password': secrets.token_urlsafe(16),
+                            'nickname': card.nickname, 'aliases': list(card.aliases),
+                            'room': card.home_room, 'stationary': True,
+                            'anchor': dict(zip(('x', 'y'), room.spawn)),
+                            'personality': card.personality_text()})
+    if not doc['bots']:
+        raise ValueError('No enabled cast characters')
+    doc['provider'].update(daily_usd=1.0, monthly_usd=30.0, max_concurrent=4)
+    doc['policy']['max_concurrent_requests'] = 4
+    return doc
+
+
+def cast_nickname_sql(bots):
+    """Only validated ASCII identities may enter this operator SQL."""
+    import re
+    pairs = []
+    for bot in bots:
+        user, nick = bot['username'], bot['nickname']
+        if not re.fullmatch(r'[a-z0-9]{4,12}', user) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9 ]{0,29}', nick):
+            raise ValueError('Invalid cast identity for SQL')
+        pairs.append((user, nick))
+    cases = ' '.join("WHEN '%s' THEN '%s'" % pair for pair in pairs)
+    users = ','.join("'%s'" % user for user, _ in pairs)
+    return ('UPDATE penguin SET nickname = CASE username ' + cases + ' END '
+            'WHERE username IN (' + users + ') AND active AND NOT moderator '
+            'AND NOT stealth_moderator RETURNING username;')
 
 
 def register(base_url, username, password):
@@ -106,7 +190,7 @@ def registration_program():
 import sys
 payload = json.load(sys.stdin)
 for bot in payload['bots']:
-    register('http://web:8080', bot['nickname'], bot['password'])
+    register('http://web:8080', bot['username'], bot['password'])
 print(json.dumps({'created': len(payload['bots'])}))
 '''
 
@@ -157,9 +241,8 @@ def deployment_is_stopped(deployment):
 
 def legacy_work_nicknames_unchanged(accounts):
     """Refuse to overwrite later renames when using the legacy provisioner."""
-    expected = {name.lower(): name for name, *_ in WORK_ROLES}
-    return all(name in expected and isinstance(row, dict) and
-               row.get('nickname') in (expected[name], expected[name].capitalize())
+    return all(name in WORK_NICKNAME_ALIASES and isinstance(row, dict) and
+               row.get('nickname') in WORK_NICKNAME_ALIASES[name]
                for name, row in accounts.items())
 
 
@@ -174,7 +257,7 @@ def nickname_correction_sql():
     for name, _aliases, _room, _personality in WORK_ROLES:
         if not name.isalnum():
             raise ValueError('role name must be alphanumeric')
-        pairs.append((name.lower(), name))
+        pairs.append((name.lower(), WORK_VISIBLE[name][0]))
     cases = ' '.join("WHEN '%s' THEN '%s'" % pair for pair in pairs)
     users = ','.join("'%s'" % user for user, _nick in pairs)
     return (
@@ -209,10 +292,16 @@ async def one(bot):
         rndk = await world.handshake(10)
         await world.login_legacy(bot['username'].lower(), world_login_password(login_key, rndk), 10)
         await world.join_world(int(pid), login_key, 10)
-        walk = bot['walk']
-        x = (int(walk['min_x']) + int(walk['max_x'])) // 2
-        y = (int(walk['min_y']) + int(walk['max_y'])) // 2
+        anchor = bot.get('anchor')
+        if anchor:
+            x, y = int(anchor['x']), int(anchor['y'])
+        else:
+            walk = bot['walk']
+            x = (int(walk['min_x']) + int(walk['max_x'])) // 2
+            y = (int(walk['min_y']) + int(walk['max_y'])) // 2
         frame = await world.join_room(int(bot['room']), 10, x, y)
+        if not frame.args or frame.args[0] != str(int(bot['room'])):
+            return 'room'
         record = next((parts for parts in (v.split('|') for v in frame.args)
                        if len(parts) >= 3 and parts[0] == str(int(pid))), None)
         if record is None or record[1] != bot['nickname']:

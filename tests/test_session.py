@@ -151,6 +151,33 @@ class LoginAndChatTests(unittest.IsolatedAsyncioTestCase):
         finally:
             await stop_running(stop_event, task)
 
+    async def test_stationary_bot_repeats_dance_without_walking(self):
+        world = FakeWorld({'djia': 'DJ Cobra'})
+        await world.start()
+        document = config_document_world(world.port, **FAST)
+        document['bots'] = [{
+            'username': 'djia', 'password': 'secreto1', 'nickname': 'DJ Cobra',
+            'room': 100, 'aliases': ['DJ'], 'stationary': True,
+            'anchor': {'x': 40, 'y': 40}, 'repeat_action': 11,
+        }]
+        config = build_config(document)
+        bot = config.bots[0]
+        session = BotSession(
+            index=0, bot=bot, server=config.server,
+            provider=SimulatedProvider(replies=['ok']),
+            policy=config.policy, behavior=config.behavior,
+            metrics=BotMetrics(Registry()),
+            fallback_replies=config.provider.fallback_replies)
+        stop_event, task = await start_running(session, 'djia')
+        try:
+            await wait_until(lambda: len(world.actions) >= 2, message='dance actions')
+            self.assertEqual(world.moves, [])
+            for _room, player_id, action_id in world.actions:
+                self.assertEqual(str(player_id), str(session.player_id))
+                self.assertEqual(action_id, '11')
+        finally:
+            await stop_running(stop_event, task)
+
     async def test_reconnect_keeps_the_same_identity(self):
         world = FakeWorld({'guiaia': 'GuiaIA'})
         await world.start()

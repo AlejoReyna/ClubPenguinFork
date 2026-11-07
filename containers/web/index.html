@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#00529b">
 <meta name="description" content="Glaciar: mundo privado de Club Penguin (AS2) jugable desde tu teléfono.">
 <meta name="mobile-web-app-capable" content="yes">
@@ -16,52 +16,364 @@
 <style>
   /* El fondo IMITA el borde del SWF: el contenedor desaparece y solo queda el juego. */
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  /* Altura de la barra FIJA (una sola fila, sin medir con JS): el juego no salta al cambiar de contenido. */
+  :root{--bar-h:calc(52px + env(safe-area-inset-top))}
   html{touch-action:manipulation}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
   html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#00529b;color:#fff;font:16px system-ui,sans-serif}
-  body{position:fixed;inset:0;overscroll-behavior:none}
-  #game{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-        width:min(100vw,158.333333dvh);height:min(100dvh,63.157895vw)}
-  /* Oculta el marco del SWF de 760 × 480, incluido el suavizado del borde. */
-  ruffle-player{display:block;width:100%;height:100%;clip-path:inset(1.25% .789474% round .526316% / .833334%)}
+  body{position:fixed;inset:0;overscroll-behavior:none;height:100dvh;overflow:hidden;
+       padding:0 env(safe-area-inset-right) 0 env(safe-area-inset-left)}
+  main{position:fixed;top:var(--bar-h,52px);left:0;right:var(--infra-w,0px);bottom:0;z-index:0;overflow:hidden;
+       container-type:size;display:flex;align-items:flex-end;justify-content:center;background:#00529b;
+       transition:right .28s cubic-bezier(.22,1,.36,1)}
+  /* Escala correcta (760×480) y el pie del SWF pegado al borde inferior. */
+  #game{width:min(100cqw,158.333333cqh);aspect-ratio:760 / 480;max-height:100cqh;flex-shrink:0;
+       overflow:hidden;background:#00529b;touch-action:none;-webkit-touch-callout:none;user-select:none}
+  /* Recorta el marco del SWF; escala desde abajo para ocultar el borde blanco inferior. */
+  ruffle-player{display:block;width:100%;height:100%;background:#00529b;transform-origin:bottom center;
+       transform:scale(1.012);clip-path:inset(1.25% .789474% .789474% .789474% round .526316% / .833334%)}
 
-  /* Solo avisos mínimos: nada de interfaz propia. */
-  #estado{position:fixed;top:calc(12px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:40;max-width:88vw;
+  #estado{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:2;width:max-content;max-width:88%;
           margin:0;padding:9px 15px;border-radius:11px;background:#063354c9;text-align:center;font-size:14px;opacity:0;transition:opacity .25s;
           pointer-events:none}
   #estado.on{opacity:1}
 
-  .bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom));z-index:30;display:none;gap:9px;
-       transition:opacity .25s}
-  body.listo .bar{display:flex}
-  body.quiet .bar{opacity:0;pointer-events:none}
-  body.quiet .bar:focus-within{opacity:1;pointer-events:auto}
-  .bar button{min-height:42px;min-width:48px;padding:0 15px;border:1px solid #ffffff2e;border-radius:12px;background:#063354c9;color:#fff;
-              font:inherit;font-size:13.5px;cursor:pointer}
+  .bar{position:fixed;top:0;left:0;right:var(--infra-w,0px);z-index:30;transition:right .28s cubic-bezier(.22,1,.36,1);display:flex;align-items:center;justify-content:flex-start;flex-wrap:nowrap;gap:6px;
+       height:var(--bar-h);padding:env(safe-area-inset-top) 12px 0;background:#0b7ab9}
+  .bar-actions{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;margin-inline-start:auto}
+  .dock{display:flex;align-items:center;gap:6px}
+  .bar [hidden]{display:none!important}
+  /* Iconos que solo se muestran cuando la barra se compacta (vertical / riel). */
+  .bar #fullscreen svg,.bar #puffle svg,.bar #zoom{display:none}
+  .bar label{display:flex;align-items:center;gap:6px;color:#fff;font-size:.875rem;font-weight:700}
+  .bar select{min-height:44px;padding:0 8px;border:1px solid #0758a5;border-radius:10px;
+              background:#fff;color:#123551;font:inherit;cursor:pointer}
+  .bar button,.bar a{display:inline-flex;align-items:center;justify-content:center;
+       min-height:44px;min-width:44px;padding:0 10px;border:0;border-radius:10px;
+       background:#0758a5;color:#fff;font:700 .875rem system-ui,sans-serif;text-decoration:none;cursor:pointer}
+  .bar #inicio{background:transparent}
+  .bar .bar-icon{padding-inline:0;width:44px}
+  .bar .spotify-on{background:#1db954}
+  .bar :is(button,a):hover,.bar #inicio:hover{background:#06447f}
+  .bar .spotify-on:hover{background:#179443}
+  .bar #spotify{position:relative}
+  .punto-aviso{position:absolute;top:6px;right:6px;width:10px;height:10px;border-radius:50%;background:#ffcf33;
+       box-shadow:0 0 0 2px #0b7ab9}
 
-  .overlay{position:fixed;inset:0;z-index:50;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;
-           background:#00529bd9;text-align:center}
-  .overlay.on{display:flex}
-  #rota .avion{width:72px;height:64px;animation:gira-aviso 2.4s ease-in-out infinite;border-radius:14px;border:3px solid #ffffffb0}
+  /* Globo bajo el ícono de Spotify (posición calculada en JS; 16px de margen en móvil). */
+  .globo{position:fixed;z-index:40;width:min(340px,calc(100vw - 32px));padding:16px 18px 14px;border-radius:16px;
+       background:#fff;color:#123551;box-shadow:0 10px 30px #0003,0 2px 6px #0002;font:15px/1.45 system-ui,sans-serif}
+  .globo::before{content:"";position:absolute;top:-8px;left:calc(var(--flecha,50%) - 8px);width:16px;height:16px;
+       background:#fff;transform:rotate(45deg);border-radius:3px 0 0 0}
+  .globo p{margin:0 0 8px}
+  .globo-titulo{font-weight:700;font-size:16px;padding-right:28px}
+  .globo-aviso{padding:8px 10px;border-radius:10px;background:#e6f6ec;color:#0d5a2b;font-weight:600}
+  .globo-aviso.mal{background:#fdecea;color:#8a1c12}
+  .globo-codigo{font:700 22px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.04em;padding:8px 10px;border-radius:10px;
+       border:2px dashed #0b7ab9;background:#f2f8fc;user-select:all;overflow-wrap:anywhere}
+  .globo-nota{color:#4c6375;font-size:13px}
+  .globo-acciones{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 8px}
+  .globo-acciones button{min-height:40px;padding:0 14px;border:0;border-radius:10px;background:#0758a5;color:#fff;
+       font:700 14px system-ui,sans-serif;cursor:pointer}
+  .globo-acciones button.sp{background:#1db954;color:#06210f}
+  .globo-acciones button.alt{background:#e8eff5;color:#123551}
+  .globo-acciones button:disabled{opacity:.6;cursor:wait}
+  .globo-cerrar{position:absolute;top:8px;right:8px;width:32px;height:32px;border:0;border-radius:8px;background:transparent;
+       color:#4c6375;font:400 22px/1 system-ui;cursor:pointer}
+  .globo-cerrar:hover{background:#eef3f7}
+  .globo :focus-visible{outline:2px solid #0758a5;outline-offset:2px}
+  .bar :focus-visible{outline:2px solid #fff;outline-offset:2px}
+  @media(max-width:460px){
+    .bar label span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+    .bar button,.bar a,.bar label{font-size:.8125rem}
+    .bar button,.bar a{padding-inline:8px}
+  }
+
+  /* Aviso no bloqueante (girar el teléfono / instalar para pantalla completa). El juego siempre es jugable. */
+  .chip{position:fixed;z-index:45;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom));
+        display:flex;align-items:center;gap:10px;width:max-content;max-width:min(92vw,440px);padding:8px 6px 8px 14px;
+        border-radius:999px;background:#063354f2;box-shadow:0 6px 20px #0005;font:700 14px/1.3 system-ui,sans-serif}
+  .chip[hidden]{display:none}
+  .chip p{margin:0}
+  .chip-ico{flex:none;width:22px;height:16px;border:2px solid #fff;border-radius:4px;animation:gira-aviso 2.4s ease-in-out infinite}
+  .chip-ico.fijo{animation:none}
+  .chip button{flex:none;width:36px;height:36px;border:0;border-radius:50%;background:transparent;color:#fff;font:400 22px/1 system-ui;cursor:pointer}
+  .chip button:hover{background:#ffffff26}
   @keyframes gira-aviso{0%,20%{transform:rotate(0)}55%,100%{transform:rotate(90deg)}}
-  #rota p{margin:0;font-size:17px;font-weight:700;text-shadow:0 2px 8px #0006}
+  .pan{display:none}
+
+  /* Panel de infraestructura: lateral oscuro. En escritorio reserva su ancho (main y .bar se
+     comprimen hacia la izquierda y Ruffle se reescala sin recargar); en pantallas estrechas es
+     una hoja superpuesta que respeta las áreas seguras. */
+  .infra{position:fixed;top:0;right:0;bottom:0;z-index:35;display:flex;flex-direction:column;width:22rem;max-width:100%;
+       background:#0b0b0d;color:#ececf1;border-left:1px solid #2a2a31;font:14px/1.45 system-ui,sans-serif;
+       padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) 0;
+       transform:translateX(100%);visibility:hidden;transition:transform .28s cubic-bezier(.22,1,.36,1),visibility 0s linear .28s}
+  html.infra-abierto .infra{transform:none;visibility:visible;transition:transform .28s cubic-bezier(.22,1,.36,1),visibility 0s}
+  @media(min-width:1000px){html.infra-abierto{--infra-w:22rem}}
+  @media(max-width:999.98px){.infra{width:min(26rem,100%)}}
+  @media(max-width:480px){.infra{width:100%;border-left:0}}
+  .infra-cab{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px 10px}
+  .infra-cab h2{margin:0;font-size:16px;font-weight:600}
+  .infra .infra-x{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;padding:0;
+       border:1px solid #2a2a31;border-radius:50%;background:#151518;color:#ececf1;font:400 22px/1 system-ui;cursor:pointer}
+  .infra-tabs{display:flex;flex-direction:column;gap:4px;padding:4px 12px 12px}
+  .infra-tab{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border:1px solid transparent;border-radius:11px;
+       background:transparent;color:#9a9aa6;font:600 14px system-ui,sans-serif;text-align:left;cursor:pointer}
+  .infra-tab:hover{background:#151518;color:#ececf1}
+  .infra-tab[aria-current="true"]{background:#8b5cf629;border-color:#8b5cf673;color:#fff}
+  .infra-tab[aria-current="true"] svg{color:#8b5cf6}
+  .infra-cuerpo{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;display:flex;flex-direction:column;gap:12px;padding:4px 12px 16px}
+  .infra-card{margin:0;padding:14px 16px;border:1px solid #2a2a31;border-radius:14px;background:#151518}
+  .infra-card h3{margin:0 0 10px;color:#9a9aa6;font-size:11.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+  .infra-fila{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+  .infra-fila h3{margin:0}
+  .infra-datos{display:grid;gap:8px;margin:0}
+  .infra-datos div{display:grid;grid-template-columns:5.5rem minmax(0,1fr);gap:12px}
+  .infra-datos dt{color:#9a9aa6}.infra-datos dd{margin:0;overflow-wrap:anywhere}
+  .infra .mudo{color:#9a9aa6}
+  .infra .mono{font:13px ui-monospace,Menlo,monospace}
+  .infra-lista{display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;list-style:none}
+  .infra-lista li{padding:3px 10px;border:1px solid #2a2a31;border-radius:999px;background:#1c1c21}
+  .infra-metricas{display:grid;grid-template-columns:repeat(auto-fit,minmax(7rem,1fr));gap:8px;margin:0;padding:0;list-style:none}
+  .infra-metricas li{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border:1px solid #2a2a31;border-radius:10px;background:#1c1c21}
+  .infra-metricas span{color:#9a9aa6;font-size:12px}.infra-metricas b{font-size:19px;font-variant-numeric:tabular-nums}
+  .infra-lectura{margin:12px 0 0;color:#9a9aa6;font-size:12.5px}
+  .infra-estado{flex:none;padding:2px 10px;border:1px solid #2a2a31;border-radius:999px;color:#9a9aa6;font-size:12px;font-weight:700;white-space:nowrap}
+  .infra-estado.ok{border-color:#4ade8066;color:#4ade80}.infra-estado.aviso{border-color:#fbbf2466;color:#fbbf24}
+  .infra-estado.mal{border-color:#f8717166;color:#f87171}.infra-estado.priv{border-color:#8b5cf680;color:#c4b5fd}
+  .infra .infra-accion{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 16px;border:1px solid #8b5cf673;
+       border-radius:11px;background:#8b5cf629;color:#fff;font:700 14px system-ui,sans-serif;text-decoration:none;cursor:pointer}
+  .infra .infra-accion:hover{background:#8b5cf647}.infra .infra-accion:disabled{opacity:.6;cursor:progress}
+  .infra :focus-visible{outline:2px solid #8b5cf6;outline-offset:2px}
+
+  /* ===== Móvil VERTICAL: juego entero arriba (ancho completo), dock de accesos y panel debajo. =====
+     El SWF es 760×480; a ancho completo en un teléfono sobra alto, así que ese alto se usa para el
+     dock y los paneles. «Zoom» agranda hasta 1.3× recortando los lados del mapa (ancla abajo: el HUD
+     del juego queda visible) y un deslizador mueve el recorte. Debe coincidir con mqVertical en JS. */
+  @media(orientation:portrait) and (max-width:900px){
+    :root{--stage-h:calc(100vw * .631579 * var(--zoom,1));--pan-h:0px;--dock-h:72px;
+          --dock-top:calc(var(--bar-h) + var(--stage-h) + var(--pan-h));--panel-top:calc(var(--dock-top) + var(--dock-h))}
+    :root.zoom{--pan-h:34px}
+    main{top:var(--bar-h);left:0;right:0;bottom:auto;height:var(--stage-h);justify-content:flex-start;transition:none}
+    #game{width:calc(100cqw * var(--zoom,1));max-height:none;
+          transform:translateX(calc((var(--zoom,1) - 1) * -100cqw * var(--pan,.5)))}
+    .bar #zoom,.bar #fullscreen svg{display:block}
+    .bar #zoom{display:inline-flex}
+    .bar #fullscreen{width:44px;padding-inline:0}
+    #fs-txt,.bar label span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+    .bar #zoom[aria-pressed="true"]{background:#fff;color:#0758a5}
+    :root.zoom .pan{display:block;position:fixed;z-index:20;top:calc(var(--bar-h) + var(--stage-h));left:0;right:0;height:var(--pan-h);
+                    margin:0;padding:0 18px;background:transparent;accent-color:#fff}
+    .dock{position:fixed;top:var(--dock-top);left:0;right:0;height:var(--dock-h);gap:8px;padding:8px 12px;
+          background:#0b7ab9;border-block:1px solid #ffffff26}
+    .bar .dock button{flex:1;flex-direction:column;gap:2px;min-height:0;height:100%;padding:0 4px;font-size:.6875rem;width:auto}
+    .dock #infra::after,.dock #spotify::after{content:attr(data-lbl)}
+    .bar #puffle svg{display:block}
+    .dock [aria-expanded="true"]{background:#06447f;box-shadow:inset 0 0 0 2px #ffffff8c}
+    /* Globo y panel de infraestructura se acoplan bajo el dock (sin tapar el juego). */
+    .globo{position:fixed;z-index:34;left:8px!important;right:8px;top:var(--panel-top)!important;width:auto;
+           max-height:calc(100dvh - var(--panel-top) - 8px);overflow:auto}
+    .globo::before{display:none}
+    .infra{top:var(--panel-top);left:0;right:0;width:100%;border-left:0;border-top:1px solid #2a2a31;padding-top:0}
+  }
+
+  /* ===== Móvil HORIZONTAL (poca altura): la barra pasa a un riel lateral y el juego usa TODA la altura.
+     El ancho sobra (el escenario es 1.58:1), la altura no. Debe coincidir con mqRiel en JS. ===== */
+  @media(orientation:landscape) and (max-height:520px){
+    :root{--rail-w:calc(64px + env(safe-area-inset-left))}
+    main{top:0;left:var(--rail-w);right:calc(var(--infra-w,0px) + env(safe-area-inset-right));bottom:env(safe-area-inset-bottom)}
+    .bar{top:0;bottom:0;right:auto;width:var(--rail-w);height:auto;flex-direction:column;align-items:center;gap:6px;
+         padding:calc(6px + env(safe-area-inset-top)) 6px calc(6px + env(safe-area-inset-bottom)) calc(6px + env(safe-area-inset-left));
+         overflow-y:auto;overscroll-behavior:contain;transition:none}
+    .bar button,.bar a{flex:none}
+    .bar-actions,.dock{flex-direction:column;width:100%;margin:0;gap:6px}
+    .bar label{width:100%}
+    .bar label span,#fs-txt,#puffle-txt{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+    .bar select{width:100%;padding:0;text-align:center;text-align-last:center;-webkit-appearance:none;appearance:none;font-size:.75rem}
+    .bar #fullscreen svg,.bar #puffle svg{display:block}
+    .bar #fullscreen,.bar #puffle{width:44px;padding-inline:0}
+    .globo{max-height:calc(100dvh - 16px);overflow:auto}
+    .globo.lado::before{top:calc(var(--flecha,50%) - 8px);left:-8px;border-radius:0 0 0 3px}
+  }
+  @media(prefers-reduced-motion:reduce){
+    .infra,html.infra-abierto .infra,main,.bar{transition:none!important}
+    .chip-ico{animation:none}
+  }
 </style>
 </head>
 <body>
 <nav class="bar" aria-label="Controles">
-  <button id="salir" type="button" hidden>Salir</button>
-  <button id="fullscreen" type="button" aria-label="Pantalla completa">⛶</button>
-  <button id="puffle" type="button">Mi puffle</button>
+  <button id="inicio" type="button" aria-label="Inicio" title="Inicio">
+    <svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M11.3 2.3a1 1 0 0 1 1.4 0l9 8.3a1 1 0 0 1-.7 1.7h-1.5V20a2 2 0 0 1-2 2h-3v-5a2.5 2.5 0 0 0-5 0v5h-3a2 2 0 0 1-2-2v-7.7H3a1 1 0 0 1-.7-1.7z"/>
+    </svg>
+  </button>
+  <div class="bar-actions">
+    <label for="idioma">
+      <span id="etiqueta-idioma">Idioma</span>
+      <select id="idioma">
+        <option value="es" lang="es">Español</option>
+        <option value="en" lang="en">English</option>
+      </select>
+    </label>
+    <button id="fullscreen" type="button" aria-pressed="false">
+      <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+      <span id="fs-txt">Pantalla completa</span>
+    </button>
+    <button id="zoom" class="bar-icon" type="button" aria-pressed="false" aria-label="Acercar el mapa" title="Acercar el mapa">
+      <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l5 5M11 8v6M8 11h6"/></svg>
+    </button>
+  </div>
+  <div class="dock">
+    <button id="infra" class="bar-icon" data-lbl="Infraestructura" type="button" aria-label="Infraestructura" title="Infraestructura"
+            aria-expanded="false" aria-controls="infra-panel">
+      <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="M7 7h.01M7 17h.01"/>
+      </svg>
+    </button>
+    <button id="spotify" class="bar-icon" data-lbl="Spotify" type="button" aria-label="Spotify" title="Spotify"
+            aria-haspopup="dialog" aria-expanded="false" aria-controls="globo">
+      <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+      </svg>
+      <span class="punto-aviso" id="punto-aviso" hidden></span>
+    </button>
+    <button id="puffle" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="globo">
+      <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="7.5"/><path d="M8 7L6.5 3.5M16 7l1.5-3.5M9.5 12.5h.01M14.5 12.5h.01M10 16c1.3.9 2.7.9 4 0"/></svg>
+      <span id="puffle-txt">Mi puffle</span>
+    </button>
+  </div>
 </nav>
-<p id="estado" role="status" class="on">Cargando el glaciar…</p>
 
-<div class="overlay" id="rota" role="dialog" aria-label="Gira tu teléfono">
-  <div class="avion" aria-hidden="true"></div>
-  <p>Gira el teléfono y el juego se ve entero</p>
+<!-- Globo del puffle: todo el flujo (código, confirmación y Spotify) sin salir del juego. -->
+<div id="globo" class="globo" role="dialog" aria-labelledby="globo-titulo" hidden>
+  <button id="globo-cerrar" class="globo-cerrar" type="button" aria-label="Cerrar">×</button>
+  <p id="globo-aviso" class="globo-aviso" role="status" hidden></p>
+  <p id="globo-titulo" class="globo-titulo"></p>
+  <p id="globo-texto" class="globo-texto"></p>
+  <p id="globo-codigo" class="globo-codigo" hidden></p>
+  <div id="globo-acciones" class="globo-acciones"></div>
+  <p id="globo-nota" class="globo-nota" hidden></p>
 </div>
 
-<main aria-label="Club Penguin · Glaciar"><div id="game"></div></main>
+<!-- Panel de infraestructura y monitoreo (lateral). Es solo lectura y no toca el juego: Ruffle y su
+     WebSocket siguen vivos al abrirlo y cerrarlo; únicamente cambia el espacio disponible. -->
+<aside id="infra-panel" class="infra" aria-labelledby="infra-titulo" inert>
+  <header class="infra-cab">
+    <h2 id="infra-titulo">Infraestructura y monitoreo</h2>
+    <button id="infra-cerrar" class="infra-x" type="button" aria-label="Cerrar panel de infraestructura">×</button>
+  </header>
+  <nav class="infra-tabs" id="infra-tabs" aria-label="Secciones de infraestructura">
+    <button type="button" class="infra-tab" data-sec="infra">
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="M7 7h.01M7 17h.01"/></svg>
+      <span>Infraestructura</span>
+    </button>
+    <button type="button" class="infra-tab" data-sec="prom">
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c1 3 4 4.5 4 8.2A4 4 0 0 1 12 15a4 4 0 0 1-4-3.8c0-1.4.6-2.4 1.5-3.4C10.4 6.8 11.7 5.6 12 3z"/><path d="M9 20h6M10 17.5h4"/></svg>
+      <span>Prometheus</span>
+    </button>
+    <button type="button" class="infra-tab" data-sec="graf">
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+      <span>Grafana</span>
+    </button>
+  </nav>
+  <div id="infra-cuerpo" class="infra-cuerpo" aria-live="polite"></div>
+</aside>
+
+<main aria-label="Club Penguin · Glaciar">
+  <div id="game"></div>
+  <p id="estado" role="status" class="on">Cargando el glaciar…</p>
+</main>
+<input id="pan" class="pan" type="range" min="0" max="100" value="50" aria-label="Mover el mapa">
+<div id="rota" class="chip" role="status" hidden>
+  <span class="chip-ico" id="rota-ico" aria-hidden="true"></span>
+  <p></p>
+  <button id="rota-x" type="button" aria-label="Cerrar">×</button>
+</div>
 <script src="/ruffle/ruffle.js" defer></script>
 <script>
+  // Spotify solo acepta 127.0.0.1 (no «localhost») y la cookie del puffle vive en ese origen.
+  if (location.hostname === 'localhost') location.replace(location.href.replace('//localhost', '//127.0.0.1'));
+  const selector = document.getElementById('idioma');
+  const inicio = document.getElementById('inicio');
+  const fsBoton = document.getElementById('fullscreen');
+  const enlaceSpotify = document.getElementById('spotify');
+  const barra = document.querySelector('.bar');
+  const avisoRotacion = document.getElementById('rota');
+  const avisoEstado = document.getElementById('estado');
+  const preferenciaIdioma = 'glaciar-idioma';
+  const pagina = new URL(location.href);
+  let idiomaGuardado;
+  try {
+    idiomaGuardado = localStorage.getItem(preferenciaIdioma);
+  } catch {
+    // La URL conserva el idioma si el navegador bloquea el almacenamiento.
+  }
+  const idioma = (pagina.searchParams.get('lang') ?? idiomaGuardado) === 'en' ? 'en' : 'es';
+  const enIngles = idioma === 'en';
+  document.documentElement.lang = idioma;
+  selector.value = idioma;
+
+  if (enIngles) {
+    document.querySelector('.bar').setAttribute('aria-label', 'Game controls');
+    inicio.setAttribute('aria-label', 'Home');
+    inicio.title = 'Home';
+    document.getElementById('etiqueta-idioma').textContent = 'Language';
+    document.getElementById('fs-txt').textContent = 'Fullscreen';
+    document.getElementById('puffle-txt').textContent = 'My puffle';
+    document.getElementById('zoom').setAttribute('aria-label', 'Zoom the map');
+    document.getElementById('zoom').title = 'Zoom the map';
+    document.getElementById('pan').setAttribute('aria-label', 'Move the map');
+    const infraBtn = document.getElementById('infra');
+    infraBtn.setAttribute('aria-label', 'Infrastructure');
+    infraBtn.title = 'Infrastructure';
+    infraBtn.dataset.lbl = 'Infrastructure';
+    enlaceSpotify.setAttribute('aria-label', 'Spotify');
+    enlaceSpotify.title = 'Spotify';
+    avisoEstado.textContent = 'Loading Glaciar…';
+  }
+  fsBoton.setAttribute('aria-label', document.getElementById('fs-txt').textContent);
+
+  // Modos de pantalla (idénticos a los @media del CSS): vertical = juego arriba + dock; riel = barra lateral.
+  const mqVertical = matchMedia('(orientation: portrait) and (max-width: 900px)');
+  const mqRiel = matchMedia('(orientation: landscape) and (max-height: 520px)');
+  const raizDoc = document.documentElement;
+
+  // iPhone no ofrece Fullscreen API en páginas normales: no mostramos un botón que no hace nada.
+  const fsApi = raizDoc.requestFullscreen || raizDoc.webkitRequestFullscreen;
+  if (!fsApi) fsBoton.hidden = true;
+
+  // Zoom del mapa (solo vertical): 1× = todo el juego; 1.3× recorta los lados, anclado abajo (HUD visible).
+  const zoomBoton = document.getElementById('zoom');
+  const deslizador = document.getElementById('pan');
+  const ZOOM = 1.3;
+  let zoom = 1;
+  try { zoom = localStorage.getItem('glaciar-zoom') === '1' ? ZOOM : 1; } catch {}
+  const pintarZoom = () => {
+    raizDoc.style.setProperty('--zoom', zoom);
+    raizDoc.classList.toggle('zoom', zoom > 1);
+    zoomBoton.setAttribute('aria-pressed', String(zoom > 1));
+  };
+  zoomBoton.addEventListener('click', () => {
+    zoom = zoom > 1 ? 1 : ZOOM;
+    try { localStorage.setItem('glaciar-zoom', zoom > 1 ? '1' : '0'); } catch {}
+    pintarZoom();
+  });
+  deslizador.addEventListener('input', () => raizDoc.style.setProperty('--pan', deslizador.value / 100));
+  pintarZoom();
+
+  selector.addEventListener('change', () => {
+    try {
+      localStorage.setItem(preferenciaIdioma, selector.value);
+      pagina.searchParams.delete('lang');
+    } catch {
+      pagina.searchParams.set('lang', selector.value);
+    }
+    // Ruffle lee el idioma al arrancar y abre una nueva sesión del juego.
+    location.replace(pagina);
+  });
+
   window.RufflePlayer = window.RufflePlayer || {};
   const socketBase = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}`;
   window.RufflePlayer.config = {
@@ -81,9 +393,8 @@
   }
 
   const estado = texto => {
-    const el = document.getElementById('estado');
-    el.textContent = texto;
-    el.classList.toggle('on', !!texto);
+    avisoEstado.textContent = texto;
+    avisoEstado.classList.toggle('on', !!texto);
   };
 
   // Carga el juego a la primera, sin lobby: el cliente ES la interfaz.
@@ -100,60 +411,530 @@
       ]);
       const player = window.RufflePlayer.newest().createPlayer();
       player.id = 'penguin-player';
+      player.style.backgroundColor = '#00529b';
       document.getElementById('game').appendChild(player);
       await player.ruffle().load({
         url: new URL('/media/boots.swf', location.href).href,
-        parameters: {lang: 'es', base: location.origin + '/'}
+        parameters: {lang: idioma, base: location.origin + '/'}
       });
       estado('');
-      document.body.classList.add('listo');          // revela la barra discreta
-      document.getElementById('salir').hidden = false;
     } catch (error) {
       console.error(error);
-      estado('No se pudo cargar el juego. Recarga la página (desliza para actualizar).');
+      estado(enIngles ? 'The game could not load. Use Home to try again.'
+                      : 'No se pudo cargar el juego. Usa Inicio para volver a intentarlo.');
     }
   });
 
-  // Pantalla completa: la primera interacción es suficiente permiso.
-  document.addEventListener('pointerdown', () => {
-    if (!document.fullscreenElement && document.fullscreenEnabled) {
-      document.documentElement.requestFullscreen?.({navigationUI: 'hide'}).catch(() => {});
-    }
-  }, {once: true, passive: true});
-
-  const fsBoton = document.getElementById('fullscreen');
+  document.addEventListener('fullscreenchange', () => {
+    fsBoton.setAttribute('aria-pressed', Boolean(document.fullscreenElement));
+  });
   fsBoton.addEventListener('click', async () => {
     try {
       if (document.fullscreenElement) await document.exitFullscreen();
       else await document.documentElement.requestFullscreen({navigationUI: 'hide'});
-    } catch (e) {
-      estado('La pantalla completa no está disponible aquí.');
-      setTimeout(() => estado(''), 2200);
+    } catch {
+      if (avisoEstado.textContent) return;
+      const mensaje = enIngles ? 'Fullscreen is unavailable here.' : 'La pantalla completa no está disponible aquí.';
+      estado(mensaje);
+      setTimeout(() => {
+        if (avisoEstado.textContent === mensaje) estado('');
+      }, 2200);
     }
   });
 
-  // Barra que se esconde sola mientras juegas.
-  let quieto;
-  function despertar() {
-    document.body.classList.remove('quiet');
-    clearTimeout(quieto);
-    quieto = setTimeout(() => document.body.classList.add('quiet'), 2500);
-  }
-  for (const tipo of ['pointerdown', 'pointermove', 'keydown']) {
-    document.addEventListener(tipo, despertar, {passive: true, capture: true});
-  }
-  despertar();
-
-  // Aviso de rotación: solo en móvil y solo en vertical.
-  const vertical = matchMedia('(orientation: portrait)');
+  // Avisos NO bloqueantes (el juego es jugable en ambas orientaciones): girar el teléfono, o instalar
+  // en la pantalla de inicio para tener pantalla completa real en iPhone. Cada uno sale una vez por sesión.
   const tactil = matchMedia('(pointer: coarse)');
-  const revisar = () => document.getElementById('rota')
-    .classList.toggle('on', vertical.matches && tactil.matches);
-  vertical.addEventListener?.('change', revisar);
+  const instalada = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+  const AVISOS = {
+    rotar: enIngles ? 'Rotate your phone for a bigger game' : 'Gira el teléfono para ver el juego más grande',
+    instalar: enIngles ? 'Fullscreen: Share → Add to Home Screen' : 'Pantalla completa: Compartir → Añadir a inicio',
+  };
+  const vistos = new Set();
+  let claveAviso = '', relojAviso = null;
+  const visto = k => { try { return vistos.has(k) || sessionStorage.getItem('glaciar-aviso-' + k) === '1'; } catch { return vistos.has(k); } };
+  const marcarVisto = k => { vistos.add(k); try { sessionStorage.setItem('glaciar-aviso-' + k, '1'); } catch {} };
+  const ocultarAviso = () => { avisoRotacion.hidden = true; clearTimeout(relojAviso); if (claveAviso) marcarVisto(claveAviso); claveAviso = ''; };
+  const revisar = () => {
+    const k = !tactil.matches ? '' : mqVertical.matches ? 'rotar' : (mqRiel.matches && !fsApi && !instalada) ? 'instalar' : '';
+    if (k === claveAviso && !avisoRotacion.hidden) return;
+    if (!k || visto(k)) { avisoRotacion.hidden = true; claveAviso = ''; clearTimeout(relojAviso); return; }
+    claveAviso = k;
+    avisoRotacion.querySelector('p').textContent = AVISOS[k];
+    document.getElementById('rota-ico').classList.toggle('fijo', k !== 'rotar');
+    avisoRotacion.hidden = false;
+    clearTimeout(relojAviso);
+    relojAviso = setTimeout(ocultarAviso, 9000);
+  };
+  document.getElementById('rota-x').addEventListener('click', ocultarAviso);
+  mqVertical.addEventListener?.('change', revisar);
+  mqRiel.addEventListener?.('change', revisar);
   revisar();
 
-  document.getElementById('salir').addEventListener('click', () => location.reload());
-  document.getElementById('puffle').addEventListener('click', () => window.open('/puffle/', '_blank', 'noopener'));
+  inicio.addEventListener('click', () => location.reload());
+
+  // ---- Globo del puffle: código, confirmación y Spotify sin salir del juego ----
+  // El puffleEstado viene del servidor (cookie HttpOnly, mismo origen; nada de :1455).
+  // Spotify se conecta en una ventana emergente que, si sale bien, pasa a ser el
+  // reproductor web; el resultado llega aquí por un evento de storage del mismo origen.
+  const botonPuffle = document.getElementById('puffle');
+  const globo = document.getElementById('globo');
+  const g = id => document.getElementById('globo-' + id);
+  const puntoAviso = document.getElementById('punto-aviso');
+  const TXT = enIngles ? {
+    title: 'Your puffle', intro: 'Adopt a puffle and leave it in your igloo (not walking). Then get a code to connect it.',
+    getCode: 'Get code', typeTitle: 'Type this in your igloo chat', copy: 'Copy', copied: 'Copied', cancel: 'Cancel',
+    codeNote: 'It is private and expires in 5 minutes. This bubble updates by itself when you type it.',
+    confirmTitle: 'Is this your penguin?', yes: 'Yes, my penguin', no: 'No', back: 'Back',
+    confirmText: n => `The code was typed by ${n}. If that is you, allow your puffle to talk and play your music.`,
+    deniedTitle: 'Penguin not enabled', deniedText: n => `${n} is not on this lab's list.`,
+    pairedTitle: n => `${n}'s puffle`, offline: 'Reconnecting to the game…',
+    spotifyOff: 'Connect your Spotify (Premium) to ask for songs from your igloo.', connect: 'Connect Spotify',
+    opening: 'Opening Spotify…', connecting: 'Finish connecting in the Spotify window…',
+    spotifyOn: 'Spotify connected. Tell your puffle in your igloo, or any bot by name (Cobra, Juanito, Viterbos…): «pon despacito», «pausa», «siguiente».',
+    openPlayer: 'Open player', disconnectSpotify: 'Disconnect Spotify', disconnectPuffle: 'Disconnect puffle',
+    noApp: 'The server has no Spotify app configured yet.',
+    unavailable: 'The puffle is not available right now. Try again later.',
+    popupBlocked: 'Your browser blocked the Spotify window. Allow pop-ups for this site and try again.',
+    failed: 'That did not work. Try again.', notAllowed: 'This penguin is not enabled in the lab.',
+    busy: 'Too many requests; wait a moment.', pairedOk: 'Puffle connected!', bye: 'Puffle disconnected.',
+    sp_ok: 'Done! The Spotify player opened: play something for a few seconds, then ask your puffle for music.',
+    sp_denied: 'Spotify connection cancelled.', sp_error: 'Spotify could not be connected. Try again.',
+    sp_bye: 'Spotify disconnected. Also remove the app at spotify.com/account/apps.',
+    iconOn: 'Spotify connected', iconOff: 'Connect Spotify to your puffle',
+  } : {
+    title: 'Tu puffle', intro: 'Adopta un puffle y déjalo en tu iglú (sin pasearlo). Luego pide un código para conectarlo.',
+    getCode: 'Obtener código', typeTitle: 'Escribe esto en el chat de tu iglú', copy: 'Copiar', copied: 'Copiado', cancel: 'Cancelar',
+    codeNote: 'Es privado y vence en 5 minutos. Este globo sigue solo cuando lo escribas.',
+    confirmTitle: '¿Es tu pingüino?', yes: 'Sí, es mi pingüino', no: 'No', back: 'Volver',
+    confirmText: n => `El código se escribió desde ${n}. Si eres tú, autoriza que tu puffle converse y ponga tu música.`,
+    deniedTitle: 'Pingüino no habilitado', deniedText: n => `${n} no está en la lista de este laboratorio.`,
+    pairedTitle: n => `Puffle de ${n}`, offline: 'Reconectando con el juego…',
+    spotifyOff: 'Conecta tu Spotify (Premium) para pedirle canciones desde tu iglú.', connect: 'Conectar Spotify',
+    opening: 'Abriendo Spotify…', connecting: 'Termina de conectar en la ventana de Spotify…',
+    spotifyOn: 'Spotify conectado. Pídeselo a tu puffle en tu iglú o a cualquier bot por su nombre (Cobra, Juanito, Viterbos…): «pon despacito», «pausa», «siguiente».',
+    openPlayer: 'Abrir reproductor', disconnectSpotify: 'Desconectar Spotify', disconnectPuffle: 'Desconectar puffle',
+    noApp: 'Falta configurar la app de Spotify en el servidor.',
+    unavailable: 'El puffle no está disponible ahora. Vuelve a intentarlo en un rato.',
+    popupBlocked: 'Tu navegador bloqueó la ventana de Spotify. Permite ventanas emergentes para este sitio y vuelve a intentarlo.',
+    failed: 'No se pudo completar. Inténtalo otra vez.', notAllowed: 'Este pingüino no está habilitado en el laboratorio.',
+    busy: 'Hay muchas solicitudes; espera un momento.', pairedOk: '¡Puffle conectado!', bye: 'Puffle desconectado.',
+    sp_ok: '¡Listo! Se abrió el reproductor de Spotify: pon algo unos segundos y pídele música a tu puffle.',
+    sp_denied: 'Conexión con Spotify cancelada.', sp_error: 'No se pudo conectar Spotify. Inténtalo otra vez.',
+    sp_bye: 'Spotify desconectado. Quita también la app en spotify.com/account/apps.',
+    iconOn: 'Spotify conectado', iconOff: 'Conectar Spotify con tu puffle',
+  };
+
+  const api = async path => {
+    const r = await fetch(path, {method: 'POST', headers: {'X-Puffle': '1'}, credentials: 'same-origin', cache: 'no-store'});
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw Object.assign(new Error(data.error || 'unavailable'), {code: data.error});
+    return data;
+  };
+  const guardar = (clave, valor) => {
+    try { valor ? sessionStorage.setItem(clave, valor) : sessionStorage.removeItem(clave); } catch {}
+  };
+  let frase = '';
+  try { frase = sessionStorage.getItem('puffle-frase') || ''; } catch {}
+  let puffleEstado = null, falloRed = false, conectando = false, ventana = null, aviso = null, avisoReloj = null;
+
+  const avisar = (texto, mal = false) => {
+    aviso = texto ? {texto, mal} : null;
+    clearTimeout(avisoReloj);
+    if (texto) avisoReloj = setTimeout(() => { aviso = null; pintar(); }, 15000);
+    pintar();
+  };
+  const colocar = () => {
+    if (globo.hidden) return;
+    // Vertical: el CSS lo acopla bajo el dock (sin coordenadas).
+    if (mqVertical.matches) { globo.classList.remove('lado'); return; }
+    const r = enlaceSpotify.getBoundingClientRect();
+    const ancho = globo.offsetWidth;
+    // Riel lateral: el globo sale a la derecha del riel, con la flecha apuntando al icono.
+    if (mqRiel.matches) {
+      const alto = globo.offsetHeight;
+      const izq = barra.getBoundingClientRect().right + 12;
+      const arriba = Math.max(8, Math.min(innerHeight - 8 - alto, r.top + r.height / 2 - 40));
+      globo.classList.add('lado');
+      globo.style.left = izq + 'px';
+      globo.style.top = arriba + 'px';
+      globo.style.setProperty('--flecha', Math.max(18, Math.min(alto - 18, r.top + r.height / 2 - arriba)) + 'px');
+      return;
+    }
+    globo.classList.remove('lado');
+    const centro = r.left + r.width / 2;
+    // La barra se estrecha cuando el panel reserva espacio: el globo no debe invadirlo.
+    const limite = Math.min(innerWidth, barra.getBoundingClientRect().right);
+    const izq = Math.max(16, Math.min(limite - 16 - ancho, centro - ancho / 2));
+    globo.style.left = izq + 'px';
+    globo.style.top = (r.bottom + 12) + 'px';
+    globo.style.setProperty('--flecha', Math.max(18, Math.min(ancho - 18, centro - izq)) + 'px');
+  };
+  const abrir = () => {
+    globo.hidden = false;
+    enlaceSpotify.setAttribute('aria-expanded', 'true');
+    botonPuffle.setAttribute('aria-expanded', 'true');
+    pintar();
+    colocar();
+  };
+  const cerrar = () => {
+    globo.hidden = true;
+    enlaceSpotify.setAttribute('aria-expanded', 'false');
+    botonPuffle.setAttribute('aria-expanded', 'false');
+    pintar();
+  };
+  // Un clic del usuario en el puffle/Spotify cede el sitio al panel de infraestructura (no así
+  // las aperturas automáticas del globo, que no deben quitarle el panel a quien lo está leyendo).
+  const alternar = () => { if (globo.hidden) { cerrarInfra(); abrir(); refrescar(); } else cerrar(); };
+
+  async function accion(boton, fn) {
+    boton.disabled = true;
+    try { await fn(); } catch (e) {
+      avisar(e.code === 'busy' ? TXT.busy : e.code === 'not_allowed' ? TXT.notAllowed : TXT.failed, true);
+    } finally { boton.disabled = false; }
+    refrescar();
+  }
+  const pedirCodigo = async () => {
+    const r = await api('/puffle/api/session/pair');
+    frase = 'puffle conectar ' + r.code;
+    guardar('puffle-frase', frase);
+  };
+  const copiar = async () => {
+    await navigator.clipboard.writeText(frase);
+    avisar(TXT.copied);
+  };
+  const confirmar = async () => { await api('/puffle/api/session/confirm'); avisar(TXT.pairedOk); };
+  const desconectar = async () => {
+    const antes = puffleEstado && puffleEstado.state;
+    await api('/puffle/api/session/disconnect');
+    frase = '';
+    guardar('puffle-frase', '');
+    if (antes === 'paired') avisar(TXT.bye);
+  };
+  const conectarSpotify = async () => {
+    // Abrir la ventana dentro del clic (si no, el navegador la bloquea) y navegarla después.
+    const w = window.open('', 'puffle-spotify', 'popup,width=480,height=760');
+    if (!w) { avisar(TXT.popupBlocked, true); return; }
+    try {
+      w.opener = null;  // Spotify no necesita controlar la pestaña del juego
+      w.document.title = 'Spotify';
+      w.document.body.style.cssText = 'margin:0;display:grid;place-items:center;min-height:100vh;font:18px system-ui;background:#0b7ab9;color:#fff';
+      w.document.body.textContent = TXT.opening;
+    } catch {}
+    try {
+      const r = await api('/puffle/spotify/connect?popup=1');
+      w.location.href = r.url;
+      conectando = true;
+      ventana = w;
+    } catch (e) { w.close(); throw e; }
+  };
+  const desconectarSpotify = async () => { await api('/puffle/spotify/disconnect'); avisar(TXT.sp_bye); };
+  const abrirReproductor = () => { window.open('https://open.spotify.com/', 'puffle-spotify', 'noopener'); };
+
+  function pintar() {
+    const s = puffleEstado;
+    const acciones = [];
+    let titulo = TXT.title, texto = '', codigo = '', nota = '';
+    if (!s) {
+      texto = falloRed ? TXT.unavailable : '…';
+    } else if (s.state === 'none') {
+      texto = TXT.intro;
+      acciones.push([TXT.getCode, '', pedirCodigo]);
+    } else if (s.state === 'pending') {
+      titulo = TXT.typeTitle;
+      codigo = frase || 'puffle conectar …';
+      nota = TXT.codeNote;
+      if (frase && navigator.clipboard) acciones.push([TXT.copy, 'alt', copiar]);
+      acciones.push([TXT.cancel, 'alt', desconectar]);
+    } else if (s.state === 'confirm') {
+      titulo = TXT.confirmTitle;
+      texto = TXT.confirmText(s.nickname);
+      acciones.push([TXT.yes, '', confirmar], [TXT.no, 'alt', desconectar]);
+    } else if (s.state === 'denied') {
+      titulo = TXT.deniedTitle;
+      texto = TXT.deniedText(s.nickname);
+      acciones.push([TXT.back, 'alt', desconectar]);
+    } else {
+      titulo = TXT.pairedTitle(s.nickname);
+      if (!s.online) nota = TXT.offline;
+      if (s.spotify === 'conectado') {
+        texto = TXT.spotifyOn;
+        acciones.push([TXT.openPlayer, 'sp', abrirReproductor], [TXT.disconnectSpotify, 'alt', desconectarSpotify]);
+      } else if (s.spotify === 'sin_app') {
+        texto = TXT.noApp;
+      } else {
+        texto = conectando ? TXT.connecting : TXT.spotifyOff;
+        acciones.push([TXT.connect, 'sp', conectarSpotify]);
+      }
+      acciones.push([TXT.disconnectPuffle, 'alt', desconectar]);
+    }
+    g('titulo').textContent = titulo;
+    g('texto').textContent = texto;
+    g('texto').hidden = !texto;
+    g('codigo').textContent = codigo;
+    g('codigo').hidden = !codigo;
+    g('nota').textContent = nota;
+    g('nota').hidden = !nota;
+    g('aviso').textContent = aviso ? aviso.texto : '';
+    g('aviso').classList.toggle('mal', !!(aviso && aviso.mal));
+    g('aviso').hidden = !aviso;
+    g('acciones').replaceChildren(...acciones.map(([etiqueta, clase, fn]) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = etiqueta;
+      if (clase) b.className = clase;
+      b.addEventListener('click', () => accion(b, fn));
+      return b;
+    }));
+    const conectado = !!(s && s.state === 'paired' && s.spotify === 'conectado');
+    enlaceSpotify.classList.toggle('spotify-on', conectado);
+    enlaceSpotify.setAttribute('aria-label', conectado ? TXT.iconOn : TXT.iconOff);
+    enlaceSpotify.title = conectado ? TXT.iconOn : TXT.iconOff;
+    puntoAviso.hidden = !globo.hidden || !((s && s.state === 'confirm') || aviso);
+    colocar();
+  }
+
+  let reloj = null;
+  async function refrescar() {
+    clearTimeout(reloj);
+    if (document.visibilityState !== 'hidden') {
+      try {
+        const s = await api('/puffle/api/session/status');
+        const antes = puffleEstado;
+        puffleEstado = s;
+        falloRed = false;
+        if (s.state !== 'pending' && frase) { frase = ''; guardar('puffle-frase', ''); }
+        // Notificaciones: el código ya se escribió en el iglú, o Spotify quedó conectado.
+        if (antes && antes.state === 'pending' && s.state === 'confirm') abrir();
+        if (conectando && s.spotify === 'conectado') { conectando = false; avisar(TXT.sp_ok); abrir(); }
+      } catch {
+        falloRed = true;
+        puffleEstado = null;
+      }
+    }
+    if (conectando && ventana && ventana.closed) conectando = false;
+    pintar();
+    const atento = !globo.hidden || conectando || (puffleEstado && ['pending', 'confirm'].includes(puffleEstado.state));
+    reloj = setTimeout(refrescar, atento ? 2000 : 6000);
+  }
+
+  window.addEventListener('storage', e => {
+    if (e.key !== 'puffle-spotify' || !e.newValue) return;
+    let m = '';
+    try { m = JSON.parse(e.newValue).m; } catch { return; }
+    conectando = false;
+    avisar(TXT[m] || TXT.sp_error, m !== 'sp_ok');
+    abrir();
+    refrescar();
+  });
+  enlaceSpotify.addEventListener('click', alternar);
+  botonPuffle.addEventListener('click', alternar);
+  g('cerrar').addEventListener('click', cerrar);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !globo.hidden) cerrar(); });
+  // iOS tarda en actualizar innerWidth/innerHeight al girar: recolocar también con visualViewport y un tick después.
+  const recolocar = () => requestAnimationFrame(colocar);
+  window.addEventListener('resize', recolocar);
+  window.addEventListener('orientationchange', () => setTimeout(colocar, 250));
+  window.visualViewport?.addEventListener('resize', recolocar);
+  new ResizeObserver(colocar).observe(barra);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refrescar(); });
+  refrescar();
+
+
+  // ---- Panel de infraestructura: datos de /infra/summary.json (mismo origen, resumen agregado) ----
+  // Solo lectura. Abrirlo o cerrarlo no recarga la página ni toca a Ruffle: el reproductor, su
+  // WebSocket y la sala del jugador siguen exactamente donde estaban; solo cambia el ancho de <main>.
+  const botonInfra = document.getElementById('infra');
+  const panelInfra = document.getElementById('infra-panel');
+  const cuerpoInfra = document.getElementById('infra-cuerpo');
+  const raiz = document.documentElement;
+  const TI = enIngles ? {
+    panel: 'Infrastructure and monitoring', close: 'Close infrastructure panel', tabs: 'Infrastructure sections',
+    infra: 'Infrastructure', prom: 'Prometheus', graf: 'Grafana', deploy: 'Deployment', components: 'Main components',
+    project: 'Project', provider: 'Provider', platform: 'Platform', env: 'Environment', release: 'Release',
+    metrics: 'Metrics', dash: 'Dashboard', loading: 'Loading…', none: 'Not configured', na: 'Not available',
+    operational: 'Operational', degraded: 'Degraded', stale: 'Stale data', offline: 'Offline', priv: 'Private access', avail: 'Available',
+    lastRead: 'Last reading:', noRead: 'no readings', refresh: 'Refresh reading', refreshing: 'Refreshing…',
+    noSource: 'No metrics source is configured for this environment.',
+    offlineText: 'The metrics source could not be reached. The game keeps running.',
+    staleText: 'These readings are not recent; do not treat them as current status.',
+    noMetrics: 'No readings available.', privText: 'The dashboard is only reachable through a tunnel or port-forward from an authorised machine.',
+    noDash: 'No authorised dashboard for this environment.', open: 'Open Grafana', newTab: '(opens in a new tab)',
+    workloads: 'Workloads available', players: 'Players',
+  } : {
+    panel: 'Infraestructura y monitoreo', close: 'Cerrar panel de infraestructura', tabs: 'Secciones de infraestructura',
+    infra: 'Infraestructura', prom: 'Prometheus', graf: 'Grafana', deploy: 'Despliegue', components: 'Componentes principales',
+    project: 'Proyecto', provider: 'Proveedor', platform: 'Plataforma', env: 'Entorno', release: 'Release',
+    metrics: 'Métricas', dash: 'Dashboard', loading: 'Cargando…', none: 'Sin configurar', na: 'No disponible',
+    operational: 'Operativo', degraded: 'Degradado', stale: 'Datos desactualizados', offline: 'Sin conexión', priv: 'Acceso privado', avail: 'Disponible',
+    lastRead: 'Última lectura:', noRead: 'sin lecturas', refresh: 'Actualizar lectura', refreshing: 'Actualizando…',
+    noSource: 'No hay una fuente de métricas configurada para este entorno.',
+    offlineText: 'No se pudo contactar la fuente de métricas. El juego sigue funcionando.',
+    staleText: 'Las lecturas no son recientes; no las tomes como estado actual.',
+    noMetrics: 'Sin lecturas disponibles.', privText: 'El dashboard solo es accesible mediante túnel o port-forward desde un equipo autorizado.',
+    noDash: 'No hay un dashboard autorizado para este entorno.', open: 'Abrir en Grafana', newTab: '(se abre en una pestaña nueva)',
+    workloads: 'Cargas disponibles', players: 'Jugadores',
+  };
+  document.getElementById('infra-titulo').textContent = TI.panel;
+  document.getElementById('infra-cerrar').setAttribute('aria-label', TI.close);
+  document.getElementById('infra-tabs').setAttribute('aria-label', TI.tabs);
+  panelInfra.querySelectorAll('.infra-tab').forEach(b => { b.querySelector('span').textContent = TI[b.dataset.sec]; });
+  const METRICA = {workloads: TI.workloads, players: TI.players};
+
+  let infraAbierto = false, infraSeccion = 'infra', resumen = null, resumenFallo = null, cargando = false, relojInfra = null;
+
+  const nodo = (etiqueta, clase, texto) => {
+    const e = document.createElement(etiqueta);
+    if (clase) e.className = clase;
+    if (texto !== undefined) e.textContent = texto;
+    return e;
+  };
+  const tarjeta = (titulo, estado) => {
+    const t = nodo('section', 'infra-card');
+    if (estado) {
+      const fila = nodo('div', 'infra-fila');
+      fila.append(nodo('h3', '', titulo), estado);
+      t.append(fila);
+    } else t.append(nodo('h3', '', titulo));
+    return t;
+  };
+  const insignia = (texto, clase) => nodo('span', 'infra-estado ' + (clase || ''), texto);
+  const valorOMudo = (valor, vacio) => valor ? nodo('dd', '', valor) : nodo('dd', 'mudo', vacio || TI.none);
+
+  function pintarInfra() {
+    if (!infraAbierto) return;
+    const hijos = [];
+    if (!resumen) {
+      const c = tarjeta(TI[infraSeccion]);
+      c.append(nodo('p', 'mudo', cargando ? TI.loading : (resumenFallo === 'sin_configurar' ? TI.none : TI.offline)));
+      if (infraSeccion === 'prom' && !cargando) {
+        c.querySelector('h3').replaceWith(...(() => { const f = nodo('div', 'infra-fila'); f.append(nodo('h3', '', TI.metrics), insignia(resumenFallo === 'sin_configurar' ? TI.none : TI.offline, resumenFallo === 'sin_configurar' ? '' : 'mal')); return [f]; })());
+      }
+      hijos.push(c);
+    } else if (infraSeccion === 'infra') {
+      const d = resumen.deployment || {};
+      const c = tarjeta(TI.deploy);
+      const dl = nodo('dl', 'infra-datos');
+      for (const [etiqueta, valor, mono, vacio] of [[TI.project, d.project], [TI.provider, d.provider], [TI.platform, d.platform],
+                                                    [TI.env, d.environment], [TI.release, d.release, true, TI.na]]) {
+        const fila = nodo('div');
+        const dd = valorOMudo(valor, vacio);
+        if (mono && valor) dd.className = 'mono';
+        fila.append(nodo('dt', '', etiqueta), dd);
+        dl.append(fila);
+      }
+      c.append(dl);
+      const k = tarjeta(TI.components);
+      if (d.components && d.components.length) {
+        const ul = nodo('ul', 'infra-lista');
+        d.components.forEach(x => ul.append(nodo('li', '', x)));
+        k.append(ul);
+      } else k.append(nodo('p', 'mudo', TI.none));
+      hijos.push(c, k);
+    } else if (infraSeccion === 'prom') {
+      const p = resumen.prometheus || {state: 'not_configured', metrics: []};
+      const mapa = {operational: [TI.operational, 'ok'], degraded: [TI.degraded, 'aviso'], stale: [TI.stale, 'aviso'],
+                    offline: [TI.offline, 'mal'], not_configured: [TI.none, '']};
+      const [texto, clase] = mapa[p.state] || mapa.not_configured;
+      const c = tarjeta(TI.metrics, insignia(texto, clase));
+      if (p.state === 'not_configured') c.append(nodo('p', 'mudo', TI.noSource));
+      else if (p.state === 'offline') c.append(nodo('p', 'mudo', TI.offlineText));
+      else {
+        if (p.state === 'stale') c.append(nodo('p', 'mudo', TI.staleText));
+        if (p.metrics && p.metrics.length) {
+          const ul = nodo('ul', 'infra-metricas');
+          p.metrics.forEach(m => { const li = nodo('li'); li.append(nodo('span', '', METRICA[m.id] || m.label), nodo('b', '', m.value)); ul.append(li); });
+          c.append(ul);
+        } else c.append(nodo('p', 'mudo', TI.noMetrics));
+      }
+      const lectura = nodo('p', 'infra-lectura', TI.lastRead + ' ');
+      if (p.lastReading) {
+        const t = nodo('time', '', new Date(p.lastReading * 1000).toLocaleTimeString(idioma, {hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false}));
+        t.dateTime = new Date(p.lastReading * 1000).toISOString();
+        lectura.append(t);
+      } else lectura.append(nodo('span', '', TI.noRead));
+      c.append(lectura);
+      const boton = nodo('button', 'infra-accion', cargando ? TI.refreshing : TI.refresh);
+      boton.type = 'button';
+      boton.disabled = cargando;
+      boton.addEventListener('click', () => cargarInfra(true));
+      hijos.push(c, boton);
+    } else {
+      const g = resumen.grafana || {access: 'not_configured'};
+      const c = tarjeta(TI.dash, g.access === 'link' ? insignia(TI.avail, 'ok') : g.access === 'private' ? insignia(TI.priv, 'priv') : insignia(TI.none));
+      if (g.access === 'link' && /^https:\/\//.test(g.url || '')) {
+        const a = nodo('a', 'infra-accion', TI.open);
+        a.href = g.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+        const oculto = nodo('span', '', ' ' + TI.newTab);
+        oculto.style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)';
+        a.append(oculto);
+        c.append(a);
+      } else c.append(nodo('p', 'mudo', g.access === 'private' ? TI.privText : TI.noDash));
+      hijos.push(c);
+    }
+    cuerpoInfra.replaceChildren(...hijos);
+    panelInfra.querySelectorAll('.infra-tab').forEach(b => {
+      if (b.dataset.sec === infraSeccion) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current');
+    });
+  }
+
+  async function cargarInfra(manual = false) {
+    if (cargando || !infraAbierto) return;
+    cargando = manual || !resumen;
+    pintarInfra();
+    const limite = new AbortController();
+    const temporizador = setTimeout(() => limite.abort(), 4000);
+    try {
+      const r = await fetch('/infra/summary.json', {cache: 'no-store', credentials: 'omit', signal: limite.signal});
+      if (r.status === 404) { resumen = null; resumenFallo = 'sin_configurar'; }
+      else if (!r.ok) throw new Error('http');
+      else { resumen = await r.json(); resumenFallo = null; }
+    } catch {
+      // Sin respuesta: nunca se muestra un dato viejo como actual.
+      resumen = null;
+      resumenFallo = 'sin_conexion';
+    } finally { clearTimeout(temporizador); cargando = false; }
+    pintarInfra();
+  }
+
+  const enOverlay = () => matchMedia('(max-width: 999.98px)').matches && !mqVertical.matches;
+  function abrirInfra() {
+    if (infraAbierto) return;
+    cerrar();                                   // el globo del puffle y el panel no comparten espacio
+    infraAbierto = true;
+    panelInfra.inert = false;
+    raiz.classList.add('infra-abierto');
+    botonInfra.setAttribute('aria-expanded', 'true');
+    pintarInfra();
+    cargarInfra();
+    clearInterval(relojInfra);
+    relojInfra = setInterval(() => { if (document.visibilityState !== 'hidden') cargarInfra(); }, 30000);
+    document.getElementById('infra-cerrar').focus({preventScroll: true});
+  }
+  function cerrarInfra() {
+    if (!infraAbierto) return;
+    infraAbierto = false;
+    clearInterval(relojInfra);
+    raiz.classList.remove('infra-abierto');
+    botonInfra.setAttribute('aria-expanded', 'false');
+    // Foco primero al botón (aún visible), luego el panel pasa a inert: el foco nunca queda en un nodo oculto.
+    botonInfra.focus({preventScroll: true});
+    panelInfra.inert = true;
+  }
+  botonInfra.addEventListener('click', () => (infraAbierto ? cerrarInfra() : abrirInfra()));
+  document.getElementById('infra-cerrar').addEventListener('click', cerrarInfra);
+  panelInfra.querySelectorAll('.infra-tab').forEach(b => b.addEventListener('click', () => { infraSeccion = b.dataset.sec; pintarInfra(); }));
+  document.addEventListener('keydown', e => {
+    if (!infraAbierto) return;
+    if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); cerrarInfra(); return; }
+    if (e.key === 'Tab' && enOverlay()) {
+      const items = [...panelInfra.querySelectorAll('button:not([disabled]),a[href]')];
+      if (!items.length) return;
+      const primero = items[0], ultimo = items[items.length - 1];
+      if (e.shiftKey && (document.activeElement === primero || !panelInfra.contains(document.activeElement))) { e.preventDefault(); ultimo.focus(); }
+      else if (!e.shiftKey && (document.activeElement === ultimo || !panelInfra.contains(document.activeElement))) { e.preventDefault(); primero.focus(); }
+    }
+  }, true);
 
   // Enganche heredado del captcha del registro.
   window.grecaptchaSubmit = () => {

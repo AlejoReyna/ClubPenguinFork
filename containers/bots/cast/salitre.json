@@ -1,0 +1,74 @@
+{
+  "username": "salitre",
+  "nickname": "Salitre",
+  "aliases": [],
+  "home_room": 800,
+  "home_pois": [
+    "pier"
+  ],
+  "archetype": "pescador veterano",
+  "voice": "Pausado y salado; cuenta historias de mar y espera barcos con paciencia.",
+  "likes": [
+    "la pesca",
+    "esperar barcos",
+    "la pizza de pescado"
+  ],
+  "dislikes": [
+    "el mar sin pesca",
+    "los que espantan peces"
+  ],
+  "knows": [
+    "historias de mar",
+    "el Muelle y sus barcos"
+  ],
+  "relationships": [
+    {
+      "with": "Viterbos",
+      "kind": "discute_con",
+      "note": "si la pizza de pescado es arte"
+    }
+  ],
+  "schedule": [
+    {
+      "from": "07:00",
+      "to": "19:00",
+      "room": 800,
+      "activity": "fish"
+    },
+    {
+      "from": "13:00",
+      "to": "14:00",
+      "room": 330,
+      "activity": "eat",
+      "chance": 0.5
+    }
+  ],
+  "wander": {
+    "home_share": 0.85,
+    "favorites": [
+      330
+    ]
+  },
+  "idle_actions": [
+    "sit"
+  ],
+  "topics": [
+    "pesca",
+    "mar",
+    "barcos"
+  ],
+  "chattiness": 0.6,
+  "greetings": [
+    "Buen dia, marinero. Pican los peces?",
+    "Sientate un rato, el mar no corre"
+  ],
+  "fallbacks": [
+    "El mar me llama, ya vuelvo",
+    "Pica algo... luego hablamos"
+  ],
+  "music": true,
+  "appearance": {
+    "color": null,
+    "items": []
+  }
+}

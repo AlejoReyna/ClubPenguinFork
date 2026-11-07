@@ -1,46 +1,20 @@
-"""Provider quota persists across restarts, and retries count as real attempts."""
+"""Provider quota persists across restarts, and retries count as real attempts.
+
+The ledger itself (USD caps, priorities, fail-closed, the legacy file) is in
+test_spend.py; this file covers how the manager and the provider client use it.
+"""
 import asyncio
-import json
-from pathlib import Path
 import tempfile
 import unittest
+from pathlib import Path
 
-from bots.budget import RequestBudget
 from bots.config import build_config
 from bots.manager import BotManager
-from bots.metrics import Registry
-from bots.provider import ProviderError
+from bots.metrics import Registry, BotMetrics
+from bots.provider import MoonshotClient, ProviderError
+from bots.spend import SpendLedger
 from support import config_document_world
 from test_provider import FakeKimi
-
-
-class BudgetTests(unittest.TestCase):
-    def test_minute_day_and_restart_limits(self):
-        now = [1800000000.0]
-        with tempfile.TemporaryDirectory() as temp:
-            path = Path(temp) / 'budget.json'
-            budget = RequestBudget(2, 3, path, clock=lambda: now[0])
-            self.assertTrue(budget.reserve())
-            self.assertTrue(budget.reserve())
-            self.assertFalse(budget.reserve())
-            now[0] += 61
-            self.assertTrue(budget.reserve())
-            now[0] += 61
-            self.assertFalse(budget.reserve())
-            restarted = RequestBudget(2, 3, path, clock=lambda: now[0])
-            self.assertFalse(restarted.reserve())
-            self.assertEqual(set(json.loads(path.read_text())), {'day', 'used', 'attempts'})
-            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
-            now[0] += 86400
-            self.assertTrue(restarted.reserve())
-
-    def test_insecure_ledger_is_rejected(self):
-        with tempfile.TemporaryDirectory() as temp:
-            path = Path(temp) / 'budget.json'
-            RequestBudget(path=path).reserve()
-            path.chmod(0o644)
-            with self.assertRaises(ValueError):
-                RequestBudget(path=path)
 
 
 class ManagerProviderTests(unittest.IsolatedAsyncioTestCase):
@@ -60,6 +34,9 @@ class ManagerProviderTests(unittest.IsolatedAsyncioTestCase):
                 await first.provider.complete([{'role': 'user', 'content': 'synthetic'}])
                 self.assertIn('bots_provider_requests_total{result="ok"} 1', registry.render())
                 self.assertIn('bots_provider_prompt_tokens_total', registry.render())
+                # Reconciled with the reply's usage (61 in, 9 out at 0.95/4.00 per million).
+                self.assertIn('bots_spend_usd_micros_total{priority="P0"} 94', registry.render())
+                self.assertIn('bots_spend_cap_ratio', registry.render())
                 restarted = BotManager(config, Registry())
                 with self.assertRaises(ProviderError) as caught:
                     await restarted.provider.complete([{'role': 'user', 'content': 'synthetic'}])
@@ -73,12 +50,58 @@ class ManagerProviderTests(unittest.IsolatedAsyncioTestCase):
         server.responses = [(429, b'{}')]
         await server.start()
         try:
-            from bots.provider import MoonshotClient
+            registry = Registry()
+            ledger = SpendLedger(None, per_minute=2, max_requests_per_day=3)
             client = MoonshotClient(f'http://127.0.0.1:{server.port}/v1', 'only-synthetic',
-                                    retries=3, retry_wait=0.01, budget=RequestBudget(2, 3))
+                                    retries=3, retry_wait=0.01,
+                                    ledger=ledger, metrics=BotMetrics(registry))
             with self.assertRaises(ProviderError) as caught:
                 await client.complete([{'role': 'user', 'content': 'synthetic'}])
             self.assertEqual(caught.exception.kind, 'budget')
             self.assertEqual(len(server.requests), 2)
+            self.assertIn(f'bots_spend_usd_micros_total{{priority="P0"}} {ledger.day_micros}', registry.render())
+            self.assertGreater(ledger.day_micros, 0)
         finally:
             await server.stop()
+
+    async def test_a_ledger_that_cannot_be_saved_sends_nothing(self):
+        server = FakeKimi()
+        await server.start()
+        try:
+            with tempfile.TemporaryDirectory() as temp:
+                ledger = SpendLedger(Path(temp) / 'budget.json')
+
+                def broken():
+                    raise OSError('read-only volume')
+                ledger._persist = broken
+                client = MoonshotClient(f'http://127.0.0.1:{server.port}/v1', 'only-synthetic',
+                                        ledger=ledger)
+                with self.assertRaises(ProviderError) as caught:
+                    await client.complete([{'role': 'user', 'content': 'synthetic'}])
+                self.assertEqual(caught.exception.kind, 'budget_state')
+                self.assertEqual(server.requests, [])
+        finally:
+            await server.stop()
+
+    async def test_local_budget_refusals_are_not_counted_as_provider_errors(self):
+        server = FakeKimi()
+        await server.start()
+        try:
+            registry = Registry()
+            from bots.metrics import BotMetrics
+            client = MoonshotClient(f'http://127.0.0.1:{server.port}/v1', 'only-synthetic',
+                                    metrics=BotMetrics(registry),
+                                    ledger=SpendLedger(None, per_minute=1))
+            await client.complete([{'role': 'user', 'content': 'uno'}])
+            with self.assertRaises(ProviderError):
+                await client.complete([{'role': 'user', 'content': 'dos'}])
+            text = registry.render()
+            self.assertIn('bots_spend_denied_total{reason="rate"} 1', text)
+            self.assertNotIn('bots_provider_errors_total{kind="budget"}', text)
+            self.assertNotIn('result="error"', text)
+        finally:
+            await server.stop()
+
+
+if __name__ == '__main__':
+    unittest.main()

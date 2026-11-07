@@ -21,6 +21,22 @@ web_image_tag = "lab-006"
 # bots_provider_mode = "api"
 # bots_replicas      = 1
 
+# Live penguins: local simulated validation first; owner reviews any real plan.
+world_capacity = "60"
+# bots_image_tag             = "bots-003"
+# bots_provider_mode         = "simulated"
+# bots_cast_enabled          = true
+# bots_dialogue_enabled      = true # local validation first; api spending needs separate authorization
+# bots_life_enabled          = true # Phase 3 local travel/events; confirm BOTS_TZ first
+# bots_recall_enabled        = true # Phase 4 SQLite relationship notes on the budget PVC
+# bots_daily_spend_cap_usd    = 1.00
+# bots_monthly_spend_cap_usd  = 30.00
+# bots_max_concurrent        = 4
+# bots_memory_limit          = "192Mi"
+# bots_cpu_limit             = "250m"
+# bots_timezone              = "UTC" # pending owner choice
+# bots_blocklist_config_map  = "bots-chat-filter"
+
 # State location of infra/cloud (required; deploy.py fills it from deploy.env).
 cloud_state = {
   resource_group_name  = "rg-example-state"

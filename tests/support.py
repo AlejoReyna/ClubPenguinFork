@@ -74,6 +74,9 @@ class FakeWorld:
         self.worlds_connected = []
         self.chats = []
         self.moves = []
+        self.actions = []
+        self.frames = []
+        self.join_errors = {}  # room -> queued error codes
         self.heartbeats = 0
         self.account_ids = {}
         self._player_id = 100
@@ -188,7 +191,19 @@ class FakeWorld:
             fields = raw.split('%')[1:-1]
             action = fields[2] if len(fields) > 2 else ''
             if action == 'j#jr':
+                destination = int(fields[4])
+                errors = self.join_errors.get(destination, [])
+                if errors:
+                    await conn.send_line(f'%xt%e%-1%{errors.pop(0)}%')
+                    continue
+                if room_id is not None:
+                    old = self.rooms.get(room_id, {})
+                    old.pop(player_id, None)
+                    await room_broadcast(old, f'%xt%rp%-1%{player_id}%')
                 room_id = int(fields[4])
+                parts = string.split('|')
+                parts[12:14] = fields[5:7]
+                string = '|'.join(parts)
                 members = self.rooms.setdefault(room_id, {})
                 others = {pid: member for pid, member in members.items()
                           if pid != player_id}
@@ -210,9 +225,23 @@ class FakeWorld:
                 await conn.send_line(f'%xt%grs%-1%{room_id}%{roster}%')
             elif action == 'u#sp':
                 self.moves.append((room_id, fields[4], fields[5]))
+                parts = string.split('|')
+                parts[12:14] = fields[4:6]
+                string = '|'.join(parts)
+                self.rooms[room_id][player_id]['string'] = string
                 asyncio.get_running_loop().create_task(
                     room_broadcast(self.rooms.get(room_id, {}),
                                     f'%xt%sp%-1%{player_id}%{fields[4]}%{fields[5]}%'))
+            elif action == 'u#sa':
+                action_id = fields[4]
+                self.actions.append((room_id, player_id, action_id))
+                asyncio.get_running_loop().create_task(
+                    room_broadcast(self.rooms.get(room_id, {}),
+                                   f'%xt%sa%-1%{player_id}%{action_id}%'))
+            elif action == 'u#sf':
+                self.frames.append((room_id, player_id, fields[4]))
+                await room_broadcast(self.rooms.get(room_id, {}),
+                                     f'%xt%sf%-1%{player_id}%{fields[4]}%')
             elif action == 'u#h':
                 self.heartbeats += 1
                 await conn.send_line('%xt%h%-1%')
