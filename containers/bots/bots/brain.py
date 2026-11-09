@@ -68,7 +68,7 @@ class Brain:
         self.bot = session.bot
         self.rng = rng or random.Random()
         self.output_filter = session.output_filter or safety.OutputFilter()
-        self.maximum = min(54, session.behavior.behavior.max_message_length)
+        self.maximum = min(100, session.behavior.behavior.max_message_length)
         self.memory = session.behavior.memory
 
     def rules(self):
@@ -104,7 +104,8 @@ class Brain:
                 'evento': session.director.events.current.get(session.room_id) if session.director and session.director.events else None,
                 'max_caracteres': self.maximum}
 
-    def messages(self, sender_id, message, *, greeting=False, now=None):
+    def messages(self, sender_id, message, *, greeting=False, now=None, group=False, heard=()):
+        """``group``: the line was aimed at everyone; ``heard``: (nickname, line) already said to it."""
         # The first two messages are byte-for-byte stable across human turns.
         messages = [
             {'role': 'system', 'content': self.rules()},
@@ -118,11 +119,20 @@ class Brain:
             if note:
                 messages.append({'role': 'system', 'content': 'NOTA_DE_RELACION (datos): '
                                  + json.dumps({'resumen': note}, ensure_ascii=False, sort_keys=True)})
-        messages.append({'role': 'user', 'content': json.dumps({
-            'tipo': 'saludo_de_entrada' if greeting else 'mensaje_del_jugador',
+        turn = {
+            'tipo': 'saludo_de_entrada' if greeting else 'mensaje_al_grupo' if group else 'mensaje_del_jugador',
             'nombre': self.session.roster.get(sender_id, 'un jugador')[:30],
             'texto_no_confiable': str(message)[:300],
-        }, ensure_ascii=False, sort_keys=True)})
+        }
+        if heard:
+            # Other penguins' published (already filtered) lines, so this one adds instead of repeating.
+            turn['ya_respondieron'] = [{'nombre': name[:30], 'dijo': line} for name, line in heard]
+            turn['instruccion_de_grupo'] = ('Otros pinguinos ya contestaron. Responde con tu propia voz '
+                                            'y algo distinto; puedes reaccionar a lo que dijeron.')
+        if greeting and getattr(self.bot, 'greeter', False):
+            turn['instruccion_del_puesto'] = ('Acabas de acercarte a quien entro. Saluda en tu personaje y '
+                                              'hazle una pregunta corta sobre lo que quiere pedir.')
+        messages.append({'role': 'user', 'content': json.dumps(turn, ensure_ascii=False, sort_keys=True)})
         return messages
 
     def local_line(self, greeting=False):
@@ -184,7 +194,8 @@ class Brain:
             return False
         return recall.upsert(self.bot.index, sender_id, answer.say)
 
-    async def reply(self, sender_id, message, *, priority=spend.P0, model=True, greeting=False):
+    async def reply(self, sender_id, message, *, priority=spend.P0, model=True, greeting=False,
+                    group=False, heard=()):
         if asks_about_ai(message) and not greeting:
             phrase = f'Si, soy una IA. Aqui soy {self.bot.nickname}.'
             if len(phrase) > self.maximum:
@@ -194,7 +205,8 @@ class Brain:
             return await self.safe(self.local_line(greeting))
         try:
             raw, _usage = await self.session.provider.complete(
-                self.messages(sender_id, message, greeting=greeting), priority=priority)
+                self.messages(sender_id, message, greeting=greeting, group=group, heard=heard),
+                priority=priority)
         except ProviderError:
             await self.session.metrics.fallback_used(self.bot.index)
             return await self.safe(self.local_line(greeting))

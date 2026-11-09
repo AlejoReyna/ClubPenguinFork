@@ -42,11 +42,22 @@ class RecallStore:
 
     def _open(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        if self.path.exists() or self.path.is_symlink():
-            info = self.path.lstat()
-            if (not stat.S_ISREG(info.st_mode) or info.st_mode & 0o077
-                    or info.st_uid != os.getuid()):
+        # Create or open without following symlinks. The mode is explicit because
+        # SQLite would otherwise honour the container umask (0644 in a pod), and
+        # a file that is ours but left open by an earlier start is made private
+        # again instead of crash-looping the service.
+        try:
+            fd = os.open(str(self.path), os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+        except OSError as error:
+            raise ValueError('recall database must be private and not a symlink') from error
+        try:
+            info = os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid():
                 raise ValueError('recall database must be private and not a symlink')
+            if info.st_mode & 0o077:
+                os.fchmod(fd, 0o600)
+        finally:
+            os.close(fd)
         self._conn = sqlite3.connect(str(self.path), check_same_thread=False)
         self._conn.execute('PRAGMA journal_mode=WAL')
         self._conn.execute('PRAGMA synchronous=NORMAL')

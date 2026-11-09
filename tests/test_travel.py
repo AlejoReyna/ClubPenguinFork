@@ -280,6 +280,7 @@ class TravelTests(unittest.IsolatedAsyncioTestCase):
     async def test_follow_in_room_uses_only_a_measured_segment(self):
         manager, travel, _now = await self.make()
         session = manager.sessions[0]
+        session.behavior.behavior.personal_space = 0  # original walk: straight onto the player
         travel.offer(session, 'follow', 999)
         life = session.behavior.life
         self.assertEqual(life.target(), (350, 250))

@@ -34,6 +34,7 @@ SPEND_LEDGER_OK = 'bots_spend_ledger_ok'
 OUTPUT_FILTERED = 'bots_output_filtered_total'
 BOTS_IN_ROOM = 'bots_in_room'
 BOTS_PLANNED = 'bots_planned'
+BOTS_OVERLAPPING = 'bots_overlapping_pairs'
 BOTS_TRAVEL = 'bots_travel_total'
 TRAVEL_DENIED = 'bots_travel_denied_total'
 
@@ -72,6 +73,7 @@ HELP_TEXTS = {
     OUTPUT_FILTERED: 'Model replies replaced by a local line, by bounded filter reason',
     BOTS_IN_ROOM: 'Bot sessions currently inside each room',
     BOTS_PLANNED: 'Bot sessions whose home is each room',
+    BOTS_OVERLAPPING: 'Pairs with at least one bot standing closer than 45 px, per room',
     BOTS_TRAVEL: 'Room changes attempted mid-session, by result',
     TRAVEL_DENIED: 'Local travel refusals by bounded policy reason',
 }
@@ -88,7 +90,8 @@ _STANDARD_SERIES = (
     (PROVIDER_PROMPT_TOKENS, 'counter'), (PROVIDER_COMPLETION_TOKENS, 'counter'),
     (BOTS_REPLIES, 'counter'), (SPEND_MICROS, 'counter'), (SPEND_RATIO, 'gauge'),
     (SPEND_DENIED, 'counter'), (SPEND_LEDGER_OK, 'gauge'), (OUTPUT_FILTERED, 'counter'),
-    (BOTS_IN_ROOM, 'gauge'), (BOTS_PLANNED, 'gauge'), (BOTS_TRAVEL, 'counter'),
+    (BOTS_IN_ROOM, 'gauge'), (BOTS_PLANNED, 'gauge'), (BOTS_OVERLAPPING, 'gauge'),
+    (BOTS_TRAVEL, 'counter'),
     (TRAVEL_DENIED, 'counter'),
 )
 

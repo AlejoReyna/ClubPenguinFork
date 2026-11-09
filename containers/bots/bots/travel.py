@@ -279,6 +279,11 @@ class Travel:
                     human = ticket.requester if ticket.kind in ('invitation', 'follow') else None
                     ready = human is None or self.world.human_room(human) == ticket.target
                     self.leases[session.index] = Lease(expiry, human, None if ready else self.clock(), ready)
+                if life:
+                    try:
+                        await life.settle()  # walk in off the shared entry point, like a player
+                    except (as2.Disconnected, OSError):
+                        pass  # the session loop reconnects; the room change itself succeeded
                 return True
         except TravelDenied as error:
             await session.metrics.travel_denied(error.reason)

@@ -35,6 +35,12 @@ LABEL_ACTIVITIES = frozenset({
 })
 ACTIVITIES = frozenset(BODY_ACTIVITY) | LABEL_ACTIVITIES
 
+# Label activities that are done on the move: the chance, at each life step, that a
+# body with no post for the activity in this room walks to a new spot instead of
+# standing still for the whole schedule block (often hours). Post-bound labels
+# (work, fish, perform, eat) are absent and keep the body at its post.
+ROAMING = {'patrol': 0.8, 'play': 0.7, 'sled': 0.7, 'train': 0.5, 'watch': 0.2}
+
 # Points of interest a card may name as a home. A measured room defines the
 # ones it really has; an unmeasured room has none (the bot holds one post).
 KNOWN_POIS = frozenset({

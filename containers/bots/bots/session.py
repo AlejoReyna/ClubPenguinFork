@@ -366,6 +366,9 @@ class BotSession:
         self._require_conn()
         async with self.mutations_lock:
             await self.conn.send_move(x, y)
+        if self.world is not None and self.room_id is not None and self.player_id is not None:
+            # Our destination before the server echoes it, so two bots never pick the same free spot.
+            self.world.member_moved(self.room_id, self.player_id, x, y)
 
     async def send_action(self, action):
         self._require_conn()

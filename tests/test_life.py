@@ -70,6 +70,23 @@ class LifeTests(unittest.IsolatedAsyncioTestCase):
         life.session.send_move.assert_not_awaited()
         self.assertEqual(life.position, load_catalog().require(320).spawn)
 
+    async def test_approximate_walk_is_opt_in_and_stays_in_the_labelled_rectangle(self):
+        from types import SimpleNamespace
+        life = life_for('bruma')
+        life.activity = 'walk'
+        room = load_catalog().require(320)
+        self.assertFalse(room.measured)
+        self.assertTrue(room.approx_walk)
+        self.assertIsNone(life.target())  # default: unmeasured rooms hold their post
+        life.session.travel = SimpleNamespace(settings=SimpleNamespace(approximate_walk=1, walk_weight=1),
+                                              leases={})
+        life.session.room_id = 320
+        for _ in range(50):
+            point = life.target()
+            self.assertIsNotNone(point)
+            self.assertTrue(any(rect.contains(*point) for rect in room.approx_walk))
+        self.assertFalse(room.measured)
+
     async def test_dance_uses_the_verified_frame_after_a_safe_walk(self):
         life = life_for()
         life.clock = lambda: dt.datetime(2026, 11, 5, 20, tzinfo=dt.timezone.utc)
