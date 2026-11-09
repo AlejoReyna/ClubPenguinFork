@@ -48,8 +48,8 @@ def bodies(usernames, personal=55.0, approximate=1, walk_weight=4, seed=7):
         session.send_move = AsyncMock(side_effect=move)
         lives.append(Life(session))
     for room in {life.session.room_id for life in lives}:
-        world.snapshot(room, [record(l.session.player_id, l.bot.nickname, *l.position)
-                              for l in lives if l.session.room_id == room])
+        world.snapshot(room, [record(bot.session.player_id, bot.bot.nickname, *bot.position)
+                              for bot in lives if bot.session.room_id == room])
     return config, world, lives
 
 

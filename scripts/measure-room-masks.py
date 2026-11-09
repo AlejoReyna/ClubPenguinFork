@@ -109,13 +109,17 @@ def grow_from(point, floor):
     while grew:
         grew = False
         if c0 > 0 and all(floor[rr][c0 - 1] for rr in range(r0, r1 + 1)):
-            c0 -= 1; grew = True
+            c0 -= 1
+            grew = True
         if c1 < cols - 1 and all(floor[rr][c1 + 1] for rr in range(r0, r1 + 1)):
-            c1 += 1; grew = True
+            c1 += 1
+            grew = True
         if r0 > 0 and all(floor[r0 - 1][cc] for cc in range(c0, c1 + 1)):
-            r0 -= 1; grew = True
+            r0 -= 1
+            grew = True
         if r1 < rows - 1 and all(floor[r1 + 1][cc] for cc in range(c0, c1 + 1)):
-            r1 += 1; grew = True
+            r1 += 1
+            grew = True
     return c0, c1, r0, r1
 
 
