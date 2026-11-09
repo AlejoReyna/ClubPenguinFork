@@ -15,6 +15,7 @@ Host and user come from --host/--user or private configuration (CP_PI_HOST,
 CP_PI_USER); the committed repository holds only anonymized examples.
 """
 import argparse
+import hashlib
 import json
 import subprocess
 import sys
@@ -27,6 +28,21 @@ LOCAL_PORT = 16443
 EXPECTED_SERVER = f'https://127.0.0.1:{LOCAL_PORT}'
 root = Path(__file__).resolve().parents[1]
 private = root / '.local'
+# A Unix socket path must fit in sun_path (104 bytes on macOS, 108 on Linux), and ssh appends
+# 17 random characters to ControlPath while it binds. A deeply nested checkout, such as a CI
+# runner's workspace, overflows that, so fall back to a short per-checkout directory under $HOME.
+SOCKET_BUDGET = 80
+
+
+def control_path(base=None, home=None):
+    base = Path(base or private)
+    candidate = base / 'pi-ssh.sock'
+    if len(str(candidate)) <= SOCKET_BUDGET:
+        return str(candidate)
+    digest = hashlib.sha256(str(base).encode()).hexdigest()[:10]
+    short = Path(home or Path.home()) / '.cp-ssh'
+    short.mkdir(mode=0o700, exist_ok=True)
+    return str(short / f'{digest}.sock')
 
 
 def ssh_base(control, ssh_config):
@@ -105,7 +121,7 @@ def main():
         raise SystemExit(0 if ok else 1)
 
     private.mkdir(mode=0o700, exist_ok=True)
-    control = str(private / 'pi-ssh.sock')
+    control = control_path()
     destination = f'{user}@{host}'
     base = ssh_base(control, ssh_config)
     check = subprocess.run(base + ['-O', 'check', destination], capture_output=True)
