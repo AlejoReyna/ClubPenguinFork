@@ -4,8 +4,9 @@ import datetime as dt
 import json
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from bots.provider import ProviderError
 
@@ -33,14 +34,19 @@ class DirectorTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_all_observers_of_a_frame_produce_one_reply_and_no_echo_loop(self):
         manager, provider, director = await self.make()
-        await asyncio.gather(*(s.behavior.on_chat(999, 'Lola y Tito, hola') for s in manager.sessions))
+        await asyncio.gather(*(s.behavior.on_chat(999, 'Lola, hola') for s in manager.sessions))
         await drain(director)
         self.assertEqual([name for name, _line in sent(manager)], ['lolaritmo'])
         self.assertEqual(len(provider.calls), 1)
+        # Two names in one frame: one reply per named penguin, not one per observer.
+        await asyncio.gather(*(s.behavior.on_chat(999, 'Lola y Tito, que tal') for s in manager.sessions))
+        await drain(director)
+        self.assertEqual([name for name, _line in sent(manager)], ['lolaritmo', 'lolaritmo', 'titogroove'])
+        self.assertEqual(len(provider.calls), 3)
         for session in manager.sessions:
             await session.behavior.on_chat(manager.sessions[0].player_id, 'Tito hola')
         await drain(director)
-        self.assertEqual(len(provider.calls), 1)
+        self.assertEqual(len(provider.calls), 3)
 
     async def test_topic_then_distance_then_continuity_and_expiry(self):
         manager, _provider, director = await self.make()
@@ -183,6 +189,34 @@ class DirectorTests(unittest.IsolatedAsyncioTestCase):
         await drain(director)
         self.assertEqual(provider.calls[-1][1], 'P0')
 
+    async def test_host_walks_up_to_the_newcomer_greets_with_the_model_and_returns_to_its_post(self):
+        manager, provider, director = await self.make(greeting_chance=0, greeting_delay_min=0, greeting_delay_max=0)
+        host = manager.sessions[0]
+        host.bot.greeter = True
+        host.send_move = AsyncMock()
+        manager.world.member_added(120, record(998, 'Nuevo', 340, 250))
+        director.host_settle, director.host_walk_cap, director.host_idle, director.host_poll = (0, 0), 0, 0.05, 0.02
+        director.member_added(120, 998)
+        await wait_until(lambda: len(sent(manager)) == 1)
+        await drain(director)
+        self.assertEqual(sent(manager)[0][0], host.bot.username)
+        self.assertEqual(provider.calls[0][1], 'P1')  # greeting goes through the model
+        host.send_move.assert_awaited()
+        x, y = host.send_move.await_args_list[0].args
+        room = manager.config.catalog.require(120)
+        self.assertTrue(any(rect.contains(x, y) for rect in room.wander_rects(approximate=True)))
+        self.assertLessEqual(((x - 340) ** 2 + (y - 250) ** 2) ** .5, 60)
+        await wait_until(lambda: host.send_move.await_count == 2)  # back to the post
+        self.assertEqual(host.send_move.await_args_list[-1].args, tuple(host.bot.spawn))
+
+    async def test_greeter_instruction_only_reaches_a_host(self):
+        manager, _provider, director = await self.make()
+        brain = director.brains[0]
+        plain = json.dumps(brain.messages(999, '', greeting=True), ensure_ascii=False)
+        self.assertNotIn('instruccion_del_puesto', plain)
+        manager.sessions[0].bot.greeter = True
+        self.assertIn('instruccion_del_puesto', json.dumps(brain.messages(999, '', greeting=True), ensure_ascii=False))
+
     async def test_scene_is_one_p2_call_for_two_or_three_validated_lines(self):
         def scene(messages, priority):
             cast = json.loads(messages[1]['content'].split(': ', 1)[1])
@@ -262,3 +296,119 @@ class DirectorTests(unittest.IsolatedAsyncioTestCase):
             await drain(director)
             self.assertIsNone(manager.recall.get(observer.index, 999))
             self.assertIn('borre', sent(manager)[-1][1].lower())
+
+
+def numbered(messages, priority):
+    """A distinct model line per call, so each voice can be told apart."""
+    numbered.count += 1
+    return json.dumps({'say': f'linea {numbered.count}', 'do': None})
+
+
+class GroupChatTests(unittest.IsolatedAsyncioTestCase):
+    async def make(self, provider=None, **kwargs):
+        numbered.count = 0
+        provider = provider or FakeVoice([numbered])
+        manager = fixture(provider=provider, **kwargs)
+        self.addAsyncCleanup(manager.close)
+        self.said = []  # every room line in the order it was sent
+        for session in manager.sessions:
+            session.send_chat.side_effect = (
+                lambda _id, line, name=session.bot.username: self.said.append((name, line)))
+        return manager, provider, manager.director
+
+    def test_group_lines_are_told_apart_from_lines_for_one_penguin(self):
+        from bots.director import addresses_group
+        for line in ('que hacen', 'hola chicos!', 'alguien quiere jugar?', '¿Cómo están?',
+                     'y ustedes?', 'que haceis', 'hola a todos', 'que onda gente'):
+            self.assertTrue(addresses_group(line), line)
+        for line in ('que haces', 'como estas?', 'hola', 'bonito paisaje', 'como va?', 'Lola, bailas?'):
+            self.assertFalse(addresses_group(line), line)
+
+    async def test_a_question_to_the_group_gets_several_voices_that_hear_each_other(self):
+        manager, provider, director = await self.make()
+        await director.on_chat(manager.sessions[0], 999, 'que hacen')
+        await drain(director)
+        # Nearest first (Mambo 10 px, Tito 30 px, Lola 50 px), each with its own line.
+        self.assertEqual(self.said, [('mambo', 'linea 1'), ('titogroove', 'linea 2'),
+                                         ('lolaritmo', 'linea 3')])
+        self.assertEqual([priority for _messages, priority in provider.calls], ['P0', 'P1', 'P1'])
+        turns = [json.loads(messages[-1]['content']) for messages, _priority in provider.calls]
+        self.assertEqual({turn['tipo'] for turn in turns}, {'mensaje_al_grupo'})
+        self.assertNotIn('ya_respondieron', turns[0])
+        mambo = manager.sessions[2].bot.nickname
+        self.assertEqual(turns[1]['ya_respondieron'], [{'nombre': mambo, 'dijo': 'linea 1'}])
+        self.assertEqual(len(turns[2]['ya_respondieron']), 2)
+        # Every voice remembers its own exchange; only the lead keeps the conversation.
+        for index in range(3):
+            self.assertEqual(len(director.brains[index].memory.context(999)), 2)
+        self.assertEqual(director.continuity[(120, 999)][0], 2)
+        self.assertEqual([s.bot.username for s in director.responders(120, 999, 'jaja')], ['mambo'])
+
+    async def test_group_max_caps_voices_and_a_second_voice_can_chime_in(self):
+        manager, _provider, director = await self.make(group_max=2)
+        await director.on_chat(manager.sessions[0], 999, 'hola chicos')
+        await drain(director)
+        self.assertEqual([name for name, _line in self.said], ['mambo', 'titogroove'])
+        director.continuity.clear()
+        director.settings.chime_chance = 1
+        self.assertEqual([s.bot.username for s in director.responders(120, 999, 'bonito paisaje')],
+                         ['mambo', 'titogroove'])
+        director.settings.group_max = 1
+        self.assertEqual(len(director.responders(120, 999, 'bonito paisaje')), 1)
+        self.assertEqual(len(director.responders(120, 999, 'que hacen')), 1)
+        self.assertEqual(len(director.responders(120, 999, 'Lola y Tito, hola')), 1)
+
+    async def test_each_penguin_decides_on_its_own_and_the_partner_goes_first(self):
+        manager, _provider, director = await self.make(group_chance=0.5, question_chance=0.25,
+                                                       other_chance=0.25)
+        rolls = iter([0.9, 0.1, 0.1])  # Mambo passes, Tito and Lola answer
+        director.rng = SimpleNamespace(random=lambda: next(rolls))
+        self.assertEqual([s.bot.username for s in director.responders(120, 999, 'que hacen')],
+                         ['titogroove', 'lolaritmo'])
+        director.continuity[(120, 999)] = (0, director.clock())  # already talking with Lola
+        director.rng = SimpleNamespace(random=lambda: 0.1)
+        self.assertEqual([s.bot.username for s in director.responders(120, 999, 'que hacen')],
+                         ['lolaritmo', 'mambo', 'titogroove'])
+        # Not aimed at the group: the partner answers alone.
+        self.assertEqual([s.bot.username for s in director.responders(120, 999, 'jaja')], ['lolaritmo'])
+
+    async def test_a_newer_line_makes_waiting_voices_stand_down(self):
+        provider = FakeVoice([numbered], blocked=True)
+        manager, _provider, director = await self.make(provider=provider)
+        await director.on_chat(manager.sessions[0], 999, 'que hacen')
+        await asyncio.wait_for(provider.entered.wait(), 1)
+        await director.on_chat(manager.sessions[0], 999, 'Mambo, y tu?')
+        provider.release.set()
+        await drain(director)
+        self.assertEqual([name for name, _line in self.said], ['mambo', 'mambo'])
+        self.assertEqual(len(provider.calls), 2)
+
+    async def test_extra_voices_stay_quiet_instead_of_using_a_canned_line(self):
+        provider = FakeVoice([json.dumps({'say': 'Mirando nubes', 'do': None}), ProviderError('http_5xx'),
+                              json.dumps({'say': 'Yo tambien', 'do': 'go:330'})])
+        manager, _provider, director = await self.make(provider=provider)
+        await director.on_chat(manager.sessions[0], 999, 'que hacen')
+        await drain(director)
+        self.assertEqual(self.said, [('mambo', 'Mirando nubes'), ('lolaritmo', 'Yo tambien')])
+        # The failed voice gave its player-quota slot back; nobody travels on a chorus line.
+        self.assertEqual(director.daily[999], 2)
+        self.assertEqual(manager.sessions[0].send_frame.await_count + manager.sessions[0].send_action.await_count, 0)
+
+    async def test_ai_question_to_the_group_is_answered_honestly_by_each_voice(self):
+        manager, provider, director = await self.make()
+        await director.on_chat(manager.sessions[0], 999, 'ustedes son bots?')
+        await drain(director)
+        self.assertEqual(len(self.said), 3)
+        self.assertTrue(all('IA' in line for _name, line in self.said))
+        self.assertEqual(provider.calls, [])
+
+    def test_group_settings_are_validated(self):
+        from bots.config import build_config, ConfigError
+
+        def build(**dialogue):
+            return build_config({'bots': [{'username': 'nevado', 'password': 'synthetic'}],
+                                 'dialogue': dialogue}, {})
+        self.assertEqual((build().dialogue.group_max, build().dialogue.chime_chance), (3, 0.15))
+        for dialogue in ({'group_max': 0}, {'group_max': 1.5}, {'group_chance': 1.2}, {'chime_chance': 2}):
+            with self.assertRaises(ConfigError):
+                build(**dialogue)

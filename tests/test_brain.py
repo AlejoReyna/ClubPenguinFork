@@ -50,9 +50,13 @@ class FakeVoice:
 
 
 def fixture(usernames=('lolaritmo', 'titogroove', 'mambo'), provider=None, life=None, recall=None, **dialogue):
+    # Deterministic voice: every message is answered at once (attention and typing off);
+    # unnamed chat that is not aimed at the group never draws a random second voice.
     settings = dict(enabled=True, greeting_chance=0, hello_chance=1, question_chance=1,
-                    other_chance=1, room_gap=0, line_delay_min=0, line_delay_max=0,
-                    scene_min_delay=3600, scene_max_delay=3600)
+                    other_chance=1, group_chance=1, chime_chance=0,
+                    room_gap=0, line_delay_min=0, line_delay_max=0,
+                    scene_min_delay=3600, scene_max_delay=3600, hearing_radius=0,
+                    chattiness_weight=0, typing_cps=0)
     settings.update(dialogue)
     document = {'bots': [{'username': name, 'password': 'synthetic-only'} for name in usernames],
                 'dialogue': settings,

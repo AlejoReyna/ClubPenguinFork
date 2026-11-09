@@ -22,7 +22,7 @@ from . import actions
 SCENE_WIDTH, SCENE_HEIGHT = 1520, 960
 DATA_PATH = Path(__file__).resolve().parent / 'data' / 'rooms.json'
 _ROOM_KEYS = {'name', 'swf', 'measured', 'source', 'client_checked', 'spawn', 'spawn_source',
-              'walk', 'pois', 'exits', 'bot_cap'}
+              'walk', 'pois', 'exits', 'bot_cap', 'approx_walk', 'approx_source'}
 
 
 class RoomError(ValueError):
@@ -73,7 +73,7 @@ class Poi:
 
 class Room:
     def __init__(self, room_id, name, swf, measured, source, client_checked, spawn,
-                 spawn_source, walk, pois, exits, bot_cap):
+                 spawn_source, walk, pois, exits, bot_cap, approx_walk=(), approx_source=''):
         self.id = room_id
         self.name = name
         self.swf = swf
@@ -86,10 +86,20 @@ class Room:
         self.pois = dict(pois)          # name -> Poi
         self.exits = tuple(exits)
         self.bot_cap = bot_cap
+        # Unverified, spawn-centred rectangles for an UNMEASURED room. They are an explicit,
+        # labelled approximation (a bot may stand on a wall); they never make a room measured.
+        self.approx_walk = tuple(approx_walk)
+        self.approx_source = approx_source
+
+    def wander_rects(self, approximate=False):
+        """Rectangles a bot may roam: the measured floor, else (opt-in) the labelled approximation."""
+        if self.measured:
+            return self.walk
+        return self.approx_walk if approximate else ()
 
     def allows(self, x, y):
         """True only for a point the catalog vouches for (never a guess)."""
-        if any(rect.contains(x, y) for rect in self.walk):
+        if any(rect.contains(x, y) for rect in self.wander_rects(approximate=True)):
             return True
         if any(poi.rect.contains(x, y) for poi in self.pois.values()):
             return True
@@ -212,13 +222,18 @@ def _parse_room(room_id, raw):
     spawn = _point(raw['spawn'], f'{where}.spawn') if raw.get('spawn') is not None else None
     spawn_source = _text(raw, 'spawn_source', where, required=spawn is not None)
 
+    approx_walk = [_rect(item, f'{where}.approx_walk[{i}]', point_ok=False)
+                   for i, item in enumerate(raw.get('approx_walk') or [])]
+    approx_source = _text(raw, 'approx_source', where, required=bool(approx_walk))
     if not measured:
-        # The no-guessing rule, enforced: nothing walkable without a measurement.
+        # The no-guessing rule, enforced: nothing measured-walkable without a measurement.
         if walk or pois_raw:
             raise RoomError(f'{where}: an unmeasured room cannot carry walk rectangles or points of interest')
         if client_checked:
             raise RoomError(f'{where}: an unmeasured room cannot be client-checked')
     else:
+        if approx_walk:
+            raise RoomError(f'{where}: a measured room must not carry approx_walk')
         if not walk:
             raise RoomError(f'{where}: a measured room needs at least one walk rectangle')
         if spawn is None:
@@ -243,11 +258,14 @@ def _parse_room(room_id, raw):
 
     room = Room(room_id, _text(raw, 'name', where), _text(raw, 'swf', where), measured, source,
                 client_checked, spawn, spawn_source, walk, pois,
-                _parse_exits(raw.get('exits') or [], where), _int(raw.get('bot_cap', 3), f'{where}.bot_cap'))
+                _parse_exits(raw.get('exits') or [], where), _int(raw.get('bot_cap', 3), f'{where}.bot_cap'),
+                approx_walk, approx_source)
     if room.bot_cap < 1:
         raise RoomError(f'{where}: bot_cap must be at least 1')
     if measured and not any(rect.contains(*spawn) for rect in list(walk) + [p.rect for p in pois.values()]):
         raise RoomError(f'{where}: the spawn is not inside a walk rectangle or a point of interest')
+    if approx_walk and spawn is not None and not any(rect.contains(*spawn) for rect in approx_walk):
+        raise RoomError(f'{where}: the spawn is not inside an approx_walk rectangle')
     if not measured and room.exits:
         raise RoomError(f'{where}: exits require measurement')
     return room

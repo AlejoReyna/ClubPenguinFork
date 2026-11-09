@@ -19,7 +19,34 @@
       "spawn_source": "start_x/start_y in the room SWF frame script (designer value), read with FFDec 26.4.0",
       "walk": [],
       "pois": {},
-      "exits": []
+      "exits": [],
+      "approx_walk": [
+        {
+          "min_x": 256,
+          "max_x": 519,
+          "min_y": 244,
+          "max_y": 451
+        },
+        {
+          "min_x": 520,
+          "max_x": 655,
+          "min_y": 312,
+          "max_y": 395
+        },
+        {
+          "min_x": 152,
+          "max_x": 255,
+          "min_y": 296,
+          "max_y": 387
+        },
+        {
+          "min_x": 292,
+          "max_x": 527,
+          "min_y": 452,
+          "max_y": 479
+        }
+      ],
+      "approx_source": "Derived from the room SWF block_mc mask (FFDec 26.4.0, scripts/measure-room-masks.py): largest all-floor rectangles inset 12 px. NOT verified in Ruffle, so the room stays unmeasured for POIs and exits."
     },
     "110": {
       "name": "Coffee Shop",
@@ -66,7 +93,22 @@
       "spawn_source": "start_x/start_y in the room SWF frame script (designer value), read with FFDec 26.4.0",
       "walk": [],
       "pois": {},
-      "exits": []
+      "exits": [],
+      "approx_walk": [
+        {
+          "min_x": 204,
+          "max_x": 675,
+          "min_y": 268,
+          "max_y": 403
+        },
+        {
+          "min_x": 260,
+          "max_x": 511,
+          "min_y": 188,
+          "max_y": 267
+        }
+      ],
+      "approx_source": "Derived from the room SWF block_mc mask (FFDec 26.4.0, scripts/measure-room-masks.py): largest all-floor rectangles inset 12 px. NOT verified in Ruffle, so the room stays unmeasured for POIs and exits."
     },
     "120": {
       "name": "Night Club",
@@ -121,7 +163,22 @@
       "spawn_source": "start_x/start_y in the room SWF frame script (designer value), read with FFDec 26.4.0",
       "walk": [],
       "pois": {},
-      "exits": []
+      "exits": [],
+      "approx_walk": [
+        {
+          "min_x": 100,
+          "max_x": 691,
+          "min_y": 292,
+          "max_y": 387
+        },
+        {
+          "min_x": 184,
+          "max_x": 463,
+          "min_y": 236,
+          "max_y": 291
+        }
+      ],
+      "approx_source": "Derived from the room SWF block_mc mask (FFDec 26.4.0, scripts/measure-room-masks.py): largest all-floor rectangles inset 12 px. NOT verified in Ruffle, so the room stays unmeasured for POIs and exits."
     },
     "230": {
       "name": "Ski Hill",
@@ -137,7 +194,22 @@
       "spawn_source": "start_x/start_y in the room SWF frame script (designer value), read with FFDec 26.4.0",
       "walk": [],
       "pois": {},
-      "exits": []
+      "exits": [],
+      "approx_walk": [
+        {
+          "min_x": 288,
+          "max_x": 523,
+          "min_y": 160,
+          "max_y": 347
+        },
+        {
+          "min_x": 180,
+          "max_x": 287,
+          "min_y": 196,
+          "max_y": 295
+        }
+      ],
+      "approx_source": "Derived from the room SWF block_mc mask (FFDec 26.4.0, scripts/measure-room-masks.py): largest all-floor rectangles inset 12 px. NOT verified in Ruffle, so the room stays unmeasured for POIs and exits."
     },
     "300": {
       "name": "The Plaza",
@@ -153,7 +225,22 @@
       "spawn_source": "start_x/start_y in the room SWF frame script (designer value), read with FFDec 26.4.0",
       "walk": [],
       "pois": {},
-      "exits": []
+      "exits": [],
+      "approx_walk": [
+        {
+          "min_x": 132,
+          "max_x": 567,
+          "min_y": 280,
+          "max_y": 479
+        },
+        {
+          "min_x": 568,
+          "max_x": 671,
+          "min_y": 284,
+          "max_y": 395
+        }
+      ],
+      "approx_source": "Derived from the room SWF block_mc mask (FFDec 26.4.0, scripts/measure-room-masks.py): largest all-floor rectangles inset 12 px. NOT verified in Ruffle, so the room stays unmeasured for POIs and exits."
     },
     "310": {
       "name": "Pet Shop",
@@ -169,7 +256,22 @@
       "spawn_source": "start_x/start_y in the room SWF frame script (designer value), read with FFDec 26.4.0",
       "walk": [],
       "pois": {},
-      "exits": []
+      "exits": [],
+      "approx_walk": [
+        {
+          "min_x": 120,
+          "max_x": 719,
+          "min_y": 288,
+          "max_y": 479
+        },
+        {
+          "min_x": 348,
+          "max_x": 475,
+          "min_y": 200,
+          "max_y": 479
+        }
+      ],
+      "approx_source": "Derived from the room SWF block_mc mask (FFDec 26.4.0, scripts/measure-room-masks.py): largest all-floor rectangles inset 12 px. NOT verified in Ruffle, so the room stays unmeasured for POIs and exits."
     },
     "320": {
       "name": "The Dojo",
@@ -185,7 +287,28 @@
       "spawn_source": "start_x/start_y in the room SWF frame script (designer value), read with FFDec 26.4.0",
       "walk": [],
       "pois": {},
-      "exits": []
+      "exits": [],
+      "approx_walk": [
+        {
+          "min_x": 136,
+          "max_x": 455,
+          "min_y": 300,
+          "max_y": 339
+        },
+        {
+          "min_x": 456,
+          "max_x": 687,
+          "min_y": 328,
+          "max_y": 339
+        },
+        {
+          "min_x": 124,
+          "max_x": 467,
+          "min_y": 288,
+          "max_y": 351
+        }
+      ],
+      "approx_source": "Derived from the room SWF block_mc mask (FFDec 26.4.0, scripts/measure-room-masks.py): largest all-floor rectangles inset 12 px. NOT verified in Ruffle, so the room stays unmeasured for POIs and exits."
     },
     "330": {
       "name": "Pizza Parlor",
@@ -193,7 +316,7 @@
       "bot_cap": 4,
       "measured": true,
       "client_checked": true,
-      "source": "block_mc of pizza.swf exported with FFDec and the zone checked in Ruffle with a penguin at every corner and the centre, 2026-11-04 (docs/bots.md \"Zonas medidas\"; scripts/bot_accounts.py MEASURED_WORK_AREAS)",
+      "source": "block_mc of pizza.swf exported with FFDec and the zone checked in Ruffle with a penguin at every corner and the centre, 2026-11-04 (docs/bots.md \"Zonas medidas\"; scripts/bot_accounts.py MEASURED_WORK_AREAS) Floor widened on 2026-11-06 to the block_mc mask rectangles (scripts/measure-room-masks.py); the oven side is now reachable.",
       "spawn": {
         "x": 400,
         "y": 278
@@ -201,10 +324,10 @@
       "spawn_source": "start_x/start_y of pizza.swf (400,278); it lies inside the measured zone",
       "walk": [
         {
-          "min_x": 365,
-          "max_x": 430,
-          "min_y": 258,
-          "max_y": 290
+          "min_x": 132,
+          "max_x": 759,
+          "min_y": 236,
+          "max_y": 479
         }
       ],
       "pois": {
@@ -232,7 +355,16 @@
       "spawn_source": "start_x/start_y in the room SWF frame script (designer value), read with FFDec 26.4.0",
       "walk": [],
       "pois": {},
-      "exits": []
+      "exits": [],
+      "approx_walk": [
+        {
+          "min_x": 30,
+          "max_x": 340,
+          "min_y": 280,
+          "max_y": 400
+        }
+      ],
+      "approx_source": "APPROXIMATE, NOT MEASURED: stage.swf places block_mc at (373,234) and covers only part of the room, so a 310x120 rectangle around the designer spawn is used; a bot may stand on a wall (cosmetic only)."
     },
     "800": {
       "name": "The Dock",
@@ -248,7 +380,28 @@
       "spawn_source": "start_x/start_y in the room SWF frame script (designer value), read with FFDec 26.4.0",
       "walk": [],
       "pois": {},
-      "exits": []
+      "exits": [],
+      "approx_walk": [
+        {
+          "min_x": 296,
+          "max_x": 643,
+          "min_y": 148,
+          "max_y": 383
+        },
+        {
+          "min_x": 116,
+          "max_x": 295,
+          "min_y": 184,
+          "max_y": 315
+        },
+        {
+          "min_x": 252,
+          "max_x": 543,
+          "min_y": 100,
+          "max_y": 147
+        }
+      ],
+      "approx_source": "Derived from the room SWF block_mc mask (FFDec 26.4.0, scripts/measure-room-masks.py): largest all-floor rectangles inset 12 px. NOT verified in Ruffle, so the room stays unmeasured for POIs and exits."
     },
     "801": {
       "name": "Snow Forts",
@@ -264,7 +417,22 @@
       "spawn_source": "start_x/start_y in the room SWF frame script (designer value), read with FFDec 26.4.0",
       "walk": [],
       "pois": {},
-      "exits": []
+      "exits": [],
+      "approx_walk": [
+        {
+          "min_x": 140,
+          "max_x": 759,
+          "min_y": 256,
+          "max_y": 439
+        },
+        {
+          "min_x": 244,
+          "max_x": 639,
+          "min_y": 204,
+          "max_y": 255
+        }
+      ],
+      "approx_source": "Derived from the room SWF block_mc mask (FFDec 26.4.0, scripts/measure-room-masks.py): largest all-floor rectangles inset 12 px. NOT verified in Ruffle, so the room stays unmeasured for POIs and exits."
     },
     "802": {
       "name": "Ice Rink",
@@ -280,7 +448,22 @@
       "spawn_source": "start_x/start_y in the room SWF frame script (designer value), read with FFDec 26.4.0",
       "walk": [],
       "pois": {},
-      "exits": []
+      "exits": [],
+      "approx_walk": [
+        {
+          "min_x": 188,
+          "max_x": 599,
+          "min_y": 180,
+          "max_y": 367
+        },
+        {
+          "min_x": 188,
+          "max_x": 403,
+          "min_y": 100,
+          "max_y": 179
+        }
+      ],
+      "approx_source": "Derived from the room SWF block_mc mask (FFDec 26.4.0, scripts/measure-room-masks.py): largest all-floor rectangles inset 12 px. NOT verified in Ruffle, so the room stays unmeasured for POIs and exits."
     }
   }
 }

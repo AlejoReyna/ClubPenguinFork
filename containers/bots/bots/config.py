@@ -92,7 +92,8 @@ class BehaviorConfig:
     def __init__(self, walk_min_delay, walk_max_delay, first_move_delay_min,
                  first_move_delay_max, max_message_length, respond_to_bots,
                  bot_chat_interval, bot_exchange_limit, life_min_delay=20.0,
-                 life_max_delay=60.0):
+                 life_max_delay=60.0, personal_space=55.0, rest_median=35.0,
+                 burst_chance=0.45, afk_chance=0.03):
         self.walk_min_delay = float(walk_min_delay)
         self.walk_max_delay = float(walk_max_delay)
         self.first_move_delay_min = float(first_move_delay_min)
@@ -105,6 +106,13 @@ class BehaviorConfig:
         # Cast-driven bots pick a new in-room activity every 20-60 s.
         self.life_min_delay = float(life_min_delay)
         self.life_max_delay = float(life_max_delay)
+        # Cast bodies: minimum px between penguins (0 = original random walk).
+        self.personal_space = float(personal_space)
+        # Player-like pacing: median pause in s (0 = uniform life_min..life_max), chance a
+        # walk turns into a burst of clicks, chance a pause becomes a few AFK minutes.
+        self.rest_median = float(rest_median)
+        self.burst_chance = float(burst_chance)
+        self.afk_chance = float(afk_chance)
 
 
 class ServiceConfig:
@@ -133,6 +141,16 @@ class DialogueConfig:
         'hello_chance': 0.6, 'question_chance': 0.5, 'other_chance': 0.25,
         'continuity_ttl': 120.0, 'player_daily_limit': 40, 'queue_size': 8,
         'room_gap': 2.0,
+        # Attention: a bot already chatting with the player keeps answering; unnamed chat
+        # is heard less across the room (px, 0 = everywhere) and by shyer characters
+        # (weight of card chattiness, 0 = ignore it).
+        'continuity_chance': 0.9, 'hearing_radius': 220.0, 'chattiness_weight': 1.0,
+        # Typing speed in characters per second before a line appears (0 = instant).
+        'typing_cps': 4.5,
+        # Group chat: at most group_max penguins answer one human line. Chat aimed at the
+        # group ("que hacen", "chicos") gives each nearby penguin group_chance to answer;
+        # other unnamed chat lets one extra penguin chime in with chime_chance.
+        'group_max': 3, 'group_chance': 0.7, 'chime_chance': 0.15,
     }
 
     def __init__(self, enabled=False, **settings):
@@ -146,7 +164,8 @@ class LifeConfig:
     DEFAULTS = {'visit_seconds': 180.0, 'follow_seconds': 600.0,
                 'departure_min': 1.0, 'departure_max': 2.0, 'tick_seconds': 2.0,
                 'wander_chance': 0.15, 'minimum_home_share': 0.75,
-                'conversation_seconds': 180.0, 'dojo_hour': 18}
+                'conversation_seconds': 180.0, 'dojo_hour': 18, 'walk_weight': 1,
+                'approximate_walk': 0}
 
     def __init__(self, enabled=False, events=True, autonomous=True, **values):
         self.enabled, self.events, self.autonomous = enabled, events, autonomous
@@ -236,12 +255,12 @@ def _parse_dialogue(raw, env):
         raise ConfigError('dialogue.enabled must be true or false')
     values = {}
     for key, default in DialogueConfig.DEFAULTS.items():
-        minimum = 1 if key in ('player_daily_limit', 'queue_size') else 0
+        minimum = 1 if key in ('player_daily_limit', 'queue_size', 'group_max') else 0
         value = _number(raw, key, default, minimum, 'dialogue')
-        if key.endswith('chance') or key == 'greeting_model_share':
+        if key.endswith('chance') or key in ('greeting_model_share', 'chattiness_weight'):
             if value > 1:
                 raise ConfigError(f'dialogue.{key}: probability must be at most 1')
-        if key in ('player_daily_limit', 'queue_size'):
+        if key in ('player_daily_limit', 'queue_size', 'group_max'):
             if value != int(value):
                 raise ConfigError(f'dialogue.{key}: must be an integer')
             value = int(value)
@@ -259,7 +278,7 @@ class BotConfig:
     def __init__(self, index, username, password, nickname, room, aliases,
                  personality, area, *, stationary=False, spawn=None,
                  repeat_action=None, repeat_emote=None, music=True, card=None,
-                 fallbacks=()):
+                 fallbacks=(), greeter=False):
         self.index = index
         self.username = str(username)
         self.password = str(password)
@@ -277,6 +296,8 @@ class BotConfig:
         # cast.Card for cast-driven bots (their life is life.py, not the walk loops).
         self.card = card
         self.fallbacks = [str(line) for line in fallbacks]  # persona lines; empty = global ones
+        # A host walks up to every human who enters its room, greets with the model and goes back to its post.
+        self.greeter = bool(greeter)
 
     @property
     def mention_names(self):
@@ -490,7 +511,7 @@ def parse_bot(index, raw):
         personality=raw.get('personality') or '', area=area,
         stationary=stationary, spawn=spawn,
         repeat_action=repeat_action, repeat_emote=repeat_emote,
-        music=raw.get('music', True))
+        music=raw.get('music', True), greeter=bool(raw.get('greeter', False)))
     return bot
 
 
@@ -717,11 +738,19 @@ def build_config(document, env=None):
         bot_chat_interval=_number(behavior_raw, 'bot_chat_interval', 90.0, 5, 'behavior'),
         bot_exchange_limit=_number(behavior_raw, 'bot_exchange_limit', 2, 0, 'behavior'),
         life_min_delay=_number(behavior_raw, 'life_min_delay', 20.0, 0.05, 'behavior'),
-        life_max_delay=_number(behavior_raw, 'life_max_delay', 60.0, 0.05, 'behavior'))
+        life_max_delay=_number(behavior_raw, 'life_max_delay', 60.0, 0.05, 'behavior'),
+        personal_space=_number(behavior_raw, 'personal_space', 55.0, 0, 'behavior'),
+        rest_median=_number(behavior_raw, 'rest_median', 35.0, 0, 'behavior'),
+        burst_chance=_number(behavior_raw, 'burst_chance', 0.45, 0, 'behavior'),
+        afk_chance=_number(behavior_raw, 'afk_chance', 0.03, 0, 'behavior'))
     if behavior.walk_max_delay < behavior.walk_min_delay:
         raise ConfigError('behavior.walk_max_delay must be >= walk_min_delay')
     if behavior.life_max_delay < behavior.life_min_delay:
         raise ConfigError('behavior.life_max_delay must be >= life_min_delay')
+    if behavior.personal_space > 200 or (0 < behavior.rest_median < 1) or behavior.rest_median > 600:
+        raise ConfigError('behavior: personal_space must be 0-200 px and rest_median 0 or 1-600 s')
+    if behavior.burst_chance > 1 or behavior.afk_chance > 1:
+        raise ConfigError('behavior: burst_chance and afk_chance are probabilities (<= 1)')
 
     metrics_port = int(env.get('BOTS_METRICS_PORT', METRICS_PORT_DEFAULT))
     return Config(server=server, provider=provider, policy=policy,

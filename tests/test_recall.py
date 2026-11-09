@@ -38,6 +38,32 @@ class RecallTests(unittest.TestCase):
             again = RecallStore(path, ttl_seconds=86400)
             self.assertEqual(again.get(2, 99), 'volvio al dia siguiente')
 
+    def test_database_is_private_under_a_permissive_umask(self):
+        import os
+        import stat as stat_module
+        old = os.umask(0o022)
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                path = f'{tmp}/recall.sqlite'
+                RecallStore(path, ttl_seconds=60)
+                self.assertEqual(stat_module.S_IMODE(os.stat(path).st_mode), 0o600)
+        finally:
+            os.umask(old)
+
+    def test_reopen_repairs_own_open_file_but_rejects_symlinks(self):
+        import os
+        import stat as stat_module
+        with tempfile.TemporaryDirectory() as tmp:
+            path = f'{tmp}/recall.sqlite'
+            open(path, 'w').close()
+            os.chmod(path, 0o644)
+            RecallStore(path, ttl_seconds=60)
+            self.assertEqual(stat_module.S_IMODE(os.stat(path).st_mode), 0o600)
+            link = f'{tmp}/link.sqlite'
+            os.symlink(path, link)
+            with self.assertRaises(ValueError):
+                RecallStore(link, ttl_seconds=60)
+
 
 if __name__ == '__main__':
     unittest.main()

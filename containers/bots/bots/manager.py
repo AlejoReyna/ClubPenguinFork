@@ -10,6 +10,7 @@ from .provider import MoonshotClient, SimulatedProvider
 from .session import AuthFailure, BotSession
 from . import metrics as metrics_mod
 from . import music as music_mod
+from . import spacing
 from . import spend as spend_mod
 from .world import World
 
@@ -115,7 +116,17 @@ class BotManager:
                 counts[name] = counts.get(name, 0) + count
             return [({'room': name}, value) for name, value in sorted(counts.items())]
 
+        def overlapping():
+            counts = {}
+            for room in self.world.bot_counts():
+                name = str(room) if room in known else 'other'
+                bots = [(m.x, m.y) for m in self.world.bots_in(room) if m.x is not None and m.y is not None]
+                humans = [(m.x, m.y) for m in self.world.humans_in(room) if m.x is not None and m.y is not None]
+                counts[name] = counts.get(name, 0) + spacing.overlap_pairs(bots, humans)
+            return [({'room': name}, value) for name, value in sorted(counts.items())]
+
         collect(metrics_mod.BOTS_IN_ROOM, in_room)
+        collect(metrics_mod.BOTS_OVERLAPPING, overlapping)
         collect(metrics_mod.BOTS_PLANNED,
                 lambda: [({'room': str(room)}, count) for room, count in sorted(homes.items())])
         collect(metrics_mod.SPEND_RATIO,

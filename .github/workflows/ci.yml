@@ -83,6 +83,20 @@ jobs:
       TF_VAR_bots_enabled: 'true'
       TF_VAR_bots_replicas: '1'
       TF_VAR_bots_provider_mode: ${{ vars.CP_BOTS_PROVIDER_MODE }}
+      # Non-secret settings the Pi already runs with. They used to live only in the untracked
+      # infra/cluster/terraform.tfvars on the operator's Mac, so a clean checkout planned the
+      # defaults (cast/dialogue/life/recall off, capacity 20) and the plan gate rightly refused
+      # it as a rollback. Keep these equal to what is deployed; change them here, in a PR.
+      TF_VAR_bots_cast_enabled: 'true'
+      TF_VAR_bots_dialogue_enabled: 'true'
+      TF_VAR_bots_life_enabled: 'true'
+      TF_VAR_bots_recall_enabled: 'true'
+      TF_VAR_world_capacity: '60'
+      TF_VAR_bots_daily_spend_cap_usd: '1.00'
+      TF_VAR_bots_monthly_spend_cap_usd: '30.00'
+      TF_VAR_bots_memory_limit: 320Mi
+      TF_VAR_bots_cpu_limit: 500m
+      TF_VAR_bots_timezone: America/Mexico_City
       ARM_USE_OIDC: 'true'
       ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
       ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
