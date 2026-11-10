@@ -344,6 +344,10 @@ def check_images(cfg, manifest):
         expected['puffle'] = {'puffle': manifest['components']['runtime']}
     seen = set()
     for pod in pods:
+        # A rolling update leaves the replaced pod Terminating (still Ready, old image) for its grace
+        # period after `rollout status` returns; it is on its way out, not part of the running release.
+        if pod['metadata'].get('deletionTimestamp'):
+            continue
         app = pod['metadata'].get('labels', {}).get('app')
         if app not in expected:
             continue
