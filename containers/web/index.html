@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#00529b">
+<meta name="theme-color" content="#016bb6">
 <meta name="description" content="Glaciar: mundo privado de Club Penguin (AS2) jugable desde tu teléfono.">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -37,6 +37,10 @@
           margin:0;padding:9px 15px;border-radius:11px;background:#063354c9;text-align:center;font-size:14px;opacity:0;transition:opacity .25s;
           pointer-events:none}
   #estado.on{opacity:1}
+  /* Instalada (barra de estado translúcida) la página se dibuja bajo la hora, el wifi y la batería:
+     esa franja lleva el mismo azul que theme-color. Vale 0 donde no hay muesca ni barra de estado. */
+  body::before{content:"";position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top);z-index:50;
+               background:#016bb6;pointer-events:none}
 
   .bar{position:fixed;top:0;left:0;right:var(--infra-w,0px);z-index:30;transition:right .28s cubic-bezier(.22,1,.36,1);display:flex;align-items:center;justify-content:flex-start;flex-wrap:nowrap;gap:6px;
        height:var(--bar-h);padding:env(safe-area-inset-top) 12px 0;background:#0b7ab9}
@@ -44,7 +48,7 @@
   .dock{display:flex;align-items:center;gap:6px}
   .bar [hidden]{display:none!important}
   /* Iconos que solo se muestran cuando la barra se compacta (vertical / riel). */
-  .bar #fullscreen svg,.bar #puffle svg,.bar #zoom{display:none}
+  .bar #fullscreen svg,.bar #puffle svg,.bar #zoom,.bar .lang-switch{display:none}
   .bar label{display:flex;align-items:center;gap:6px;color:#fff;font-size:.875rem;font-weight:700}
   .bar select{min-height:44px;padding:0 8px;border:1px solid #0758a5;border-radius:10px;
               background:#fff;color:#123551;font:inherit;cursor:pointer}
@@ -166,12 +170,20 @@
     .bar button{flex:1;max-width:56px;width:44px;height:44px;padding:0;min-width:44px;border-radius:12px}
     .bar #inicio{order:0}
     .bar #infra{order:1}.bar #spotify{order:2}.bar #puffle{order:3}
-    .bar #fullscreen{order:4}.bar #zoom{order:5;display:inline-flex}
+    .bar #fullscreen{order:4}
     .bar #fullscreen svg,.bar #puffle svg{display:block}
-    .bar label{position:fixed;top:calc(10px + env(safe-area-inset-top));right:calc(10px + env(safe-area-inset-right));
-               filter:drop-shadow(0 2px 6px #003b6266)}
-    .bar select{min-height:36px;padding:0 8px;border-color:#ffffff66;border-radius:10px;font-size:.75rem}
-    #fs-txt,#puffle-txt,.bar label span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+    /* El idioma se cambia con el interruptor ES/EN de la barra (en el lugar de la lupa), no con el selector. */
+    .bar label{display:none}
+    #fs-txt,#puffle-txt{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+    /* Interruptor: misma caja que los demás botones de la barra; la pastilla blanca marca el idioma activo. */
+    .bar .lang-switch{display:inline-flex;order:5;position:relative;align-items:stretch;padding:3px;border-radius:12px}
+    .lang-switch .ls-thumb{position:absolute;top:3px;bottom:3px;left:3px;width:calc(50% - 3px);border-radius:9px;
+                           background:#fff;transition:transform .2s}
+    .lang-switch[aria-checked="true"] .ls-thumb{transform:translateX(100%)}
+    .lang-switch .ls-opt{position:relative;flex:1;display:grid;place-items:center;font:800 .6875rem/1 system-ui,sans-serif;
+                         letter-spacing:.02em;color:#fff}
+    .lang-switch[aria-checked="false"] .ls-es,.lang-switch[aria-checked="true"] .ls-en{color:#0758a5}
+    @media(prefers-reduced-motion:reduce){.lang-switch .ls-thumb{transition:none}}
     .bar #zoom[aria-pressed="true"]{background:#fff;color:#0758a5}
     .bar #zoom .zoom-plus{display:none}
     .fit-game .bar #zoom .zoom-plus{display:block}
@@ -253,8 +265,15 @@
       <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
       <span id="fs-txt">Pantalla completa</span>
     </button>
-    <button id="zoom" class="bar-icon" type="button" aria-pressed="false" aria-label="Ver el juego completo" title="Ver el juego completo">
+    <!-- La lupa («ver el juego completo») ya no se ofrece en el teléfono; el botón sigue en el DOM
+         porque el encuadre y el login lo consultan. En su lugar, el interruptor ES/EN (solo vertical). -->
+    <button id="zoom" class="bar-icon" type="button" hidden aria-pressed="false" aria-label="Ver el juego completo" title="Ver el juego completo">
       <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l5 5M8 11h6"/><path class="zoom-plus" d="M11 8v6"/></svg>
+    </button>
+    <button id="idioma-switch" class="lang-switch" type="button" role="switch" aria-checked="false" aria-label="Idioma inglés">
+      <span class="ls-thumb" aria-hidden="true"></span>
+      <span class="ls-opt ls-es" aria-hidden="true">ES</span>
+      <span class="ls-opt ls-en" aria-hidden="true">EN</span>
     </button>
   </div>
   <div class="dock">
@@ -611,6 +630,14 @@
   const enIngles = idioma === 'en';
   document.documentElement.lang = idioma;
   selector.value = idioma;
+  // Interruptor ES/EN de la barra vertical: delega en el selector para compartir guardado y recarga.
+  const interruptorIdioma = document.getElementById('idioma-switch');
+  interruptorIdioma.setAttribute('aria-checked', String(enIngles));
+  interruptorIdioma.setAttribute('aria-label', enIngles ? 'English language' : 'Idioma inglés');
+  interruptorIdioma.addEventListener('click', () => {
+    selector.value = enIngles ? 'es' : 'en';
+    selector.dispatchEvent(new Event('change'));
+  });
 
   if (enIngles) {
     document.querySelector('.bar').setAttribute('aria-label', 'Game controls');
