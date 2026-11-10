@@ -169,6 +169,17 @@ def write_output(data, out):
 
 # --- build and test ----------------------------------------------------------------
 
+def sources_to_fetch(to_build):
+    """Pinned sources to download before building: those of the pending components, plus the ones the tests need.
+
+    The isolated tests and the bot/puffle suites always run against the runtime image and read
+    vendor/houdini and vendor/dash, even when only the web image is pending. A clean CI workspace has
+    neither, so fetching only the pending components' sources made a web-only release fail its tests.
+    """
+    needed = set(to_build) | {'runtime', 'database'}
+    return sorted({s for n in needed for s in COMPONENTS[n]['sources']})
+
+
 def build(args):
     """Build what the release needs for linux/arm64 and test it in isolation.
 
@@ -198,7 +209,7 @@ def build(args):
                 origin = f'{auth["loginServer"]}/clubpenguin/{name}@{comps[name]["registry_digest"]}'
                 run(['docker', '--config', directory, 'pull', '--platform', 'linux/arm64', origin], timeout=1800, quiet=True)
                 run(['docker', '--config', directory, 'tag', origin, f'clubpenguin/{name}:{comps[name]["tag"]}'], quiet=True)
-    sources = sorted({s for n in to_build for s in COMPONENTS[n]['sources']})
+    sources = sources_to_fetch(to_build)
     py = sys.executable
     run([py, str(ROOT / 'scripts/fetch-sources.py'), '--only', ','.join(sources)], timeout=3600)
     command = [py, str(ROOT / 'scripts/build-images.py'), '--platform', args.platform, '--components', ','.join(to_build)]
