@@ -169,5 +169,20 @@ class PinAndTfvarsTests(unittest.TestCase):
                 release.fetch_manifest({'CP_STATE_STORAGE_ACCOUNT': 'a', 'CP_BACKUP_CONTAINER': 'c'}, bad, '/tmp/never')
 
 
+class SourcesToFetchTests(unittest.TestCase):
+    def test_a_web_only_release_still_fetches_what_the_isolated_tests_read(self):
+        # Regression: web-only builds fetched just media/ruffle, and the bot tests then
+        # failed on a clean workspace because vendor/houdini was missing.
+        sources = release.sources_to_fetch(['web'])
+        self.assertTrue({'houdini', 'dash', 'legacy-media', 'ruffle'} <= set(sources))
+
+    def test_a_bots_only_release_fetches_the_runtime_sources_for_its_tests(self):
+        self.assertEqual(release.sources_to_fetch(['bots']), ['dash', 'houdini'])
+
+    def test_result_is_sorted_and_without_duplicates(self):
+        sources = release.sources_to_fetch(['runtime', 'database', 'web'])
+        self.assertEqual(sources, sorted(set(sources)))
+
+
 if __name__ == '__main__':
     unittest.main()
