@@ -15,7 +15,8 @@ Checks, in order:
      through nginx (the route the browser uses).
   6. With --bots-tag: the bots image writes a dialog-log line when the switch file
      is true and writes nothing when it is false. The bench calls emit itself;
-     director/travel/life do not.
+     The bench calls emit directly. With --igloos it also checks real igloo
+     travel, seeded decisions, role gates and an abrupt bots-process restart.
 
 Cleanup removes only containers, volumes and the network carrying this run's label.
 """
@@ -44,11 +45,16 @@ def parse_args():
     parser.add_argument('--bots-tag', help='also test a separate bots service against real, disposable Houdini')
     parser.add_argument('--live-cast', action='store_true', help='26 simulated sessions and 10 protocol clients; requires --bots-tag')
     parser.add_argument('--voices', action='store_true', help='also test opt-in Phase 2 with a synthetic loopback HTTP provider')
+    parser.add_argument('--igloos', action='store_true', help='test seeded igloo visits and abrupt restart on disposable Houdini; requires --bots-tag')
     parser.add_argument('--life', action='store_true', help='also test Phase 3 invitations, following and returns with simulated providers')
     parser.add_argument('--recall', action='store_true', help='also test Phase 4 relationship notes on a writable PVC slice (simulated summaries)')
     parser.add_argument('--puffle', action='store_true', help='test the production world and two isolated companions')
     parser.add_argument('--keep-logs', action='store_true', help='print container logs even when tests pass')
     args = parser.parse_args()
+    if args.igloos and not args.bots_tag:
+        parser.error('--igloos requires --bots-tag')
+    if args.igloos and args.live_cast:
+        parser.error('--igloos runs its own small cast; omit --live-cast')
     if args.live_cast and not args.bots_tag:
         parser.error('--live-cast requires --bots-tag')
     if args.voices and not args.live_cast:
@@ -223,10 +229,14 @@ try:
                 from bots_integration import check_bots
             from dialog_log_integration import check_dialog_log
             check_dialog_log(docker, tags['bots'], Path(temp), label)
-            check_bots(root, docker, exec_script, dash, postgres, prefix + '-glaciar',
-                       prefix, label, tags['bots'], Path(temp),
-                       **(dict(voices=args.voices, life=args.life, recall=args.recall)
-                          if args.live_cast else {}))
+            if args.igloos:
+                from igloos_integration import check_igloos
+                check_igloos(root, docker, postgres, prefix, label, tags['bots'], Path(temp))
+            else:
+                check_bots(root, docker, exec_script, dash, postgres, prefix + '-glaciar',
+                           prefix, label, tags['bots'], Path(temp),
+                           **(dict(voices=args.voices, life=args.life, recall=args.recall)
+                              if args.live_cast else {}))
         if args.puffle:
             from puffle_integration import check_puffle
             check_puffle(root, docker, exec_script, dash, postgres)
