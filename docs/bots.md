@@ -209,6 +209,9 @@ Initial `reason` vocabulary. Extending it requires updating this document.
 - `off_schedule`
 - `lease_expired`
 - `room_min_guard`
+- `restart`: forced return because the service restarted.
+- `p2_cutoff`: return or decline caused by the P2 spend cutoff.
+- `seeded_roll`: no hard rule decided; the outcome came from the seeded random roll, so analysis can tell rule-based from chance decisions.
 
 When events are emitted:
 
@@ -218,8 +221,8 @@ When events are emitted:
   player message into a travel intent, or `life.py` may decide on its own that a bot invites
   another, for example to its igloo.
 - `accept` and `decline`: when occupancy and behavior rules decide, with `reason`.
-- `travel`: when a penguin actually leaves for another room, including forced returns (lease
-  expired, restart, P2 cutoff), with `reason`.
+- `travel`: when a penguin actually leaves for another room, including forced returns
+  (`lease_expired`, `restart`, `p2_cutoff`), with `reason`.
 
 Bitácora implements `dialog_log.py`, the store, retention, metrics and tests. Vida adds the
 `emit` calls in `director.py`, `travel.py` and `life.py`.
