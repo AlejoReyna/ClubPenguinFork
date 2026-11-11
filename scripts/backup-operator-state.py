@@ -39,6 +39,7 @@ def main():
     found = subprocess.run(command + ['get', 'deploy', 'bots', '-o', 'name'], capture_output=True)
     if found.returncode == 0:
         capture('bots-budget.json', ['exec', 'deploy/bots', '--', 'cat', '/var/lib/bots/budget.json'])
+        # bots-dialog (the dialog log) is intentionally not captured. It stays on the Pi.
     found = subprocess.run(command + ['get', 'deploy', 'puffle', '-o', 'name'], capture_output=True)
     if found.returncode == 0:
         # sqlite.backup takes a consistent snapshot, never a torn live file copy.

@@ -13,6 +13,9 @@ Checks, in order:
   5. With --web-tag: nginx -> proxy -> login works for allowed origins, refuses other
      origins and paths, serves /healthz and /servers.xml, and registration works
      through nginx (the route the browser uses).
+  6. With --bots-tag: the bots image writes a dialog-log line when the switch file
+     is true and writes nothing when it is false. The bench calls emit itself;
+     director/travel/life do not.
 
 Cleanup removes only containers, volumes and the network carrying this run's label.
 """
@@ -218,6 +221,8 @@ try:
                 from live_bots_integration import check_live_bots as check_bots
             else:
                 from bots_integration import check_bots
+            from dialog_log_integration import check_dialog_log
+            check_dialog_log(docker, tags['bots'], Path(temp), label)
             check_bots(root, docker, exec_script, dash, postgres, prefix + '-glaciar',
                        prefix, label, tags['bots'], Path(temp),
                        **(dict(voices=args.voices, life=args.life, recall=args.recall)

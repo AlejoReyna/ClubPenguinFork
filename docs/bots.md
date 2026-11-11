@@ -32,11 +32,15 @@ flowchart LR
     B --> G["Spend ledger"]
     G -->|HTTPS| K[("Moonshot Kimi K2.6")]
     B --> F["Sanitize + safety filter"] -->|chat| S
+    F --> DL["Dialog log"]
   end
   S <-->|"TCP 6112 / 9876"| H["Houdini login and world"]
   G --- PVC[("PVC bots-budget")]
+  DL --- DPVC[("PVC bots-dialog")]
   Cast["ConfigMap: persona cards"] --> M
   Sec["Secret: credentials"] --> M
+  Sw["ConfigMap: dialog switch"] --> DL
+  Salt["Secret: dialog salt"] --> DL
 ```
 
 | Module | Responsibility |
@@ -52,7 +56,7 @@ flowchart LR
 | `text.py`, `safety.py` | Input sanitation, mention matching, output filtering |
 | `life.py`, `travel.py`, `events.py` | Seeded activities, room-to-room travel with occupancy leases, calendar events |
 | `memory.py`, `recall.py` | Short-term memory per speaker; optional relationship notes on the PVC |
-| `dialog_log.py` (planned) | Upcoming dialog log. Callers use `emit` only (see [Dialog log](#dialog-log)) |
+| `dialog_log.py` | Append-only JSONL dialog log on its own PVC. Callers use `emit` only (see [Dialog log](#dialog-log)) |
 | `cast.py`, `rooms.py`, `actions.py` | Persona cards, measured room catalog, closed action vocabulary |
 | `metrics.py` | Prometheus endpoint with no third-party dependency |
 | `music.py` | Forwards a player's own music request to the puffle host |
@@ -167,19 +171,110 @@ to the provider account: other applications sharing the same API key still bill.
 
 ## Dialog log
 
-Planned module `containers/bots/bots/dialog_log.py`, owned by Bitácora. It exposes `emit(...)`.
-Callers in `director.py`, `travel.py` and `life.py` (owned by Vida) only call `emit`. A change
-to `emit`'s signature has to be agreed first.
+`containers/bots/bots/dialog_log.py`, owned by Bitácora, exposes `emit(...)`. Callers in
+`director.py`, `travel.py` and `life.py` (owned by Vida) only call `emit`. Those call sites
+are not in this change. `manager.py` only starts and stops the writer task. A change to
+`emit`'s signature has to be agreed first. The service has no function that reads the log
+back, and `/metrics` is not a read API for it.
 
-`emit` is synchronous and does no I/O. It calls `put_nowait` on a bounded in-memory queue and
-never raises. If the log is off or the queue is full, it returns immediately and a drop
-counter metric increments. A background writer batches events to the store. If the store
-fails, the bots continue and an error metric increments. `emit` hashes `player_id` into
-`player` before enqueueing and discards the raw id.
+`emit` is synchronous and does no I/O. It calls `put_nowait` on a bounded in-memory queue
+(2048 events) and never raises. When the switch is off it returns immediately: that is not a
+drop, and no day file is created. When the queue is full the event is dropped and
+`bots_dialog_log_dropped_total{reason="queue_full"}` increments. A background writer batches
+lines (32 events or 30 seconds, whichever comes first) and appends them with `O_APPEND`, one
+complete line each. If the store fails, the bots continue, `bots_dialog_log_errors_total`
+increments, and the writer backs off. `emit` hashes `player_id` into `player` before
+enqueueing and discards the raw id.
 
-The storage backend is pendiente (PostgreSQL versus an append-only file on a PVC is not
-decided). The retention job and the query/analysis tool are pendiente and will be documented
-in a follow-up PR. This section does not describe a backend.
+Storage is append-only JSONL, one file per UTC day (`YYYY-MM-DD.jsonl`), on a dedicated PVC
+`bots-dialog` (1Gi, `local-path`) mounted at `/var/lib/bots-dialog`. It is not the
+`bots-budget` volume: if this disk is full or missing, the spend ledger is untouched and the
+penguins keep talking. Files are created mode `0600` by UID 10001. A symlink at the day-file
+path is refused. A torn last line (the process died mid-write, so the file does not end in a
+newline) is given its own newline on the next append; readers skip that incomplete line.
+
+The player hash is HMAC-SHA256, hex-encoded. The key is the environment variable
+`BOTS_DIALOG_LOG_SALT`, from the Secret `bots-dialog-salt` key `salt` (created by hand; see
+[operations](operations.md#dialog-log)). The value is never logged and is not hot-reloaded:
+changing the Secret needs a pod restart, and a new salt makes later hashes not match earlier
+ones. If the variable is missing, `player` is null and the raw id is still discarded.
+
+The kill switch is the ConfigMap `bots-dialog-log` key `enabled`, mounted at
+`/etc/bots-dialog/enabled` and re-read about every 30 seconds. Only the exact word `true`
+turns it on. The default is `false`. Patching the ConfigMap does not roll the pod. The
+kubelet can take around a minute to refresh the file, and the process notices on its next
+read. Events already queued are discarded without being written once a reload sees the switch
+off; that discard is not a drop.
+
+Retention runs in the writer (a ReadWriteOnce volume cannot be mounted by a CronJob while the
+pod has it). It runs at startup and about every six hours. It deletes only files whose name
+is `YYYY-MM-DD.jsonl` and whose date is more than 30 days before today UTC. The file dated
+exactly 30 days ago is kept. Any other name, and any symlink, is left in place. While the
+switch is off the directory is not created.
+
+There is no PostgreSQL table and no HTTP route. The log is not added to the Azure backup; it
+stays on the Pi. Read it from the operator Mac with `kubectl exec` or `kubectl cp`, then
+`scripts/bitacora.py` (standard library only). NetworkPolicies are unchanged: nothing new
+listens, Cloudflare Tunnel still reaches only the web pod, and `bots-metrics` / `bots-egress`
+are as they were.
+
+Metrics (bounded labels only: event `kind`, or `queue_full` / `io` / `invalid` / `symlink`):
+
+| Series | Meaning |
+|---|---|
+| `bots_dialog_log_events_total{kind}` | Lines actually written |
+| `bots_dialog_log_dropped_total{reason="queue_full"}` | Queue was full. The switch being off is not in this series |
+| `bots_dialog_log_errors_total{reason}` | `io`, `invalid`, or `symlink` |
+| `bots_dialog_log_queue_depth` | Accepted events not yet written |
+| `bots_dialog_log_bytes_total` | Payload bytes written |
+| `bots_dialog_log_retention_deleted_total` | Day files removed |
+| `bots_dialog_log_enabled` | 1 when the switch is on |
+| `bots_dialog_log_salt_configured` | 1 when `BOTS_DIALOG_LOG_SALT` is set. The value is not a label |
+
+`BotsDialogLogWriteErrors` fires when the switch has been on for 15 minutes and `io` or
+`symlink` errors are still increasing.
+
+Cost, measured on this implementation. A typical reply line is 345 bytes; a line that fills
+both 54-character text fields is 420 bytes. The queue at 2048 maximum lines is about 1.2 MiB
+(traced allocation; the JSON itself is about 850 KiB). Building one event is about 80 µs, and
+a 32-line flush is about 150 µs, so 40,000 events in a day are a few seconds of CPU. The
+writer does not `fsync`. At a steady 2,500 events/day each event falls in its own 30-second
+window, about 2,500 `write()` calls and about 0.9 MB appended. At a steady 40,000 events/day
+the 30-second timer wins over the 32-line batch (about 14 lines each), about 2,880 `write()`
+calls and about 14 MB appended. If every small append rewrites a 4 KiB flash page, that is on
+the order of 10 MB/day at 2,500 events and 10–25 MB/day at 40,000. A power cut can lose the
+open batch (at most 30 seconds) plus whatever the kernel has not written back.
+
+`emit` is keyword-only:
+
+```text
+emit(*, room_id, speaker, kind, target_kind, source,
+     target=None, player_id=None, text=None, human_text=None,
+     priority=None, scene_id=None, invite_id=None, reason=None,
+     dest_room_id=None, ts=None)
+```
+
+`scripts/bitacora.py` reads a directory of day files (a torn last line is ignored):
+
+```bash
+python3 scripts/bitacora.py --dir ./bots-dialog filter --room 110 --penguin rayo \
+    --since 2026-11-01 --until 2026-11-11
+python3 scripts/bitacora.py --dir ./bots-dialog conversations
+python3 scripts/bitacora.py --dir ./bots-dialog matrix
+python3 scripts/bitacora.py --dir ./bots-dialog invites
+python3 scripts/bitacora.py --dir ./bots-dialog sources
+python3 scripts/bitacora.py --dir ./bots-dialog phrases --top 20
+python3 scripts/bitacora.py --dir ./bots-dialog export --format csv --output dialog.csv
+python3 scripts/bitacora.py --dir ./bots-dialog export --format jsonl --output dialog.jsonl
+```
+
+`conversations` groups a scene by `scene_id`, an invitation by `invite_id`, and other lines
+for the same player hash in the same room, splitting a chat when the gap exceeds 10 minutes.
+`matrix` counts directed pairs; a player column is `player:` plus the salted hash, not a name.
+`invites` joins made / accepted / declined / travel on `invite_id` and counts every `reason`,
+including `restart`, `p2_cutoff` and `seeded_roll`. `phrases` counts bot `text` only, not
+`human_text`. `sources` is the model / local / fallback ratio for spoken lines and for every
+event.
 
 | Field | Contents |
 |---|---|
@@ -233,17 +328,22 @@ Bitácora implements `dialog_log.py`, the store, retention, metrics and tests. V
   `/metrics` (port 9102) exposes sessions, reconnects, replies by priority and source, provider
   errors and latency, and spend against the cap, all with bounded labels and no chat text.
 - Alert rules in `monitoring/bots-rules.yaml` cover sessions below target, daily spend above
-  80 %, a high provider error rate, and a planned room left empty.
-- Scaling the deployment to zero keeps the volume and its ledger. Setting `enabled: false` on a
-  card silences a single penguin.
+  80 %, a high provider error rate, a planned room left empty, and dialog-log write errors
+  while the log is enabled.
+- Scaling the deployment to zero keeps both volumes. `bots-budget` has `prevent_destroy`.
+  `bots-dialog` does not: turning `bots_enabled` off plans deletion of the log. Setting
+  `enabled: false` on a card silences a single penguin and does not touch the log.
 - The pod mounts no service-account token, runs as UID 10001 with a read-only root filesystem,
   and its egress policy allows only DNS, the game servers and (in `api` mode) public HTTPS.
 
 ## Testing
 
-`scripts/test-bots.py` runs the suite (269 tests) against an in-memory fake world: director
+`scripts/test-bots.py` runs the suite (329 tests) against an in-memory fake world: director
 arbitration, occupancy minimums, travel leases, the spend ledger, the output filter, prompt
-shapes and seeded life, including a virtual 48-hour run that checks room coverage. CI runs it
-inside the runtime image with `--network none`, so no test can reach a paid provider.
+shapes and seeded life, including a virtual 48-hour run that checks room coverage, plus the
+dialog log (contract, privacy, switch, retention, metrics) and `scripts/bitacora.py`. CI runs
+it inside the runtime image with `--network none`, so no test can reach a paid provider.
 `scripts/test-containers.py` adds an end-to-end run against a disposable Houdini with a fake
-provider and no outbound network.
+provider and no outbound network. With `--bots-tag` it also runs the dialog-log image check:
+one line when the switch file is `true`, and no day file when it is `false`. That check calls
+`emit` itself, because `director.py`, `travel.py` and `life.py` do not yet.

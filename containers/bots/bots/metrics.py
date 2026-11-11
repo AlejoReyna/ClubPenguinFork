@@ -37,6 +37,15 @@ BOTS_PLANNED = 'bots_planned'
 BOTS_OVERLAPPING = 'bots_overlapping_pairs'
 BOTS_TRAVEL = 'bots_travel_total'
 TRAVEL_DENIED = 'bots_travel_denied_total'
+# Dialog log. Labels are the closed kind/reason sets; never chat, hashes or names.
+DIALOG_EVENTS = 'bots_dialog_log_events_total'
+DIALOG_DROPPED = 'bots_dialog_log_dropped_total'
+DIALOG_ERRORS = 'bots_dialog_log_errors_total'
+DIALOG_QUEUE = 'bots_dialog_log_queue_depth'
+DIALOG_BYTES = 'bots_dialog_log_bytes_total'
+DIALOG_RETENTION = 'bots_dialog_log_retention_deleted_total'
+DIALOG_ENABLED = 'bots_dialog_log_enabled'
+DIALOG_SALT = 'bots_dialog_log_salt_configured'
 
 # Bounded skip reasons (never free text).
 SKIP_SELF = 'self'
@@ -76,6 +85,14 @@ HELP_TEXTS = {
     BOTS_OVERLAPPING: 'Pairs with at least one bot standing closer than 45 px, per room',
     BOTS_TRAVEL: 'Room changes attempted mid-session, by result',
     TRAVEL_DENIED: 'Local travel refusals by bounded policy reason',
+    DIALOG_EVENTS: 'Dialog-log lines written, by event kind',
+    DIALOG_DROPPED: 'Dialog-log events dropped because the queue was full',
+    DIALOG_ERRORS: 'Dialog-log failures by bounded reason (io, invalid, symlink)',
+    DIALOG_QUEUE: 'Dialog-log events accepted but not yet written',
+    DIALOG_BYTES: 'Dialog-log payload bytes written',
+    DIALOG_RETENTION: 'Dialog-log day files deleted by retention',
+    DIALOG_ENABLED: 'Whether the dialog log switch is on (1) or off (0)',
+    DIALOG_SALT: 'Whether the dialog-log salt is configured (1) or missing (0)',
 }
 
 HISTOGRAM_BUCKETS = (0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 30.0, 60.0)
@@ -93,6 +110,9 @@ _STANDARD_SERIES = (
     (BOTS_IN_ROOM, 'gauge'), (BOTS_PLANNED, 'gauge'), (BOTS_OVERLAPPING, 'gauge'),
     (BOTS_TRAVEL, 'counter'),
     (TRAVEL_DENIED, 'counter'),
+    (DIALOG_EVENTS, 'counter'), (DIALOG_DROPPED, 'counter'), (DIALOG_ERRORS, 'counter'),
+    (DIALOG_QUEUE, 'gauge'), (DIALOG_BYTES, 'counter'), (DIALOG_RETENTION, 'counter'),
+    (DIALOG_ENABLED, 'gauge'), (DIALOG_SALT, 'gauge'),
 )
 
 
