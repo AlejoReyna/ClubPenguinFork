@@ -15,9 +15,15 @@ CARDS = ROOT / 'containers/bots/cast'
 class CastTests(unittest.TestCase):
     def test_planned_roster_is_23_new_characters(self):
         cards = load_cards(CARDS)
-        self.assertEqual(len(cards), 23)
+        full = [card for card in cards.values() if not card.is_role_note()]
+        notes = [card for card in cards.values() if card.is_role_note()]
+        self.assertEqual(len(full), 23)
+        self.assertEqual(sorted(card.username for card in notes), ['baristaia', 'djia', 'pizzeroia'])
+        self.assertTrue(all(card.role == 'helper' for card in notes))
+        self.assertEqual(cards['peperina'].role, 'helper')
+        self.assertEqual(cards['pacopregon'].role, 'guide')
         counts = {}
-        for card in cards.values():
+        for card in full:
             self.assertEqual(card.missing_for_new_character(), [])
             self.assertTrue(card.nickname.isascii())
             self.assertLessEqual(len(card.nickname), 30)
@@ -33,7 +39,7 @@ class CastTests(unittest.TestCase):
         for before, after in zip(first.bots, second.bots):
             self.assertEqual(vars(before), vars(after))
             self.assertIsNone(after.card)
-        self.assertEqual(len(second.cast_unmatched), 23)
+        self.assertEqual(len(second.cast_unmatched), 26)
 
     def test_card_joins_only_its_credentials(self):
         document = {'bots': [{'username': 'lolaritmo', 'password': 'synthetic-only'}]}
@@ -53,7 +59,11 @@ class CastTests(unittest.TestCase):
                          'music': False}]}
         before = build_config(doc, {}).bots[0]
         after = build_config(doc, {'BOTS_CAST_DIR': str(CARDS)}).bots[0]
-        self.assertEqual(vars(before), vars(after))
+        before_fields, after_fields = vars(before), vars(after)
+        self.assertIsNone(before_fields.pop('role'))
+        self.assertEqual(after_fields.pop('role'), 'helper')
+        self.assertIsNone(after.card)
+        self.assertEqual(before_fields, after_fields)
 
     def test_explicit_empty_aliases_override_and_missing_music_is_preserved(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -77,6 +87,7 @@ class CastTests(unittest.TestCase):
                        {'nickname': 'x' * 31}, {'username': 'a'}, {'home_room': -1},
                        {'idle_actions': ['shell']}, {'schedule': 'not-a-list'},
                        {'fallbacks': ['visita example.com']}, {'relationships': {}},
+                       {'role': 'mascot'}, {'role': ''},
                        {'schedule': [{'from': '25:00', 'to': '02:00', 'room': 120, 'activity': 'dance'}]}):
             with self.subTest(update=update), self.assertRaises(CastError):
                 parse_card(dict({'username': 'testbot'}, **update))

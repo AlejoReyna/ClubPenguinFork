@@ -130,6 +130,13 @@ class Director:
                 and s.conn is not None and not s.conn.closed and not s.behavior.stopped
                 and not s.traveling]
 
+    def hears(self, room):
+        """Catalog rooms, plus an igloo a session of this process is standing in."""
+        catalog = self.config.catalog
+        if catalog is not None and room in catalog.rooms:
+            return True
+        return any(session.room_id == room for session in self.sessions)
+
     def is_human(self, room, player_id):
         return (not self.world.is_bot(player_id)
                 and any(m.id == player_id for m in self.world.humans_in(room)))
@@ -349,7 +356,7 @@ class Director:
 
     async def on_chat(self, observer, sender, message):
         room = observer.room_id
-        if (self._closed or room not in self.config.catalog.rooms or not self.is_human(room, sender)
+        if (self._closed or not self.hears(room) or not self.is_human(room, sender)
                 or not self._fresh_frame(room, sender, str(message))):
             return
         pending = self.greetings.pop((room, sender), None)
@@ -411,7 +418,7 @@ class Director:
         return f'Ahora no se donde esta {target.bot.nickname}.'
 
     def member_added(self, room, player_id):
-        if self._closed or room not in self.config.catalog.rooms or not self.is_human(room, player_id):
+        if self._closed or not self.hears(room) or not self.is_human(room, player_id):
             return
         key, now = (room, player_id), self.clock()
         if key in self.greetings:
@@ -647,12 +654,17 @@ class Director:
                 await self._pause(brain.session, answer.say, index, started)
                 if self._valid(turn) and not state.human_pending and await brain.publish(answer, spend.P2):
                     state.last_sent = self.clock()
+                    self._log_said(brain.session, 'scene', answer, spend.P2, scene_id=f's{turn.room}n{self._sequence}')
             return
         session = turn.sessions[0]
         brain = self.brains[session.index]
         if self.travel and turn.kind == 'reply':
             from .travel import invitation, TravelDenied, ROOM_ALIASES
             action = invitation(turn.message, self.config.catalog)
+            if action and str(action).startswith('igloo:') and self._named(turn.message) is session:
+                whose = 'mine' if action == 'igloo:mine' else 'yours'
+                await self.travel.answer_human_igloo(session, turn.sender, whose)
+                return
             if action and self._named(turn.message) is session:
                 try:
                     ticket = self.travel.offer(session, action, turn.sender)
@@ -670,6 +682,8 @@ class Director:
                     raise
                 if self._valid(turn) and await brain.publish(answer, spend.P0):
                     state.last_sent = self.clock()
+                    self._log_said(session, 'reply', answer, spend.P0, player_id=turn.sender,
+                                   human_text=turn.message)
                     self.world.talked(session.player_id, turn.sender, self.config.life.conversation_seconds)
                     if turn.thread is not None:
                         turn.thread.lines.append((session.bot.nickname, answer.say))
@@ -744,6 +758,9 @@ class Director:
             return
         if await brain.publish(answer, turn.priority):
             state.last_sent = self.clock()
+            logged = 'greeting' if turn.kind == 'greeting' else 'reply'
+            self._log_said(session, logged, answer, turn.priority, player_id=turn.sender,
+                           human_text=turn.message if logged == 'reply' else None)
             if self.travel and turn.sender is not None:
                 self.world.talked(session.player_id, turn.sender, self.config.life.conversation_seconds)
             first = turn.thread is None or not turn.thread.lines
@@ -774,6 +791,20 @@ class Director:
             await brain.summarize_relationship(sender_id)
         except Exception:
             logger.exception('relationship summary failed for bot %s player %s', bot_index, sender_id)
+
+    def _log_said(self, session, kind, answer, priority, *, player_id=None, human_text=None, scene_id=None):
+        """Record a line after safety, exactly what ``publish`` just sent."""
+        from .dialog_log import emit
+        if not answer.say or session.room_id is None:
+            return
+        source = 'model' if answer.source == 'llm' else (
+            answer.source if answer.source in ('local', 'fallback') else 'local')
+        emit(room_id=int(session.room_id), speaker=session.bot.username, kind=kind,
+             target_kind='player' if player_id is not None else 'room',
+             source=source, player_id=player_id, text=answer.say,
+             human_text=human_text if kind == 'reply' else None,
+             priority=priority if priority in spend.PRIORITIES else None,
+             scene_id=scene_id)
 
     def event(self, kind, room, key, speakers, minimum, maximum):
         if self.events is None or not speakers or not self.world.has_humans(room):

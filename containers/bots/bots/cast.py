@@ -28,7 +28,12 @@ _CARD_KEYS = frozenset({
     'username', 'nickname', 'aliases', 'home_room', 'home_pois', 'archetype', 'voice', 'likes',
     'dislikes', 'knows', 'relationships', 'schedule', 'wander', 'idle_actions', 'topics',
     'chattiness', 'greetings', 'fallbacks', 'music', 'appearance', 'enabled', 'personality',
+    'role',
 })
+# A helper or a guide never walks to an igloo and never accepts an igloo invitation.
+# The next PR's accept/reject must call may_enter_igloo; there is no dialog_log yet.
+IGLOO_EXCLUDED_ROLES = frozenset({'helper', 'guide'})
+_ROLE_NOTE_KEYS = frozenset({'username', 'role'})
 _LIST_MAX = 12
 _TEXT_MAX = 200
 
@@ -56,7 +61,8 @@ class Card:
                  archetype='', voice='', likes=(), dislikes=(), knows=(), relationships=(),
                  schedule=(), wander_home_share=0.75, wander_favorites=(), idle_actions=(),
                  topics=(), chattiness=0.5, greetings=(), fallbacks=(), music=True,
-                 appearance_color=None, appearance_items=(), enabled=True, personality=''):
+                 appearance_color=None, appearance_items=(), enabled=True, personality='',
+                 role=None):
         self.provided = frozenset()
         self.username = username
         self.nickname = nickname
@@ -79,6 +85,16 @@ class Card:
         self.appearance_items = tuple(appearance_items)
         self.enabled = enabled
         self.personality = personality
+        self.role = role
+
+    def is_role_note(self):
+        """A card that only stamps ``role`` onto an existing Secret entry.
+
+        Work accounts (coffee, pizza, DJ) have no full ficha. Their JSON carries
+        ``username`` and ``role`` and must not replace the post, the walk or the
+        personality already in the Secret.
+        """
+        return self.role is not None and self.provided <= _ROLE_NOTE_KEYS
 
     def personality_text(self):
         """Prompt text for the existing system prompt ("Lo que sabes y haces: ...")."""
@@ -103,6 +119,19 @@ class Card:
                     'archetype': self.archetype, 'voice': self.voice,
                     'greetings': self.greetings, 'fallbacks': self.fallbacks}
         return [name for name, value in required.items() if not value]
+
+
+def may_enter_igloo(bot):
+    """Whether this body may walk into an igloo.
+
+    ``helper`` and ``guide`` never do, and neither does a body without a full
+    ficha (GuiaIA has none, so the cycle does not include that account).
+    Invitation accept/reject is the next PR; it must call this before moving.
+    """
+    if getattr(bot, 'role', None) in IGLOO_EXCLUDED_ROLES:
+        return False
+    card = getattr(bot, 'card', None)
+    return card is not None and not card.is_role_note()
 
 
 # ----------------------------------------------------------------- parsing
@@ -236,6 +265,10 @@ def parse_card(raw, where='card', output_filter=None):
     for flag in ('music', 'enabled'):
         if flag in raw and not isinstance(raw[flag], bool):
             raise CastError(f'{where}.{flag}: must be true or false')
+    if 'role' in raw and raw['role'] not in IGLOO_EXCLUDED_ROLES:
+        raise CastError(f'{where}.role: must be one of {sorted(IGLOO_EXCLUDED_ROLES)}, '
+                        f'got {raw.get("role")!r}')
+    role = raw.get('role')
 
     card = Card(
         username=username, nickname=nickname, aliases=aliases,
@@ -255,7 +288,8 @@ def parse_card(raw, where='card', output_filter=None):
         fallbacks=_lines(raw.get('fallbacks'), f'{where}.fallbacks', output_filter),
         music=raw.get('music', True), appearance_color=color, appearance_items=items,
         enabled=raw.get('enabled', True),
-        personality=_text(raw['personality'], f'{where}.personality', maximum=800) if 'personality' in raw else '')
+        personality=_text(raw['personality'], f'{where}.personality', maximum=800) if 'personality' in raw else '',
+        role=role)
     card.provided = frozenset(raw)
     return card
 

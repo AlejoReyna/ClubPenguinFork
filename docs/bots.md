@@ -99,6 +99,7 @@ validated field by field (unknown keys are rejected, lists and strings are bound
 | `schedule`, `wander`, `idle_actions` | Daily time blocks, favourite rooms, idle body actions |
 | `greetings`, `fallbacks` | Local lines used without the model, or when it is unavailable |
 | `music`, `appearance`, `enabled` | Music forwarding, clothing, and a per-penguin kill switch |
+| `role` | Optional `helper` or `guide`. Either one never enters an igloo and never accepts an igloo invitation. Absent on a normal resident. A JSON file with only `username` and `role` stamps that role onto an existing Secret entry (the work accounts) without replacing its post |
 
 ## Life and travel
 
@@ -108,6 +109,13 @@ are reproducible. Travel goes through the director, which holds atomic occupancy
 a room in the plan never drops below its minimum while a human is inside, two penguins cannot
 leave the same room at once, and an absence is a bounded lease after which the penguin returns.
 A penguin that talked to a human in the last three minutes stays put.
+An igloo is a travel destination with the same reservation, the same minimum
+while a human is in the source room, and the same lease home. The body stands
+on the basic igloo's fixed post `(380, 320)` and does not walk there. `helper`
+and `guide` never take part. A resident may invite someone who is in the room,
+or answer a human who invites them, using the card, the schedule and a seeded
+roll (`igloo_invite.py`). The model only writes the spoken line, and only when
+a human is there and the spend cutoff still allows it.
 
 ## Measured zones (zonas medidas)
 
@@ -293,7 +301,7 @@ event.
 | `scene_id` | str or null. Groups the lines of one bot-to-bot dialogue scene only |
 | `invite_id` | str or null. Links the invite, the accept or decline, the travel and the return trip of the same invitation |
 | `reason` | Short closed code, or null. Only on `accept`, `decline` and `travel` |
-| `dest_room_id` | int or null. Destination for `invite`, `accept`, `decline` and `travel`. For an igloo it is the real Houdini room id of the igloo (numbering to be confirmed and documented) |
+| `dest_room_id` | int or null. Destination for `invite`, `accept`, `decline` and `travel`. For an igloo it is the Houdini external id `penguin_id + 2000` (the id carried in `j#jr`). A return home uses the catalog room id |
 
 Initial `reason` vocabulary. Extending it requires updating this document.
 

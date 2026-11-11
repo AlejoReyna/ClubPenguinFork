@@ -75,7 +75,8 @@ def main():
         names = [bot['username'] for bot in identities]
         allowed = set(cards) | {role[0].lower() for role in bot_accounts.WORK_ROLES}
         if (len(names) != len(set(names)) or not names or set(names) - allowed
-                or any(card.enabled and name not in names for name, card in cards.items())):
+                or any(card.enabled and not card.is_role_note() and name not in names
+                       for name, card in cards.items())):
             lablib.fail('Prepared identities do not match this cast and its preserved work accounts.')
         validated = build_config(cast_document, {'BOTS_CAST_DIR': str(Path(args.cast).resolve())})
         effective = {bot.username: bot for bot in validated.bots}

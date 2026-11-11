@@ -125,7 +125,7 @@ def cast_config_document(cast_path):
     doc = config_document()
     doc['bots'] = []
     for card in cards.values():
-        if not card.enabled:
+        if not card.enabled or card.is_role_note():
             continue
         if card.missing_for_new_character():
             raise ValueError('New cast characters need complete cards')
