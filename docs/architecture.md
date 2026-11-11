@@ -147,6 +147,7 @@ with `prometheus.io/scrape`: the game exporter (9101), bots (9102) and the puffl
   text never become labels.
 - **Alert rules.** `RaspberryLowDiskSpace`, `LabDeploymentUnavailable`, `BotsSessionsBelowTarget`,
   `BotsDailySpendHigh`, `BotsProviderErrorRateHigh`, `BotsPlannedRoomEmpty`,
+  `BotsDialogLogWriteErrors`,
   `PuffleBrokerUnavailable` and `PuffleQueueSaturated`. Alertmanager is disabled, so alerts are
   visible in Prometheus but not routed to any notification channel yet.
 - **Dashboard.** "Raspberry Pi · Club Penguin Lab": CPU, RAM, disk, availability, restarts,
