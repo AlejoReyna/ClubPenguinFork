@@ -337,7 +337,15 @@ class Travel:
         self.update()
         for session in self.sessions:
             lease = self.leases.get(session.index)
-            if lease is None or session.index in self.jobs or session.index in self.reservations:
+            job = self.jobs.get(session.index)
+            # perform() often finishes inside the dialogue drain. Its done-callback
+            # is only call_soon'd, and awaiting an already-finished task does not
+            # yield, so the callback has not popped the job yet. A finished trip
+            # is not still in flight; leaving it here skips the walk home.
+            if job is not None and job.done():
+                self.jobs.pop(session.index, None)
+                job = None
+            if lease is None or job is not None or session.index in self.reservations:
                 continue
             if not self.online(session):
                 self.leases.pop(session.index, None)
