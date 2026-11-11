@@ -136,6 +136,8 @@ release, apply behind an Azure DevOps environment, cleanup). CI checks it agains
   and a SHA-256 manifest to Blob. A private local copy is kept under `~/.clubpenguin-lab/backups/`.
 - `scripts/backup-operator-state.py` saves what the database dump does not cover: external
   Secrets, the bots spend ledger and a consistent SQLite snapshot of paired puffle devices.
+  The dialog log (PVC `bots-dialog`) is not part of this backup and is not uploaded to Azure.
+  It stays on the Pi. Losing the card loses the log; the spend ledger is still in the backup.
 - `.github/workflows/backup.yml` runs both every day at 12:00 UTC on the self-hosted runner
   when `CP_BACKUP_ENABLED` is `true`; the Pi must be on for a backup to happen.
 - `scripts/restore_verify.py` proves that a recorded backup restores (size and SHA-256 checked,
@@ -170,6 +172,57 @@ kubectl --kubeconfig ~/.kube/clubpenguin-pi.yaml -n monitoring-lab \
 kubectl --kubeconfig ~/.kube/clubpenguin-pi.yaml -n clubpenguin \
   exec -i deploy/dash -- python - < scripts/game-smoke.py         # register two synthetic players
 ```
+
+## Dialog log
+
+The AI-penguin dialog log is a directory of JSONL files on the PVC `bots-dialog`, mounted only
+in the bots pod at `/var/lib/bots-dialog`. Nothing proxies it. There is no Ingress, no
+Cloudflare route, and no read API on port 9102. NetworkPolicies did not need a change.
+
+The switch defaults to off. It is the ConfigMap `bots-dialog-log` key `enabled`. The player
+hash salt is the env var `BOTS_DIALOG_LOG_SALT` from the hand-created Secret `bots-dialog-salt`
+key `salt`. Create that Secret before the first pod start, and do not paste the value anywhere:
+
+```bash
+umask 077
+openssl rand -hex 32 | kubectl --kubeconfig ~/.kube/clubpenguin-pi.yaml -n clubpenguin \
+  create secret generic bots-dialog-salt --from-file=salt=/dev/stdin
+```
+
+If that kubectl cannot read `/dev/stdin`, write the bytes to a `mktemp` file, `--from-file=salt`
+that path, and `rm` the file. The service strips one trailing newline, so the hash key is the
+64 hex characters. The Secret is optional on the pod: without it the bots still start, and
+`player` is stored as null. The env var is not hot-reloaded; a Secret created after the pod is
+up needs `kubectl rollout restart deploy/bots`.
+
+Turn the log on or off without a redeploy (allow a minute or two for the kubelet and the
+process):
+
+```bash
+kubectl --kubeconfig ~/.kube/clubpenguin-pi.yaml -n clubpenguin \
+  patch configmap bots-dialog-log --type merge -p '{"data":{"enabled":"true"}}'
+kubectl --kubeconfig ~/.kube/clubpenguin-pi.yaml -n clubpenguin \
+  patch configmap bots-dialog-log --type merge -p '{"data":{"enabled":"false"}}'
+```
+
+Day files older than 30 days are deleted by the bots process itself. Copy a day to the Mac
+with either of:
+
+```bash
+# Reliable on the slim image: cat the file. kubectl cp needs tar inside the pod.
+kubectl --kubeconfig ~/.kube/clubpenguin-pi.yaml -n clubpenguin \
+  exec deploy/bots -- cat /var/lib/bots-dialog/2026-11-11.jsonl > 2026-11-11.jsonl
+
+# Whole directory, when the image has tar:
+kubectl --kubeconfig ~/.kube/clubpenguin-pi.yaml -n clubpenguin \
+  cp deploy/bots:/var/lib/bots-dialog ./bots-dialog
+```
+
+Then `python3 scripts/bitacora.py --dir` that directory. See `docs/bots.md`.
+
+Until `director.py`, `travel.py` and `life.py` call `emit`, a switch that is on still produces
+no file: the writer is running and idle. A one-shot `emit` from `kubectl exec` is enough to
+prove the disk; that line is real log data and ages out with everything else.
 
 ## Maintenance notes
 
