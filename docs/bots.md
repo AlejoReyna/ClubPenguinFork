@@ -52,6 +52,7 @@ flowchart LR
 | `text.py`, `safety.py` | Input sanitation, mention matching, output filtering |
 | `life.py`, `travel.py`, `events.py` | Seeded activities, room-to-room travel with occupancy leases, calendar events |
 | `memory.py`, `recall.py` | Short-term memory per speaker; optional relationship notes on the PVC |
+| `dialog_log.py` (planned) | Upcoming dialog log. Callers use `emit` only (see [Dialog log](#dialog-log)) |
 | `cast.py`, `rooms.py`, `actions.py` | Persona cards, measured room catalog, closed action vocabulary |
 | `metrics.py` | Prometheus endpoint with no third-party dependency |
 | `music.py` | Forwards a player's own music request to the puffle host |
@@ -147,8 +148,81 @@ to the provider account: other applications sharing the same API key still bill.
   data a player shares.
 - Chat addressed to the penguins goes to Moonshot only in `api` mode; the image defaults to
   `simulated`. Short-term memory (eight turns, ten minutes) lives in RAM. Optional relationship
-  notes are stored per bot and numeric player id, capped at 120 characters, and expire after
-  30 days.
+  notes are unchanged: stored per bot and numeric player id, capped at 120 characters, and
+  expire after 30 days. Lines and decisions are recorded by the optional dialog log below,
+  which is separate from those notes.
+- An optional dialog log records what the bots say (replies, greetings, bot-to-bot scene lines)
+  and their decisions (invite, accept, decline, travel), plus the human message that triggered
+  a reply. The contract is [Dialog log](#dialog-log).
+- Human text is stored only after the same sanitization in `text.py`. The player is
+  pseudonymized as a salted hash; the salt comes from a Secret. The numeric id and the name
+  are never stored in clear. The raw player id never leaves the process.
+- Retention is 30 days. Events are deleted automatically.
+- Kill switch: a ConfigMap key, re-read at runtime (hot reload, no redeploy), off by default.
+  When it is off, nothing is written.
+- The log is never exposed through Cloudflare Tunnel or any public Ingress. It is read only
+  via SSH or `kubectl port-forward` from the owner's Mac. It is never sent to external
+  services or used for training.
+- Metrics about the log carry no chat text in labels.
+
+## Dialog log
+
+Planned module `containers/bots/bots/dialog_log.py`, owned by Bitácora. It exposes `emit(...)`.
+Callers in `director.py`, `travel.py` and `life.py` (owned by Vida) only call `emit`. A change
+to `emit`'s signature has to be agreed first.
+
+`emit` is synchronous and does no I/O. It calls `put_nowait` on a bounded in-memory queue and
+never raises. If the log is off or the queue is full, it returns immediately and a drop
+counter metric increments. A background writer batches events to the store. If the store
+fails, the bots continue and an error metric increments. `emit` hashes `player_id` into
+`player` before enqueueing and discards the raw id.
+
+The storage backend is pendiente (PostgreSQL versus an append-only file on a PVC is not
+decided). The retention job and the query/analysis tool are pendiente and will be documented
+in a follow-up PR. This section does not describe a backend.
+
+| Field | Contents |
+|---|---|
+| `v` | `1` |
+| `ts` | UTC epoch milliseconds |
+| `room_id` | int |
+| `speaker` | Username of the penguin speaking or deciding |
+| `kind` | `reply`, `greeting`, `scene`, `invite`, `accept`, `decline` or `travel` |
+| `target_kind` | `player`, `bot` or `room` |
+| `target` | Bot username, or null when the target is a player or the room (the player goes in `player`) |
+| `player` | Salted hash, or null. The `emit` input is `player_id`, which is never stored |
+| `text` | The final line after the safety filter (≤ 54 characters), exactly what was sent. Null for `invite`, `accept`, `decline` and `travel` when there is no spoken line |
+| `human_text` | The triggering human message after `text.py` sanitization, only on `reply`; otherwise null |
+| `source` | `model`, `local` or `fallback` |
+| `priority` | `P0`, `P1`, `P2` or null |
+| `scene_id` | str or null. Groups the lines of one bot-to-bot dialogue scene only |
+| `invite_id` | str or null. Links the invite, the accept or decline, the travel and the return trip of the same invitation |
+| `reason` | Short closed code, or null. Only on `accept`, `decline` and `travel` |
+| `dest_room_id` | int or null. Destination for `invite`, `accept`, `decline` and `travel`. For an igloo it is the real Houdini room id of the igloo (numbering to be confirmed and documented) |
+
+Initial `reason` vocabulary. Extending it requires updating this document.
+
+- `relation_friend`
+- `busy_with_human`
+- `recent_decline`
+- `low_energy`
+- `off_schedule`
+- `lease_expired`
+- `room_min_guard`
+
+When events are emitted:
+
+- `reply`, `greeting` and `scene`: right after the safety filter, at the point where the line
+  is handed to the session (what was actually said, not what the model proposed).
+- `invite`: whenever an invitation is born, wherever it comes from. The director may turn a
+  player message into a travel intent, or `life.py` may decide on its own that a bot invites
+  another, for example to its igloo.
+- `accept` and `decline`: when occupancy and behavior rules decide, with `reason`.
+- `travel`: when a penguin actually leaves for another room, including forced returns (lease
+  expired, restart, P2 cutoff), with `reason`.
+
+Bitácora implements `dialog_log.py`, the store, retention, metrics and tests. Vida adds the
+`emit` calls in `director.py`, `travel.py` and `life.py`.
 
 ## Operations
 
