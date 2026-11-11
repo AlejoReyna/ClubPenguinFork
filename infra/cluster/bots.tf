@@ -31,7 +31,7 @@ variable "bots_replicas" {
   default = 1
   validation {
     condition     = contains([0, 1], var.bots_replicas)
-    error_message = "Use zero to stop bots while retaining their budget PVC, or one to run them."
+    error_message = "Use zero to stop bots while retaining the budget and dialog PVCs, or one to run them."
   }
 }
 
@@ -43,6 +43,12 @@ variable "bots_credentials_secret" {
 variable "bots_moonshot_secret" {
   type    = string
   default = "moonshot-api"
+}
+
+variable "bots_dialog_salt_secret" {
+  description = "External Secret (key salt) for the dialog-log player hash. Created by hand; the value never enters Terraform."
+  type        = string
+  default     = "bots-dialog-salt"
 }
 
 resource "kubernetes_persistent_volume_claim_v1" "bots_budget" {
@@ -59,6 +65,38 @@ resource "kubernetes_persistent_volume_claim_v1" "bots_budget" {
   }
   wait_until_bound = false
   lifecycle { prevent_destroy = true }
+}
+
+# Dialog log only. Separate from bots-budget so a full disk or a bad mount
+# cannot fail the spend ledger closed. No prevent_destroy: removing this PVC
+# deletes the log. It is not part of the Azure backup.
+resource "kubernetes_persistent_volume_claim_v1" "bots_dialog" {
+  count = var.bots_enabled ? 1 : 0
+  metadata {
+    name      = "bots-dialog"
+    namespace = local.game_namespace
+    labels    = local.game_labels
+  }
+  spec {
+    access_modes       = ["ReadWriteOnce"]
+    storage_class_name = "local-path"
+    resources { requests = { storage = "1Gi" } }
+  }
+  wait_until_bound = false
+}
+
+# Kill switch. Default off. Do not hash this into a pod annotation: the
+# process re-reads the file, and a checksum would roll the pod on every toggle.
+resource "kubernetes_config_map_v1" "bots_dialog_log" {
+  count = var.bots_enabled ? 1 : 0
+  metadata {
+    name      = "bots-dialog-log"
+    namespace = local.game_namespace
+    labels    = local.game_labels
+  }
+  data = {
+    enabled = "false"
+  }
 }
 
 resource "kubernetes_deployment_v1" "bots" {
@@ -93,7 +131,7 @@ resource "kubernetes_deployment_v1" "bots" {
           run_as_user     = 10001
           run_as_group    = 10001
           fs_group        = 10001
-          # Avoid recursively widening the private budget ledger on each mount
+          # Avoid recursively widening private files (budget ledger, dialog log)
           # when the volume root already has the expected group and mode.
           fs_group_change_policy = "OnRootMismatch"
           seccomp_profile { type = "RuntimeDefault" }
@@ -125,6 +163,26 @@ resource "kubernetes_deployment_v1" "bots" {
               value = env.value
             }
           }
+          # Salt is not hot-reloaded (it is an env var). The switch file is.
+          # optional so a missing Secret does not stop the bots; player is then null.
+          env {
+            name = "BOTS_DIALOG_LOG_SALT"
+            value_from {
+              secret_key_ref {
+                name     = var.bots_dialog_salt_secret
+                key      = "salt"
+                optional = true
+              }
+            }
+          }
+          env {
+            name  = "BOTS_DIALOG_LOG_DIR"
+            value = "/var/lib/bots-dialog"
+          }
+          env {
+            name  = "BOTS_DIALOG_LOG_SWITCH"
+            value = "/etc/bots-dialog/enabled"
+          }
           dynamic "env" {
             for_each = var.bots_provider_mode == "api" ? [1] : []
             content {
@@ -154,6 +212,15 @@ resource "kubernetes_deployment_v1" "bots" {
           volume_mount {
             name       = "budget"
             mount_path = "/var/lib/bots"
+          }
+          volume_mount {
+            name       = "dialog-log"
+            mount_path = "/var/lib/bots-dialog"
+          }
+          volume_mount {
+            name       = "dialog-switch"
+            mount_path = "/etc/bots-dialog"
+            read_only  = true
           }
           dynamic "volume_mount" {
             for_each = var.bots_cast_enabled ? [1] : []
@@ -197,6 +264,14 @@ resource "kubernetes_deployment_v1" "bots" {
         volume {
           name = "budget"
           persistent_volume_claim { claim_name = kubernetes_persistent_volume_claim_v1.bots_budget[0].metadata[0].name }
+        }
+        volume {
+          name = "dialog-log"
+          persistent_volume_claim { claim_name = kubernetes_persistent_volume_claim_v1.bots_dialog[0].metadata[0].name }
+        }
+        volume {
+          name = "dialog-switch"
+          config_map { name = kubernetes_config_map_v1.bots_dialog_log[0].metadata[0].name }
         }
         dynamic "volume" {
           for_each = var.bots_cast_enabled ? [1] : []

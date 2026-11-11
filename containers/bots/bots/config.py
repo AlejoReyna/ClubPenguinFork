@@ -173,6 +173,42 @@ class LifeConfig:
             setattr(self, key, values.get(key, default))
 
 
+class DialogLogConfig:
+    """Dialog log paths and the player-hash salt. The salt is never logged."""
+
+    def __init__(self, directory, switch_path, salt):
+        self.directory = str(directory)
+        self.switch_path = str(switch_path)
+        self.salt = salt or None
+
+    def __repr__(self):
+        salt = 'set' if self.salt else 'missing'
+        return (f'DialogLogConfig(directory={self.directory!r}, '
+                f'switch_path={self.switch_path!r}, salt={salt})')
+
+
+def default_dialog_log():
+    return DialogLogConfig('/var/lib/bots-dialog', '/etc/bots-dialog/enabled', None)
+
+
+def _parse_dialog_log(env):
+    """Paths and salt from the environment only, never from the credentials JSON."""
+    directory = _path_setting(env, 'BOTS_DIALOG_LOG_DIR', '/var/lib/bots-dialog')
+    switch_path = _path_setting(env, 'BOTS_DIALOG_LOG_SWITCH', '/etc/bots-dialog/enabled')
+    raw = env.get('BOTS_DIALOG_LOG_SALT')
+    salt = str(raw).strip() if raw is not None else ''
+    if len(salt) > 256:
+        raise ConfigError('BOTS_DIALOG_LOG_SALT is too long')
+    return DialogLogConfig(directory, switch_path, salt or None)
+
+
+def _path_setting(env, key, default):
+    value = str(env.get(key) or default).strip()
+    if not value or '\n' in value or '\x00' in value:
+        raise ConfigError(f'{key} must be a path')
+    return value
+
+
 class RecallConfig:
     """Opt-in Phase 4. Short relationship notes keyed by numeric player id."""
 
@@ -308,7 +344,7 @@ class BotConfig:
 class Config:
     def __init__(self, server, provider, policy, behavior, bots, metrics_port,
                  service=None, catalog=None, output_filter=None, cast_unmatched=(),
-                 dialogue=None, life=None, recall=None):
+                 dialogue=None, life=None, recall=None, dialog_log=None):
         self.server = server
         self.provider = provider
         self.policy = policy
@@ -322,6 +358,7 @@ class Config:
         self.dialogue = dialogue or DialogueConfig()
         self.life = life or LifeConfig()
         self.recall = recall or RecallConfig()
+        self.dialog_log = dialog_log if dialog_log is not None else default_dialog_log()
 
 
 def _require(mapping, key, where):
@@ -616,6 +653,7 @@ def build_config(document, env=None):
         'budget_path', '/var/lib/bots/budget.json')))
     recall_path = str(Path(budget_default).with_name('recall.sqlite'))
     recall = _parse_recall(document.get('recall', {}), env, recall_path)
+    dialog_log = _parse_dialog_log(env)
     if life.enabled and not dialogue.enabled:
         raise ConfigError('life.enabled requires dialogue.enabled for shared reservations')
     if recall.enabled and not dialogue.enabled:
@@ -757,4 +795,4 @@ def build_config(document, env=None):
                   behavior=behavior, bots=bots, metrics_port=metrics_port,
                   service=service, catalog=catalog, output_filter=output_filter,
                   cast_unmatched=sorted(set(cards) - matched), dialogue=dialogue,
-                  life=life, recall=recall)
+                  life=life, recall=recall, dialog_log=dialog_log)

@@ -42,3 +42,10 @@ serverFiles:
               severity: warning
             annotations:
               summary: "A planned room has no bot sessions"
+          - alert: BotsDialogLogWriteErrors
+            expr: bots_dialog_log_enabled == 1 and sum(rate(bots_dialog_log_errors_total{reason=~"io|symlink"}[15m])) > 0
+            for: 15m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Dialog log is enabled but writes are failing"

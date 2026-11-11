@@ -36,6 +36,10 @@ world_capacity = "60"
 # bots_cpu_limit             = "250m"
 # bots_timezone              = "UTC" # pending owner choice
 # bots_blocklist_config_map  = "bots-chat-filter"
+# Dialog log PVC (bots-dialog, 1Gi) and ConfigMap bots-dialog-log (enabled=false)
+# are created with bots_enabled. Create Secret bots-dialog-salt (key salt) by
+# hand before expecting player hashes. See docs/operations.md. The log is not
+# backed up. bots-budget keeps prevent_destroy; bots-dialog does not.
 
 # State location of infra/cloud (required; deploy.py fills it from deploy.env).
 cloud_state = {

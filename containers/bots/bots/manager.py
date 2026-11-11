@@ -8,6 +8,7 @@ import random
 from .config import Config
 from .provider import MoonshotClient, SimulatedProvider
 from .session import AuthFailure, BotSession
+from . import dialog_log as dialog_log_mod
 from . import metrics as metrics_mod
 from . import music as music_mod
 from . import spacing
@@ -86,6 +87,13 @@ class BotManager:
                 max_note_chars=int(config.recall.max_note_chars))
             for session in self.sessions:
                 session.recall = self.recall
+        # Dialog log is always installed so the ConfigMap switch can turn it on
+        # without a restart. Off (the default) queues nothing and creates no file.
+        # Callers use dialog_log.emit; this only starts the writer.
+        self.dialog_log = dialog_log_mod.DialogLog(
+            config.dialog_log.directory, config.dialog_log.switch_path, config.dialog_log.salt)
+        dialog_log_mod.install(self.dialog_log)
+        self._dialog_task = None
         self.director = None
         if config.dialogue.enabled:
             from .director import Director
@@ -100,6 +108,7 @@ class BotManager:
 
     def _register_collectors(self):
         """Gauges read from live state at scrape time, so they can never go stale."""
+        self.dialog_log.register(self.registry)
         collect = getattr(self.registry, 'collect', None)
         if collect is None:
             return
@@ -159,6 +168,7 @@ class BotManager:
             self.director.start()
         tasks = []
         try:
+            self._dialog_task = asyncio.create_task(self.dialog_log.run(), name='dialog-log')
             for position, session in enumerate(self.sessions):
                 # Staggered logins: 26 bcrypt checks and joins at once would hit the Pi.
                 if position and await self._stagger(stop_event):
@@ -213,6 +223,13 @@ class BotManager:
 
     async def close(self):
         """Close every session; cancels any still-running task."""
+        task = self._dialog_task
+        self._dialog_task = None
+        if self.dialog_log is not None:
+            self.dialog_log._stopping = True
+        if task is not None and not task.done():
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
         if self.director:
             await self.director.close()
         await asyncio.gather(*(session.close() for session in self.sessions),
