@@ -2,11 +2,14 @@
 
 The running service does not call ``emit`` yet (those call sites belong to
 Vida). This drives ``emit`` inside the bots image, once with the switch off
-and once with it on, and checks the mounted directory from the host.
+and once with it on. The day file stays mode 0600, owned by UID 10001. The
+host only lists the directory (to see that switch-off created nothing). The
+switch-on contents, mode and owner are read by a second container running as
+that same UID, because the runner cannot open a 0600 file it does not own.
 """
 import hashlib
 import hmac
-import stat
+import json
 from pathlib import Path
 
 
@@ -61,6 +64,23 @@ async def main():
 asyncio.run(main())
 '''
 
+# Runs as UID 10001. Prints one JSON object; does not change the file mode.
+_READ = r'''
+import json, pathlib, stat
+files = [path for path in pathlib.Path("/var/lib/bots-dialog").glob("*.jsonl")
+         if path.is_file() and not path.is_symlink()]
+if len(files) != 1:
+    raise SystemExit("expected one day file, got %d" % len(files))
+path = files[0]
+info = path.stat()
+print(json.dumps({
+    "name": path.name,
+    "mode": stat.S_IMODE(info.st_mode),
+    "uid": info.st_uid,
+    "text": path.read_text(encoding="utf-8"),
+}))
+'''
+
 
 def check_dialog_log(docker, tag, temp, label):
     """Fail when the image does not record a line with the switch on, or records one with it off."""
@@ -88,15 +108,24 @@ def check_dialog_log(docker, tag, temp, label):
             '--entrypoint', 'python', image, '-c', _SCRIPT])
         if result.stdout.strip() != mode + '-ok':
             raise RuntimeError('Dialog log check failed for switch ' + mode)
-        files = list(work.glob('*.jsonl'))
+        names = [path.name for path in work.glob('*.jsonl')]
         if mode == 'off':
-            if files:
-                raise RuntimeError('Switch off created ' + files[0].name)
+            if names:
+                raise RuntimeError('Switch off created ' + names[0])
             continue
-        if len(files) != 1:
+        if len(names) != 1:
             raise RuntimeError('Switch on should create one day file')
-        text = files[0].read_text(encoding='utf-8')
-        if 'hola bitacora' not in text or stat.S_IMODE(files[0].stat().st_mode) != 0o600:
-            raise RuntimeError('Day file is missing the line or is not mode 0600')
+        # Do not open the day file here. It is 0600 and owned by UID 10001.
+        reader = docker([
+            'run', '--rm', '--pull=never', '--network=none', '--read-only', '--user', '10001:10001',
+            '--label', label,
+            '--mount', f'type=bind,source={work},target=/var/lib/bots-dialog,readonly',
+            '--entrypoint', 'python', image, '-c', _READ])
+        report = json.loads(reader.stdout)
+        if report['mode'] != 0o600 or report['uid'] != 10001:
+            raise RuntimeError('Day file must stay mode 0600 owned by UID 10001')
+        text = report['text']
+        if 'hola bitacora' not in text:
+            raise RuntimeError('Day file is missing the line')
         if '424242' in text.replace(digest, ''):
             raise RuntimeError('Raw player id leaked into the dialog log')
