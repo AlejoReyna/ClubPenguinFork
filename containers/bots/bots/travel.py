@@ -11,7 +11,7 @@ import random
 import re
 import time
 
-from . import as2, text
+from . import as2, igloo_invite, spend, text
 from .cast import may_enter_igloo
 from .session import RoomChangeError
 
@@ -26,6 +26,10 @@ def invitation(message, catalog):
     folded = text.fold(message)
     if re.search(r'\b(?:no|nunca)\b', folded):
         return None
+    if re.search(r'\biglu\b|\bigloo\b|\b(?:tu|mi) casa\b|\bcasa mia\b', folded):
+        if re.search(r'\b(?:mi casa|casa mia)\b', folded):
+            return 'igloo:mine'
+        return 'igloo:yours'
     if re.search(r'\b(?:sigueme|ven conmigo|acompaname)\b', folded):
         follow = True
     else:
@@ -61,6 +65,8 @@ class Ticket:
     kind: str
     deadline: float
     owner_id: object = None
+    invite_id: object = None
+    reason: object = None
 
 
 @dataclass
@@ -69,6 +75,8 @@ class Lease:
     human: object = None
     lost_since: object = None
     ready: bool = True
+    hold: bool = False
+    invite_id: object = None
 
 
 class Travel:
@@ -79,6 +87,8 @@ class Travel:
         self.sessions = director.sessions
         self.clock, self.rng = clock, rng or random.Random(self.config.service.life_seed)
         self.reservations, self.leases, self.jobs = {}, {}, {}
+        self._recent_pairs = {}  # (a, b) -> monotonic expiry; a decline or a visit
+        self._invite_seq = 0
         self.plan = {}
         for session in self.sessions:
             self.plan.setdefault(session.bot.room, []).append(session)
@@ -174,7 +184,8 @@ class Travel:
         if session.index in self.reservations and self.reservations[session.index] is not exclude:
             raise TravelDenied('busy')
         state = self.director.rooms.get(session.room_id)
-        own_turn = 1 if kind == 'invitation' else 0
+        # The dialogue turn that is carrying this invitation is not a second commitment.
+        own_turn = 1 if kind in ('invitation', 'igloo') else 0
         if state and state.pending.get(session.index, 0) > own_turn:
             raise TravelDenied('busy')
         if not homecoming and self.world.conversation_locked(session.player_id, requester):
@@ -194,13 +205,14 @@ class Travel:
             pending = self.reservations.get(resident.index)
             return pending.target if pending is not None and pending is not exclude else resident.room_id
         absent = sum(projected_room(s) != target or not self.online(s) for s in residents if s is not session)
-        # An igloo holds the owner. It is not a catalog room and has no bot_cap.
-        cap = 1 if igloo else min(room.bot_cap, len(residents) + 2)
+        # An igloo is the owner plus one guest. It is not a catalog room.
+        cap = 2 if igloo else min(room.bot_cap, len(residents) + 2)
         if physical.get(target, 0) + incoming.get(target, 0) + (0 if igloo else absent) + 1 > cap:
             raise TravelDenied('capacity')
         return homecoming
 
-    def reserve(self, session, target, requester=None, kind='wander', seconds=None, owner_id=None):
+    def reserve(self, session, target, requester=None, kind='wander', seconds=None, owner_id=None,
+                invite_id=None, reason=None):
         self.update()
         homecoming = self._check(session, int(target), requester, kind)
         duration = self.settings.visit_seconds if seconds is None else seconds
@@ -209,22 +221,21 @@ class Travel:
             if duration < min(30, self.settings.visit_seconds):
                 raise TravelDenied('budget')
         ticket = Ticket(session, session.room_id, int(target), session.conn, duration,
-                        requester, kind, self.clock() + 60, owner_id)
+                        requester, kind, self.clock() + 60, owner_id, invite_id, reason)
         self.reservations[session.index] = ticket  # no await between policy check and reservation
         return ticket
 
-    def reserve_igloo(self, session, owner_id=None):
-        """Reserve a walk into an igloo. Nothing in this process calls it yet.
+    def reserve_igloo(self, session, owner_id=None, invite_id=None, reason=None, requester=None):
+        """Reserve a walk into an igloo. ``owner_id`` defaults to this penguin.
 
-        The next PR decides invitations here. It must keep calling
-        ``may_enter_igloo`` (``_check`` already does) and must not ask the
-        model to accept or reject. There is no ``dialog_log`` module yet.
-        ``owner_id`` defaults to this penguin's own igloo.
+        ``requester`` set means the host waits in the igloo for that human
+        instead of chasing them. The decision to call this is ``igloo_invite``.
         """
         if session.player_id is None and owner_id is None:
             raise TravelDenied('offline')
         owner_id = int(session.player_id if owner_id is None else owner_id)
-        return self.reserve(session, as2.igloo_external_id(owner_id), kind='igloo', owner_id=owner_id)
+        return self.reserve(session, as2.igloo_external_id(owner_id), requester, 'igloo',
+                            owner_id=owner_id, invite_id=invite_id, reason=reason)
 
     def offer(self, session, action, requester):
         if action == 'follow':
@@ -318,9 +329,14 @@ class Travel:
                 else:
                     previous = self.leases.get(session.index)
                     expiry = min(previous.expires, self.clock() + ticket.seconds) if previous else self.clock() + ticket.seconds
-                    human = ticket.requester if ticket.kind in ('invitation', 'follow') else None
-                    ready = human is None or self.world.human_room(human) == ticket.target
-                    self.leases[session.index] = Lease(expiry, human, None if ready else self.clock(), ready)
+                    waiting = ticket.kind == 'igloo' and ticket.requester is not None
+                    human = ticket.requester if ticket.kind in ('invitation', 'follow') or waiting else None
+                    ready = True if ticket.kind == 'igloo' else (
+                        human is None or self.world.human_room(human) == ticket.target)
+                    self.leases[session.index] = Lease(
+                        expiry, human, None if ready else self.clock(), ready,
+                        ticket.kind == 'igloo', ticket.invite_id)
+                self._emit_travel(session, ticket)
                 if life:
                     try:
                         await life.settle()  # walk in off the shared entry point, like a player
@@ -338,6 +354,273 @@ class Travel:
             if not entered and session.room_id == session.bot.room:
                 self.leases.pop(session.index, None)
         return False
+
+    def _emit_travel(self, session, ticket):
+        from .dialog_log import emit
+        if not session.bot.username:
+            return
+        emit(room_id=int(ticket.source), speaker=session.bot.username, kind='travel',
+             target_kind='room', source='local', invite_id=ticket.invite_id,
+             reason=ticket.reason, dest_room_id=int(ticket.target))
+
+    def _pair(self, left, right):
+        return tuple(sorted((str(left), str(right))))
+
+    def remember_pair(self, left, right):
+        self._recent_pairs[self._pair(left, right)] = self.clock() + igloo_invite.PAIR_SECONDS
+        if len(self._recent_pairs) > 64:
+            oldest = min(self._recent_pairs, key=self._recent_pairs.get)
+            self._recent_pairs.pop(oldest, None)
+
+    def pair_is_recent(self, left, right):
+        key = self._pair(left, right)
+        expiry = self._recent_pairs.get(key)
+        if expiry is None:
+            return False
+        if self.clock() >= expiry:
+            self._recent_pairs.pop(key, None)
+            return False
+        return True
+
+    def _invite_id(self):
+        self._invite_seq += 1
+        return f'ig{self._invite_seq}'
+
+    def _guest_facts(self, session, now, host_key, host_names, host_is_human):
+        card = session.bot.card
+        life = getattr(session.behavior, 'life', None)
+        needs = life.needs if life is not None else {'energy': 1.0, 'social': 0.0}
+        busy = self.world.conversation_locked(session.player_id)
+        partner = getattr(self.director, 'partner', None)
+        if partner and partner(session) is not None:
+            busy = True
+        pinned = bool(self.director.events and self.director.events.pinned(session, now))
+        day = now.date().isoformat() if now is not None else 'day'
+        rng = igloo_invite.decision_rng(self.config.service.life_seed, session.bot.username, day, host_key)
+        return igloo_invite.verdict(
+            rng,
+            role_blocked=not igloo_invite.eligible(session.bot),
+            on_duty=igloo_invite.on_duty(card, now),
+            pinned=pinned,
+            busy=busy,
+            energy=needs.get('energy', 1.0),
+            social=needs.get('social', 0.0),
+            recent=self.pair_is_recent(f'b:{session.bot.username}', host_key),
+            warm=igloo_invite.warm_toward(card, host_names),
+            host_is_human=host_is_human,
+        )
+
+    async def _say(self, session, line, priority, human_here):
+        """One in-character line. The model writes it only with a human listening and budget left."""
+        from .provider import SimulatedProvider
+        brain = self.director.brains.get(session.index)
+        source = 'local'
+        if human_here and brain is not None and not isinstance(session.provider, SimulatedProvider):
+            ledger = self.director.ledger
+            if ledger is None or ledger.allows(priority):
+                try:
+                    raw, _usage = await session.provider.complete(
+                        [{'role': 'user', 'content':
+                          'Escribe una sola frase en personaje, maximo 54 caracteres, sin JSON. '
+                          'La decision ya esta tomada: ' + line}],
+                        priority=priority)
+                    spoken = raw
+                    if isinstance(raw, str) and raw.lstrip().startswith('{'):
+                        import json
+                        spoken = json.loads(raw).get('say') or line
+                    line, source = spoken, 'model'
+                except Exception:
+                    source = 'fallback'
+            else:
+                source = 'fallback'
+        if brain is None:
+            return line, source
+        answer = await brain.safe(line, source=source if source != 'model' else 'llm')
+        if answer.source == 'llm':
+            source = 'model'
+        elif source == 'model':
+            source = 'fallback'
+        else:
+            source = answer.source if answer.source in ('local', 'fallback') else source
+        if answer.say and session.player_id is not None:
+            await session.send_chat(session.player_id, answer.say)
+        return answer.say, source
+
+    def _emit_invite(self, speaker, kind, *, room_id, target_kind, target, player_id,
+                     text, source, priority, invite_id, reason, dest_room_id):
+        from .dialog_log import emit
+        emit(room_id=int(room_id), speaker=speaker, kind=kind, target_kind=target_kind,
+             target=target, player_id=player_id, text=text or None, source=source,
+             priority=priority, invite_id=invite_id, reason=reason,
+             dest_room_id=int(dest_room_id))
+
+    async def consider_igloo(self, life, now):
+        """Maybe invite someone in this room to the host's igloo. True when it tried."""
+        session = life.session
+        if as2.is_igloo_room(session.room_id) or session.player_id is None:
+            return False
+        if not igloo_invite.eligible(session.bot):
+            return False
+        if igloo_invite.on_duty(session.bot.card, now):
+            return False
+        if self.world.conversation_locked(session.player_id):
+            return False
+        if life.needs.get('energy', 1) < 0.2:
+            return False
+        if not self.world.has_humans(session.room_id):
+            return False  # no bot-bot loop in an empty room, and no paid line
+        if life.rng.random() >= igloo_invite.HOST_CHANCE:
+            return False
+        guest = self._spare_guest(session)
+        if guest is not None:
+            await self.invite_bot(session, guest, now)
+            return True
+        humans = self.world.humans_in(session.room_id)
+        await self._host_departs(session, humans[0].id, now)
+        return True
+
+    def _spare_guest(self, session):
+        """Another body who can leave with the host without dropping the minimum.
+
+        A helper still counts as someone in the room, but is never the guest.
+        """
+        room = session.room_id
+        planned = len(self.plan.get(room, []))
+        minimum = max(1, planned - 1) if planned else 0
+        if planned == 1 and self.world.has_humans(room) and session.bot.room == room:
+            return None
+        present = sum(1 for other in self.sessions if self.online(other) and other.room_id == room)
+        if present - 2 < minimum:
+            return None
+        for other in self.sessions:
+            if other is session or not self.online(other) or other.room_id != room:
+                continue
+            if igloo_invite.eligible(other.bot):
+                return other
+        return None
+
+    async def answer_human_igloo(self, session, human_id, whose, now=None):
+        """A human asked this bot into an igloo. The bot decides; the model does not."""
+        life = getattr(session.behavior, 'life', None)
+        now = now or (life._last if life is not None and life._last is not None else self.director.utcnow())
+        if whose == 'mine':
+            return await self._invite_to(session, now, owner_id=int(human_id), human_id=int(human_id),
+                                         host_is_human=True, host_key=f'p:{int(human_id)}', host_names=())
+        return await self._invite_to(session, now, owner_id=session.player_id, human_id=int(human_id),
+                                     host_is_human=True, host_key=f'p:{int(human_id)}',
+                                     host_names=session.bot.mention_names)
+
+    async def _host_departs(self, session, human_id, now):
+        """The host already decided. Open the igloo and wait. The human decides in the client."""
+        invite_id = self._invite_id()
+        dest = as2.igloo_external_id(session.player_id)
+        self._emit_invite(session.bot.username, 'invite', room_id=session.room_id,
+                          target_kind='player', target=None, player_id=int(human_id),
+                          text=None, source='local', priority=None, invite_id=invite_id,
+                          reason=None, dest_room_id=dest)
+        denied = await self._depart(session, None, session.player_id, int(human_id), invite_id, 'seeded_roll')
+        if not denied:
+            return
+        line = (session.bot.card.fallbacks[0] if session.bot.card and session.bot.card.fallbacks
+                else 'Ahora no puedo.')
+        said, source = await self._say(session, line, spend.P2, True)
+        self._emit_invite(session.bot.username, 'decline', room_id=session.room_id,
+                          target_kind='player', target=None, player_id=int(human_id),
+                          text=said, source=source, priority=spend.P2, invite_id=invite_id,
+                          reason=self._travel_reason(denied), dest_room_id=dest)
+
+    async def invite_bot(self, session, guest, now):
+        """Host ``session`` invites ``guest`` while a human is in the room. Tests and the cycle."""
+        if not self.world.has_humans(session.room_id):
+            return None
+        return await self._invite_to(session, now, owner_id=session.player_id, guest=guest,
+                                     human_id=None, host_is_human=False,
+                                     host_key=f'b:{session.bot.username}',
+                                     host_names=session.bot.mention_names)
+
+    async def _invite_to(self, session, now, *, owner_id, human_id, host_is_human, host_key,
+                         host_names, guest=None, deciding=None):
+        """Run one invitation. ``deciding`` defaults to ``guest`` or ``session``."""
+        deciding = deciding or guest or session
+        invite_id = self._invite_id()
+        dest = as2.igloo_external_id(owner_id)
+        human_here = self.world.has_humans(session.room_id) or human_id is not None
+        priority = spend.P0 if host_is_human else spend.P2
+        decision, reason = self._guest_facts(deciding, now, host_key, host_names, host_is_human)
+        pair_left = f'b:{deciding.bot.username}'
+        if decision == 'skip':
+            return decision
+        if guest is not None:
+            # The host asked. The guest's accept or decline uses the same invite_id.
+            self._emit_invite(session.bot.username, 'invite', room_id=session.room_id,
+                              target_kind='bot', target=guest.bot.username, player_id=None,
+                              text=None, source='local', priority=None, invite_id=invite_id,
+                              reason=None, dest_room_id=dest)
+        if decision == 'decline':
+            line = (deciding.bot.card.fallbacks[0] if deciding.bot.card and deciding.bot.card.fallbacks
+                    else 'Ahora no puedo.')
+            said, source = await self._say(deciding, line, priority, human_here)
+            self._emit_invite(deciding.bot.username, 'decline', room_id=deciding.room_id,
+                              target_kind='player' if human_id and guest is None else 'bot',
+                              target=None if human_id and guest is None else (
+                                  session.bot.username if deciding is not session else (
+                                      guest.bot.username if guest else None)),
+                              player_id=human_id, text=said, source=source, priority=priority,
+                              invite_id=invite_id, reason=reason, dest_room_id=dest)
+            self.remember_pair(pair_left, host_key)
+            return decision
+        # accept
+        line = (deciding.bot.card.greetings[0] if deciding.bot.card and deciding.bot.card.greetings
+                else 'Vamos.')
+        said, source = await self._say(deciding, line, priority, human_here)
+        target_kind = 'player' if guest is None else 'bot'
+        target = None if guest is None else (
+            guest.bot.username if deciding is session else session.bot.username)
+        if guest is None:
+            self._emit_invite(session.bot.username, 'invite', room_id=session.room_id,
+                              target_kind='player', target=None, player_id=human_id,
+                              text=None, source='local', priority=None, invite_id=invite_id,
+                              reason=None, dest_room_id=dest)
+        denied = await self._depart(session, guest, owner_id, human_id, invite_id, reason)
+        if denied:
+            self._emit_invite(deciding.bot.username, 'decline', room_id=deciding.room_id,
+                              target_kind=target_kind, target=target, player_id=human_id,
+                              text=None, source='local', priority=None, invite_id=invite_id,
+                              reason=self._travel_reason(denied), dest_room_id=dest)
+            return 'decline'
+        self._emit_invite(deciding.bot.username, 'accept', room_id=deciding.room_id,
+                          target_kind=target_kind, target=target, player_id=human_id,
+                          text=said, source=source, priority=priority, invite_id=invite_id,
+                          reason=reason, dest_room_id=dest)
+        self.remember_pair(pair_left, host_key)
+        return decision
+
+    async def _depart(self, host, guest, owner_id, human_id, invite_id, reason):
+        tickets = []
+        try:
+            tickets.append(self.reserve_igloo(
+                host, owner_id, invite_id=invite_id, reason=reason,
+                requester=human_id if guest is None else None))
+            if guest is not None:
+                tickets.append(self.reserve_igloo(
+                    guest, owner_id, invite_id=invite_id, reason=reason))
+        except TravelDenied as error:
+            for ticket in tickets:
+                if self.reservations.get(ticket.session.index) is ticket:
+                    self.reservations.pop(ticket.session.index, None)
+            return error.reason
+        for ticket in tickets:
+            self.start(ticket)
+        return None
+
+    @staticmethod
+    def _travel_reason(reason):
+        """Map a reservation refusal onto the dialog-log vocabulary. Unknown stays null."""
+        if reason in ('minimum', 'capacity', 'budget'):
+            return 'room_min_guard'
+        if reason in ('conversation', 'busy'):
+            return 'busy_with_human'
+        return None
 
     def destination(self, life, now):
         session, card = life.session, life.card
@@ -366,6 +649,8 @@ class Travel:
         if self.director.events and self.director.events.pinned(life.session, now):
             return
         if life.session.index in self.jobs or life.session.index in self.reservations:
+            return
+        if await self.consider_igloo(life, now):
             return
         target = self.destination(life, now)
         if target is None:
@@ -398,7 +683,22 @@ class Travel:
                          and lease.human is None and not self.world.conversation_locked(session.player_id))
             if preparing:
                 target = session.bot.room
-            if not expired and lease.human is not None:
+            if getattr(lease, 'hold', False) and not expired:
+                # Stay in the igloo. Do not chase the guest around the island.
+                guest_here = (lease.human is None
+                              or self.world.human_room(lease.human) == session.room_id)
+                if guest_here:
+                    lease.lost_since = None
+                    target = session.room_id
+                elif lease.lost_since is None:
+                    lease.lost_since = self.clock()
+                    target = session.room_id
+                elif self.clock() - lease.lost_since < 8:
+                    target = session.room_id
+                else:
+                    expired = True
+                    target = session.bot.room
+            elif not expired and lease.human is not None:
                 target = self.world.human_room(lease.human)
                 if not lease.ready:
                     if target == session.room_id:
@@ -425,7 +725,9 @@ class Travel:
                 continue
             if target is not None:
                 try:
-                    self.start(self.reserve(session, target, lease.human, 'follow', max(0, lease.expires - self.clock())))
+                    self.start(self.reserve(
+                        session, target, lease.human, 'follow', max(0, lease.expires - self.clock()),
+                        invite_id=lease.invite_id, reason='lease_expired' if expired else None))
                 except TravelDenied:
                     pass
 
