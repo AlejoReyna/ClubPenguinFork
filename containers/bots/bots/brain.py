@@ -10,7 +10,7 @@ import random
 import re
 from dataclasses import dataclass
 
-from . import actions, safety, spend, text
+from . import actions, as2, safety, spend, text
 from .provider import ProviderError, SimulatedProvider
 
 GLOBAL_RULES = (
@@ -87,6 +87,8 @@ class Brain:
             profile.update(voz=card.voice, arquetipo=card.archetype, gustos=card.likes,
                            disgustos=card.dislikes, conocimientos=card.knows,
                            relaciones=card.relationships, temas=card.topics)
+            if card.role:
+                profile['rol'] = card.role
         return profile
 
     def situation(self, now=None):
@@ -95,9 +97,10 @@ class Brain:
         if session.service:
             now = now.astimezone(session.service.tz)
         room = session.catalog.get(session.room_id) if session.catalog and session.room_id else None
+        room_name = room.name if room else ('iglu' if as2.is_igloo_room(session.room_id) else session.room_id)
         members = session.world.members(session.room_id) if session.world and session.room_id else []
         life = session.behavior.life
-        return {'sala': room.name if room else session.room_id,
+        return {'sala': room_name,
                 'hora': now.isoformat(timespec='minutes'),
                 'presentes': [m.nickname[:30] for m in sorted(members, key=lambda m: m.id)[:8]],
                 'actividad': life.activity if life else ('puesto fijo' if self.bot.stationary else 'paseo'),

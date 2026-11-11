@@ -97,7 +97,11 @@ class Life:
     def _floor(self):
         """(room, visiting, rectangles this body may stand on); no rectangles = hold the post."""
         visiting = bool(getattr(self.session, 'travel', None) and self.session.room_id != self.bot.room)
-        room = self.session.catalog.require(self.session.room_id if visiting else self.bot.room)
+        room_id = self.session.room_id if visiting else self.bot.room
+        room = self.session.catalog.get(room_id) if self.session.catalog else None
+        # An igloo is not in the catalog. Hold the fixed post; do not wander it.
+        if room is None:
+            return None, True, []
         settings = getattr(getattr(self.session, 'travel', None), 'settings', None)
         approximate = bool(getattr(settings, 'approximate_walk', 0))
         return room, visiting, room.wander_rects(approximate)
@@ -204,6 +208,8 @@ class Life:
         if personal <= 0 or self.position is None:
             return False
         room, _visiting, rects = self._floor()
+        if room is None or not rects:
+            return False
         reachable = self._reachable(rects)
         others = self._others(room.id)
         if not reachable or spacing.can_stay(self.position, others, personal):
@@ -217,6 +223,8 @@ class Life:
         if personal <= 0 or self.position is None:
             return False
         room, _visiting, rects = self._floor()
+        if room is None:
+            return False
         center = self._person(room.id, human)
         reachable = self._reachable(rects)
         if room.id != self.session.room_id or center is None or not reachable:
@@ -261,10 +269,10 @@ class Life:
             # Conservative local pacing before a frame, so it doesn't interrupt a walk.
             await asyncio.sleep(max(0.6, distance / 40.0 + 0.5))
         action = actions.BODY_ACTIVITY.get(self.activity)
-        if action is None and self.activity != 'walk':
-            room = self.session.catalog.require(self.session.room_id)
+        if action is None and self.activity != 'walk' and self.session.catalog:
+            room = self.session.catalog.get(self.session.room_id)
             action = next((room.pois[name].action for name in self.card.home_pois
-                           if self.session.room_id == self.bot.room
+                           if room is not None and self.session.room_id == self.bot.room
                            and name in room.pois and room.pois[name].action), None)
         if action:
             kind, number = actions.BODY_ACTIONS[action]

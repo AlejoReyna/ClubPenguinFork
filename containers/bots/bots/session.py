@@ -101,6 +101,9 @@ class BotSession:
         self.joined_room = False
         self.room_id = None  # the room the server has this bot in right now
         self.stable_since = None
+        # True only after this connection sent g#or. A new world login clears it:
+        # the server drops the igloo map entry on disconnect.
+        self.igloo_opened = False
 
     @property
     def log_context(self):
@@ -217,6 +220,8 @@ class BotSession:
             self.world.register_bot(self.player_id)
 
     async def _enter_world(self, conn):
+        # A fresh login is never still inside an igloo. Home is j#jr, below.
+        self.igloo_opened = False
         world_rndk = await conn.handshake(self.server.auth_timeout)
         token = as2.world_login_password(self._login_key, world_rndk)
         fields = await conn.login_legacy(self.bot.username.lower(), token,
@@ -437,6 +442,65 @@ class BotSession:
                 await self.metrics.travel('ok')
                 return frame
 
+    async def open_igloo(self):
+        """Put this penguin's igloo on the legacy map (``g#or``)."""
+        self._require_conn()
+        async with self.mutations_lock:
+            await self.conn.set_igloo_open(True)
+        self.igloo_opened = True
+
+    async def close_igloo(self):
+        """Take it off the map (``g#cr``). No-op unless this connection opened it."""
+        if not self.igloo_opened:
+            return
+        self._require_conn()
+        async with self.mutations_lock:
+            await self.conn.set_igloo_open(False)
+        self.igloo_opened = False
+
+    async def join_igloo(self, owner_id, timeout=None):
+        """Enter ``owner_id``'s igloo and stand on the basic igloo's fixed post.
+
+        The post is ``as2.IGLOO_POST`` (380, 320), the designer start of
+        igloos/1.swf. The body does not walk around inside: that room is not
+        measured. The reader is parked, same as ``change_room``.
+        """
+        self._require_conn()
+        owner_id = int(owner_id)
+        external = as2.igloo_external_id(owner_id)
+        x, y = as2.IGLOO_POST
+        timeout = float(self.server.auth_timeout if timeout is None else timeout)
+        async with self._room_change_lock:
+            for attempt in (1, 2):
+                await self._wait_join_cooldown()
+                self._require_conn()
+                conn = self.conn
+                try:
+                    async with self._reader_lock:
+                        async with self.mutations_lock:
+                            self._last_join = time.monotonic()
+                            frame = await asyncio.wait_for(
+                                conn.join_player_igloo(owner_id, timeout), timeout)
+                            await conn.send_move(x, y)
+                except as2.ServerError as error:
+                    if error.code == _ROOM_FULL_OR_COOLDOWN and attempt == 1:
+                        continue
+                    if error.code == _ROOM_FULL_OR_COOLDOWN:
+                        await self.metrics.travel('full')
+                        raise RoomChangeError('full', f'igloo {external} refused the join') from None
+                    await self.metrics.travel('error')
+                    raise RoomChangeError('error', f'server code {error.code}') from None
+                except (TimeoutError, asyncio.TimeoutError):
+                    await self.metrics.travel('timeout')
+                    await conn.close()
+                    raise RoomChangeError('timeout', f'no answer joining igloo {external}') from None
+                except asyncio.CancelledError:
+                    await conn.close()
+                    raise
+                self._enter_room(external, frame.args)
+                await self.metrics.travel('ok')
+                return frame
+
     async def _wait_join_cooldown(self):
         remaining = self._last_join + _JOIN_COOLDOWN - time.monotonic()
         if remaining > 0:
@@ -450,6 +514,11 @@ class BotSession:
     # -------------------------------------------------------------- lifecycle
     async def _shutdown_tasks(self):
         await self.behavior.stop()
+        if self.igloo_opened and self.conn is not None and not self.conn.closed:
+            try:
+                await self.close_igloo()
+            except (as2.Disconnected, OSError, RoomChangeError):
+                self.igloo_opened = False  # the disconnect drops the map entry anyway
         if self.conn is not None and not self.conn.closed:
             await self.conn.close()
         self.conn = None

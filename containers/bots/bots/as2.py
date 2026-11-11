@@ -18,6 +18,11 @@ handlers under vendor/houdini):
   client's own dance/sit buttons send this one (see actions.py), Houdini keeps it;
 - presence: ``%xt%ap%-1%<player string>`` and ``%xt%rp%-1%<id>%``;
 - roster refresh: ``%xt%grs%-1%<room>%<strings...>%``;
+- igloo join (legacy): ``%xt%s%j#jp%-1%<player_id+1000>%``, answer ``jr`` with
+  external id ``player_id+2000``. ``j#grs`` inside an igloo echoes the database
+  row id, not that external id, so the join does not use the ``grs`` barrier;
+- igloo map: ``%xt%s%g#or%-1%`` opens, ``%xt%s%g#cr%-1%`` closes. Neither
+  packet gets a reply;
 - errors: ``%xt%e%-1%<code>%``.
 
 Frames are NUL-terminated lines. The reader yields frames to the session as
@@ -28,6 +33,20 @@ import hashlib
 import re
 
 STATIC_HASH_SUFFIX = 'Y(02.>\'H}t":E1'
+# Basic igloo (igloos/1.swf) designer start. Not a measured walk; hold this post.
+IGLOO_POST = (380, 320)
+IGLOO_JOIN_OFFSET = 1000
+IGLOO_EXTERNAL_OFFSET = 2000
+
+
+def igloo_external_id(player_id):
+    """Room id Houdini puts in ``jr`` for this penguin's igloo."""
+    return int(player_id) + IGLOO_EXTERNAL_OFFSET
+
+
+def is_igloo_room(room_id):
+    """True for a Houdini igloo external id. Catalog rooms stay under 1000."""
+    return isinstance(room_id, int) and room_id >= IGLOO_EXTERNAL_OFFSET
 VER_CHECK = '<msg t="sys"><body action="verChk" r="0"><ver v="153"/></body></msg>'
 RANDOM_KEY_REQUEST = '<msg t="sys"><body action="rndK" r="-1"/></msg>'
 
@@ -290,6 +309,34 @@ class AS2Connection:
                     raise error
                 continue
             raise FramingError('unexpected reply joining the room')
+
+    async def join_player_igloo(self, player_id, timeout):
+        """Send ``j#jp`` and wait for ``jr`` with external id ``player_id+2000``.
+
+        No ``j#grs`` after it: inside an igloo Houdini's refresh uses the
+        ``penguin_igloo_room`` serial, which is not the external id.
+        """
+        external = igloo_external_id(player_id)
+        await self.send_line(f'%xt%s%j#jp%-1%{int(player_id) + IGLOO_JOIN_OFFSET}%')
+        while True:
+            raw = await self.read_line(timeout)
+            if raw.startswith('%xt%jr%'):
+                frame = Frame.parse(raw)
+                if frame.args and frame.args[0] == str(external):
+                    return frame
+                continue
+            if raw.startswith('%'):
+                frame = Frame.parse(raw)
+                error = frame.as_error()
+                if error is not None:
+                    raise error
+                continue
+            raise FramingError('unexpected reply joining the igloo')
+
+    async def set_igloo_open(self, opened):
+        """``g#or`` or ``g#cr``. The legacy handlers send no answer."""
+        op = 'or' if opened else 'cr'
+        await self.send_line(f'%xt%s%g#{op}%-1%')
 
     # ------------------------------------------------------------- gameplay
     async def send_chat(self, player_id, message):

@@ -130,6 +130,13 @@ class Director:
                 and s.conn is not None and not s.conn.closed and not s.behavior.stopped
                 and not s.traveling]
 
+    def hears(self, room):
+        """Catalog rooms, plus an igloo a session of this process is standing in."""
+        catalog = self.config.catalog
+        if catalog is not None and room in catalog.rooms:
+            return True
+        return any(session.room_id == room for session in self.sessions)
+
     def is_human(self, room, player_id):
         return (not self.world.is_bot(player_id)
                 and any(m.id == player_id for m in self.world.humans_in(room)))
@@ -349,7 +356,7 @@ class Director:
 
     async def on_chat(self, observer, sender, message):
         room = observer.room_id
-        if (self._closed or room not in self.config.catalog.rooms or not self.is_human(room, sender)
+        if (self._closed or not self.hears(room) or not self.is_human(room, sender)
                 or not self._fresh_frame(room, sender, str(message))):
             return
         pending = self.greetings.pop((room, sender), None)
@@ -411,7 +418,7 @@ class Director:
         return f'Ahora no se donde esta {target.bot.nickname}.'
 
     def member_added(self, room, player_id):
-        if self._closed or room not in self.config.catalog.rooms or not self.is_human(room, player_id):
+        if self._closed or not self.hears(room) or not self.is_human(room, player_id):
             return
         key, now = (room, player_id), self.clock()
         if key in self.greetings:

@@ -278,7 +278,7 @@ class BotConfig:
     def __init__(self, index, username, password, nickname, room, aliases,
                  personality, area, *, stationary=False, spawn=None,
                  repeat_action=None, repeat_emote=None, music=True, card=None,
-                 fallbacks=(), greeter=False):
+                 fallbacks=(), greeter=False, role=None):
         self.index = index
         self.username = str(username)
         self.password = str(password)
@@ -298,6 +298,8 @@ class BotConfig:
         self.fallbacks = [str(line) for line in fallbacks]  # persona lines; empty = global ones
         # A host walks up to every human who enters its room, greets with the model and goes back to its post.
         self.greeter = bool(greeter)
+        # cast role: None, "helper" or "guide". helper/guide never enter an igloo.
+        self.role = role
 
     @property
     def mention_names(self):
@@ -464,7 +466,8 @@ def _cast_bot(index, raw, card, catalog):
         aliases=aliases, personality=card.personality_text() or raw.get('personality') or '',
         area=area, stationary=not home.walk, spawn=point,
         music=card.music if 'music' in card.provided else raw.get('music', True),
-        card=card, fallbacks=card.fallbacks if 'fallbacks' in card.provided else raw.get('fallbacks', ()))
+        card=card, fallbacks=card.fallbacks if 'fallbacks' in card.provided else raw.get('fallbacks', ()),
+        role=card.role)
 
 
 def parse_bot(index, raw):
@@ -637,6 +640,12 @@ def build_config(document, env=None):
             bots.append(parse_bot(index, raw))  # no card: exactly the format of every older release
             continue
         matched.add(card.username)
+        if card.is_role_note():
+            # Stamp the role onto the Secret entry. Do not take over its post.
+            bot = parse_bot(index, raw)
+            bot.role = card.role
+            bots.append(bot)
+            continue
         if card.enabled:
             bots.append(_cast_bot(index, raw, card, catalog))
         else:

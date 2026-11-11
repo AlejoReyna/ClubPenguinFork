@@ -12,6 +12,7 @@ import re
 import time
 
 from . import as2, text
+from .cast import may_enter_igloo
 from .session import RoomChangeError
 
 ROOM_ALIASES = {100: ('pueblo',), 110: ('cafeteria', 'cafe'), 111: ('biblioteca',),
@@ -40,7 +41,7 @@ def invitation(message, catalog):
 
 class TravelDenied(Exception):
     REASONS = ('offline', 'fixed', 'unknown', 'personality', 'conversation',
-               'busy', 'minimum', 'capacity', 'budget', 'already', 'expired')
+               'busy', 'minimum', 'capacity', 'budget', 'already', 'expired', 'role')
 
     def __init__(self, reason):
         if reason not in self.REASONS:
@@ -59,6 +60,7 @@ class Ticket:
     requester: object
     kind: str
     deadline: float
+    owner_id: object = None
 
 
 @dataclass
@@ -150,11 +152,16 @@ class Travel:
             raise TravelDenied('offline')
         if exclude is not None and (session.room_id != exclude.source or session.conn is not exclude.connection):
             raise TravelDenied('expired')
+        igloo = kind == 'igloo'
+        if igloo and session.bot.role in ('helper', 'guide'):
+            raise TravelDenied('role')
         card = session.bot.card
         if card is None or card.wander_home_share >= 1:
             raise TravelDenied('fixed')
-        room = self.config.catalog.get(target)
-        if room is None or room.spawn is None or not room.spawn_source:
+        if igloo and not may_enter_igloo(session.bot):
+            raise TravelDenied('fixed')
+        room = None if igloo else self.config.catalog.get(target)
+        if not igloo and (room is None or room.spawn is None or not room.spawn_source):
             raise TravelDenied('unknown')
         if session.room_id == target:
             raise TravelDenied('already')
@@ -162,7 +169,7 @@ class Travel:
         if not homecoming and self.director.events and self.director.events.pinned(session):
             raise TravelDenied('busy')
         party = kind == 'party' and target in (120, 121) and card.chattiness >= .5
-        if not homecoming and not party and target not in self._allowed_rooms(session):
+        if not igloo and not homecoming and not party and target not in self._allowed_rooms(session):
             raise TravelDenied('personality')
         if session.index in self.reservations and self.reservations[session.index] is not exclude:
             raise TravelDenied('busy')
@@ -187,12 +194,13 @@ class Travel:
             pending = self.reservations.get(resident.index)
             return pending.target if pending is not None and pending is not exclude else resident.room_id
         absent = sum(projected_room(s) != target or not self.online(s) for s in residents if s is not session)
-        cap = min(room.bot_cap, len(residents) + 2)
-        if physical.get(target, 0) + incoming.get(target, 0) + absent + 1 > cap:
+        # An igloo holds the owner. It is not a catalog room and has no bot_cap.
+        cap = 1 if igloo else min(room.bot_cap, len(residents) + 2)
+        if physical.get(target, 0) + incoming.get(target, 0) + (0 if igloo else absent) + 1 > cap:
             raise TravelDenied('capacity')
         return homecoming
 
-    def reserve(self, session, target, requester=None, kind='wander', seconds=None):
+    def reserve(self, session, target, requester=None, kind='wander', seconds=None, owner_id=None):
         self.update()
         homecoming = self._check(session, int(target), requester, kind)
         duration = self.settings.visit_seconds if seconds is None else seconds
@@ -201,9 +209,22 @@ class Travel:
             if duration < min(30, self.settings.visit_seconds):
                 raise TravelDenied('budget')
         ticket = Ticket(session, session.room_id, int(target), session.conn, duration,
-                        requester, kind, self.clock() + 60)
+                        requester, kind, self.clock() + 60, owner_id)
         self.reservations[session.index] = ticket  # no await between policy check and reservation
         return ticket
+
+    def reserve_igloo(self, session, owner_id=None):
+        """Reserve a walk into an igloo. Nothing in this process calls it yet.
+
+        The next PR decides invitations here. It must keep calling
+        ``may_enter_igloo`` (``_check`` already does) and must not ask the
+        model to accept or reject. There is no ``dialog_log`` module yet.
+        ``owner_id`` defaults to this penguin's own igloo.
+        """
+        if session.player_id is None and owner_id is None:
+            raise TravelDenied('offline')
+        owner_id = int(session.player_id if owner_id is None else owner_id)
+        return self.reserve(session, as2.igloo_external_id(owner_id), kind='igloo', owner_id=owner_id)
 
     def offer(self, session, action, requester):
         if action == 'follow':
@@ -247,10 +268,10 @@ class Travel:
                     raise TravelDenied('expired')
                 self._check(session, ticket.target, ticket.requester, ticket.kind, ticket)
                 session.traveling = True
-                source = self.config.catalog.require(ticket.source)
+                source = self.config.catalog.get(ticket.source) if self.config.catalog else None
                 life = session.behavior.life
                 position = life.position if life else session.bot.spawn
-                exits = [e for e in source.exits if e['to'] == ticket.target]
+                exits = [e for e in source.exits if e['to'] == ticket.target] if source else []
                 if position is not None and exits:
                     exit_point = (exits[0]['x'], exits[0]['y'])
                     if any(r.contains(*position) and r.contains(*exit_point) for r in source.walk):
@@ -260,9 +281,30 @@ class Travel:
                 self._check(session, ticket.target, ticket.requester, ticket.kind, ticket)
                 if session.conn is not ticket.connection:
                     raise TravelDenied('expired')
-                target = self.config.catalog.require(ticket.target)
-                point = session.bot.spawn if ticket.target == session.bot.room else target.spawn
-                await session.change_room(ticket.target, *point)
+                if ticket.kind == 'igloo':
+                    point = as2.IGLOO_POST
+                    opened = False
+                    try:
+                        if ticket.owner_id == session.player_id:
+                            await session.open_igloo()
+                            opened = True
+                        await session.join_igloo(ticket.owner_id)
+                    except (RoomChangeError, as2.Disconnected, OSError):
+                        if opened:
+                            try:
+                                await session.close_igloo()
+                            except (as2.Disconnected, OSError):
+                                session.igloo_opened = False
+                        raise
+                else:
+                    target = self.config.catalog.require(ticket.target)
+                    point = session.bot.spawn if ticket.target == session.bot.room else target.spawn
+                    await session.change_room(ticket.target, *point)
+                    if session.igloo_opened:
+                        try:
+                            await session.close_igloo()
+                        except (as2.Disconnected, OSError):
+                            session.igloo_opened = False
                 entered = True
                 self.update()
                 if life:
@@ -375,6 +417,11 @@ class Travel:
             if target == session.room_id:
                 if expired:
                     self.leases.pop(session.index, None)
+                    if session.igloo_opened:
+                        try:
+                            await session.close_igloo()
+                        except (as2.Disconnected, OSError):
+                            session.igloo_opened = False
                 continue
             if target is not None:
                 try:
@@ -397,6 +444,12 @@ class Travel:
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
+        for session in self.sessions:
+            if getattr(session, 'igloo_opened', False):
+                try:
+                    await session.close_igloo()
+                except (as2.Disconnected, OSError):
+                    session.igloo_opened = False
         self.jobs.clear()
         self.reservations.clear()
         self.leases.clear()
