@@ -355,3 +355,8 @@ it inside the runtime image with `--network none`, so no test can reach a paid p
 provider and no outbound network. With `--bots-tag` it also runs the dialog-log image check:
 one line when the switch file is `true`, and no day file when it is `false`. That check calls
 `emit` itself, because `director.py`, `travel.py` and `life.py` do not yet.
+
+The ARM64 igloo acceptance bench is `scripts/test-containers.py --igloos --bots-tag TAG`
+(with runtime/database tags). It uses disposable Houdini and simulated providers. See
+[bots-igloos-banco.md](bots-igloos-banco.md) for the reproducible command, scope,
+limitations and manual provisioning/deploy/rollback steps for Alexis.
