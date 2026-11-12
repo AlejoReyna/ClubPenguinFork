@@ -466,6 +466,7 @@ def cmd_verify(args):
                   'base="http://web:8080"\n'
                   'data=json.load(urllib.request.urlopen(base+"/puffle/build.json",timeout=10))\n'
                   'for path,key in (("/media/play/v2/client/engine.swf","engine.swf"),("/media/play/v2/client/login.swf","login.swf"),\n'
+                  '                 ("/media/play/v2/client/create.swf","create.swf"),\n'
                   '                 ("/puffle/companion.zip","companion.zip")):\n'
                   ' raw=urllib.request.urlopen(base+path,timeout=10).read()\n'
                   ' assert hashlib.sha256(raw).hexdigest()==data[key],"puffle artifact hash mismatch"\n'

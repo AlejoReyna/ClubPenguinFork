@@ -138,6 +138,8 @@ test('the page wires the patched login: banner skip on phones, framing, hash-pin
   assert.match(html, /GlaciarLoginFrame\.parse\(payload \?\? '', idioma\)/);
   assert.match(html, /\/\^\(\?:\.\*\\\/\)\?login\\\.swf/);
   assert.match(html, /'\/media\/play\/v2\/client\/login\.swf\?v=' \+ encodeURIComponent\(build\['login\.swf'\]\)/);
+  assert.match(html, /\/\^\(\?:\.\*\\\/\)\?create\\\.swf/);
+  assert.match(html, /'\/media\/play\/v2\/client\/create\.swf\?v=' \+ encodeURIComponent\(build\['create\.swf'\]\)/);
   // While framed, the camera does not move the stage and the whole-game toggle is off.
   assert.match(html, /active: \(\) => mqVertical\.matches && !encuadreCompleto && vistaLogin === null/);
   assert.match(html, /zoomBoton\.disabled = activo;/);
