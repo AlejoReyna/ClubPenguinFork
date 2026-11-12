@@ -934,7 +934,7 @@
       player.id = 'penguin-player';
       player.style.backgroundColor = '#00529b';
       document.getElementById('game').appendChild(player);
-<<<<<<< HEAD
+      loginDiagAttachPlayer(player);
       player.ruffle().addFSCommandHandler((command, payload) => {
         if (typeof command === 'string' && command.toLowerCase() === 'glaciarlogin') {
           verLogin(GlaciarLoginFrame.parse(payload ?? '', idioma));
@@ -946,9 +946,6 @@
         pintarSeguimiento();
         return true;
       });
-=======
-      loginDiagAttachPlayer(player);
->>>>>>> 12db37f (Add login diagnostics for Brave and WebSocket origin tracing.)
       await player.ruffle().load({
         url: new URL('/media/boots.swf', location.href).href,
         parameters: {lang: idioma, base: location.origin + '/'}
