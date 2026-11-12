@@ -39,8 +39,8 @@ COMPONENTS = {
                 'contexts': {'houdini': 'vendor/houdini', 'dash': 'vendor/dash',
                              'puffle': 'experiments/puffle_sim', 'production': 'production/puffle'}},
     'database': {'prefix': 'db', 'sources': ['houdini'], 'contexts': {'houdini': 'vendor/houdini'}},
-    'web': {'prefix': 'web', 'sources': ['legacy-media', 'ruffle'],
-            'contexts': {'media': 'vendor/legacy-media', 'ruffle': 'vendor/ruffle'}},
+    'web': {'prefix': 'web', 'sources': ['vanilla-media', 'ruffle'],
+            'contexts': {'media': 'vendor/vanilla-media', 'ruffle': 'vendor/ruffle'}},
     # Appears only when containers/bots/Dockerfile is tracked in Git.
     'bots': {'prefix': 'bots', 'sources': [], 'contexts': {}, 'optional': True},
 }

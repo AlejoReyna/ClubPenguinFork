@@ -2,10 +2,12 @@
 
 Formats verified in this repository (scripts/game-smoke.py and the Houdini
 handlers under vendor/houdini):
-- handshake: XML verChk (v 153) -> apiOK, then rndK -> static auth key;
+- handshake: XML verChk (v 253, the 2017 vanilla client) -> apiOK, then rndK -> static auth key;
 - login server: XML login, password =
   swap(digest(swap(digest(password).upper()) + rndk + 'Y(02.>\'H}t":E1'));
-- world server: XML login with swap(digest(login_key + rndk)) + login_key,
+- world server: XML login. Vanilla sends the login-server payload as nick and
+  ``client_key#confirmation`` as the password; legacy sends the username and
+  swap(digest(login_key + rndk)) + login_key,
   then XT join server ``%xt%s%j#js%-1%<id>%<key>%0%`` and
   room ``%xt%s%j#jr%-1%<room>%<x>%<y>%``;
 - chat in: broadcast ``%xt%sm%-1%<id>%<message>%`` (own messages included);
@@ -29,6 +31,7 @@ Frames are NUL-terminated lines. The reader yields frames to the session as
 they arrive, so provider latency never stalls packet processing.
 """
 import asyncio
+import collections
 import hashlib
 import re
 
@@ -47,7 +50,8 @@ def igloo_external_id(player_id):
 def is_igloo_room(room_id):
     """True for a Houdini igloo external id. Catalog rooms stay under 1000."""
     return isinstance(room_id, int) and room_id >= IGLOO_EXTERNAL_OFFSET
-VER_CHECK = '<msg t="sys"><body action="verChk" r="0"><ver v="153"/></body></msg>'
+VER_CHECK = '<msg t="sys"><body action="verChk" r="0"><ver v="253"/></body></msg>'
+Login = collections.namedtuple('Login', 'player_id login_key confirmation raw')
 RANDOM_KEY_REQUEST = '<msg t="sys"><body action="rndK" r="-1"/></msg>'
 
 _XML_ACTION_RE = re.compile(r'action="([A-Za-z]+)"')
@@ -85,6 +89,23 @@ def _xml_login(username, password):
     return ('<msg t="sys"><body action="login" r="0"><login z="w1">'
             f'<nick>{_cdata(username)}</nick><pword>{_cdata(password)}</pword>'
             '</login></body></msg>')
+
+
+def parse_login(fields):
+    """Login-server ``l`` args. Vanilla packs id|id|name|key|... into the first field."""
+    if not fields:
+        raise FramingError('login reply without id and key')
+    head = str(fields[0])
+    if '|' in head:
+        parts = head.split('|')
+        if len(parts) < 4 or not parts[0].isdigit() or not parts[3]:
+            raise FramingError(f'vanilla login reply is malformed {head!r}')
+        if len(fields) < 2 or not fields[1]:
+            raise FramingError('vanilla login reply without confirmation hash')
+        return Login(parts[0], parts[3], fields[1], head)
+    if not head.isdigit() or len(fields) < 2:
+        raise FramingError('login reply without id and key')
+    return Login(head, fields[1], None, None)
 
 
 class FramingError(Exception):
@@ -248,8 +269,21 @@ class AS2Connection:
         return key_reply.key
 
     async def login_legacy(self, username, hashed_password, timeout):
-        """XML login for a legacy-style client; returns the XT 'l' fields."""
+        """XML login; returns the XT 'l' fields. The login server uses this for both clients."""
         await self.send_line(_xml_login(username, hashed_password))
+        return await self._read_login(timeout)
+
+    async def login_world(self, username, identity, rndk, timeout):
+        """World login. Vanilla requires the confirmation hash from the login server."""
+        token = world_login_password(identity.login_key, rndk)
+        if identity.confirmation:
+            await self.send_line(_xml_login(identity.raw, token + '#' + identity.confirmation))
+        else:
+            await self.send_line(_xml_login(username, token))
+        return await self._read_login(timeout)
+
+    async def _read_login(self, timeout):
+        """Read until the XT login reply."""
         while True:
             raw = await self.read_line(timeout)
             if raw.startswith('%'):

@@ -40,6 +40,16 @@ class AuthTests(unittest.TestCase):
     def test_cdata_escapes_closing_bracket(self):
         self.assertEqual(as2._cdata('a]]>b'), '<![CDATA[a]]]]><![CDATA[>b]]>')
 
+    def test_parse_login_accepts_legacy_and_vanilla_replies(self):
+        legacy = as2.parse_login(['7', 'key'])
+        self.assertEqual(legacy.player_id, '7')
+        self.assertEqual(legacy.login_key, 'key')
+        self.assertIsNone(legacy.confirmation)
+        raw = '7|7|nico|abc|houdini|8|0'
+        vanilla = as2.parse_login([raw, 'confirm', '', '3101,0'])
+        self.assertEqual((vanilla.player_id, vanilla.login_key, vanilla.confirmation, vanilla.raw),
+                         ('7', 'abc', 'confirm', raw))
+
 
 class FrameTests(unittest.TestCase):
 

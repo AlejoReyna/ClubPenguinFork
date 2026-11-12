@@ -67,11 +67,12 @@ async def main():
             rndk=await conn.handshake(10)
             fields=await conn.login_legacy(identity['username'],login_server_password(identity['password'],rndk),10)
         finally: await conn.close()
-        pid,key=fields[:2]
+        logged=parse_login(fields)
+        pid,key=logged.player_id,logged.login_key
         conn=await AS2Connection.connect('glaciar',9876)
         connections.append(conn)
         rndk=await conn.handshake(10)
-        await conn.login_legacy(identity['username'],world_login_password(key,rndk),10)
+        await conn.login_world(identity['username'],logged,rndk,10)
         await conn.join_world(int(pid),key,10)
         await conn.join_room(120,10,330,250)
         await conn.send_heartbeat()

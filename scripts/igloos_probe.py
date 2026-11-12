@@ -27,13 +27,14 @@ async def human_login(identity):
     conn = await as2.AS2Connection.connect('login', 6112)
     try:
         rnd = await conn.handshake(10)
-        pid, key = (await conn.login_legacy(identity['username'],
-                    as2.login_server_password(identity['password'], rnd), 10))[:2]
+        logged = as2.parse_login(await conn.login_legacy(identity['username'],
+                    as2.login_server_password(identity['password'], rnd), 10))
+        pid, key = logged.player_id, logged.login_key
     finally:
         await conn.close()
     conn = await as2.AS2Connection.connect('glaciar', 9876)
     rnd = await conn.handshake(10)
-    await conn.login_legacy(identity['username'], as2.world_login_password(key, rnd), 10)
+    await conn.login_world(identity['username'], logged, rnd, 10)
     await conn.join_world(int(pid), key, 10)
     await conn.join_room(120, 10, 330, 250)
     return conn, int(pid)

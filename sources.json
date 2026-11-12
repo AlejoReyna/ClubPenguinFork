@@ -7,8 +7,8 @@
     "url": "https://github.com/solero/dash.git",
     "revision": "89ccac34883088f176c594ae55e0e93a29dac265"
   },
-  "legacy-media": {
-    "url": "https://git.solero.me/solero/legacy-media.git",
-    "revision": "b3a86b70689a38fdf8773c250aa576551acb65b8"
+  "vanilla-media": {
+    "url": "https://git.solero.me/solero/vanilla-media.git",
+    "revision": "e8666de19835faf61782358d52a3b41c9226a00a"
   }
 }

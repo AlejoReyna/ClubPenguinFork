@@ -714,7 +714,7 @@
   };
   const loginDiagProbeSocket = (socketBase, path) => new Promise(resolve => {
     const url = socketBase + path;
-    const VERCHK = '<msg t="sys"><body action="verChk" r="0"><ver v="153"/></body></msg>\0';
+    const VERCHK = '<msg t="sys"><body action="verChk" r="0"><ver v="253"/></body></msg>\0';
     const started = Date.now();
     let settled = false;
     let ws;

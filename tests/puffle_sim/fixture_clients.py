@@ -3,7 +3,7 @@ import asyncio
 import json
 import sys
 
-from bot_as2 import AS2Connection, Frame, login_server_password, world_login_password
+from bot_as2 import AS2Connection, Frame, login_server_password, parse_login
 
 
 async def login(account):
@@ -14,11 +14,12 @@ async def login(account):
                                                 login_server_password(account['password'], key), 5)
     finally:
         await login_conn.close()
-    pid, login_key = int(fields[0]), fields[1]
+    logged = parse_login(fields)
+    pid, login_key = int(logged.player_id), logged.login_key
     assert pid == account['id']
     world = await AS2Connection.connect('glaciar', 9876)
     key = await world.handshake(5)
-    await world.login_legacy(account['name'], world_login_password(login_key, key), 5)
+    await world.login_world(account['name'], logged, key, 5)
     await world.join_world(pid, login_key, 5)
     await world.join_room(100, 5)
     return world

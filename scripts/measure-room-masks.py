@@ -22,7 +22,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG = ROOT / 'containers/bots/bots/data/rooms.json'
-ROOMS_DIR = ROOT / 'vendor/legacy-media/media/play/v2/content/global/rooms'
+ROOMS_DIR = ROOT / 'vendor/vanilla-media/media/play/v2/content/global/rooms'
 CELL = 4
 STAGE_W, STAGE_H = 760, 480
 

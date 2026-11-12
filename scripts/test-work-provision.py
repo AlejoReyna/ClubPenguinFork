@@ -418,12 +418,13 @@ async def observe():
         fields = await login.login_legacy(identity["username"], login_server_password(identity["password"], rndk), 5)
     finally:
         await login.close()
-    pid, key = fields[:2]
+    logged = parse_login(fields)
+    pid, key = logged.player_id, logged.login_key
     conn = await AS2Connection.connect("glaciar", 9876)
     found = {}
     try:
         rndk = await conn.handshake(5)
-        await conn.login_legacy(identity["username"], world_login_password(key, rndk), 5)
+        await conn.login_world(identity["username"], logged, rndk, 5)
         await conn.join_world(int(pid), key, 5)
         areas = doc["areas"]
         stationary = set(doc.get("stationary") or [])

@@ -35,7 +35,8 @@ elif mode in ('login', 'world'):
         '--database-password', os.environ['POSTGRES_PASSWORD'],
         '--redis-address', os.environ.get('REDIS_HOST', 'redis'),
         '--capacity', os.environ.get('WORLD_CAPACITY', '20'),
-        '--lang', 'es', '--single-client-mode', '--default-client', 'legacy',
+        '--lang', 'es', '--single-client-mode', '--default-client', 'vanilla',
+        '--default-version', '253',
     ]
     if mode == 'world':
         sys.argv += ['-id', '3101', '--name', 'Glaciar']

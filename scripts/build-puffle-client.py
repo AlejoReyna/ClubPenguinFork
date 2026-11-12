@@ -4,14 +4,9 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
-import subprocess
-import sys
-import urllib.request
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
-from experiments.puffle_sim.client.build_engine import FFDEC_SHA256
 
 
 def main():
@@ -25,32 +20,14 @@ def main():
         (args.output / 'login.swf').write_bytes(b'test-only placeholder')
         (args.output / 'create.swf').write_bytes(b'test-only placeholder')
     else:
-        directory = ROOT / '.local/tools/ffdec-26.4.0'
-        jar = directory / 'ffdec.jar'
-        if not jar.is_file():
-            archive = ROOT / '.local/tools/ffdec-26.4.0.zip'
-            archive.parent.mkdir(parents=True, exist_ok=True)
-            if not archive.exists():
-                urllib.request.urlretrieve('https://github.com/jindrapetrik/jpexs-decompiler/releases/download/version26.4.0/ffdec_26.4.0.zip', archive)
-            if hashlib.sha256(archive.read_bytes()).hexdigest() != '56ce960aeafc7caf034e2052ba49f878a883f7c7ca690da6eeffca9587b5e4b9':
-                raise SystemExit('FFDec distribution checksum mismatch')
-            directory.mkdir(parents=True, exist_ok=True)
-            with zipfile.ZipFile(archive) as bundle:
-                for member in bundle.infolist():
-                    if not (directory / member.filename).resolve().is_relative_to(directory.resolve()):
-                        raise SystemExit('Invalid FFDec archive')
-                bundle.extractall(directory)
-        if hashlib.sha256(jar.read_bytes()).hexdigest() != FFDEC_SHA256:
-            raise SystemExit('FFDec checksum mismatch')
-        subprocess.run([sys.executable, str(ROOT / 'experiments/puffle_sim/client/build_engine.py'),
-                        '--ffdec', str(jar), '--engine', str(ROOT / 'vendor/legacy-media/media/play/v2/client/engine.swf'),
-                        '--output', str(args.output / 'engine.swf')], check=True)
-        subprocess.run([sys.executable, str(ROOT / 'experiments/puffle_sim/client/build_login.py'),
-                        '--ffdec', str(jar), '--login', str(ROOT / 'vendor/legacy-media/media/play/v2/client/login.swf'),
-                        '--output', str(args.output / 'login.swf')], check=True)
-        subprocess.run([sys.executable, str(ROOT / 'experiments/puffle_sim/client/build_create.py'),
-                        '--ffdec', str(jar), '--create', str(ROOT / 'vendor/legacy-media/media/play/v2/client/create.swf'),
-                        '--output', str(args.output / 'create.swf')], check=True)
+        client = ROOT / 'vendor/vanilla-media/media/play/v2/client'
+        # Hashes in build.json must match the SWFs the image serves. The puffle
+        # patches only apply to the older engine; the 2017 client is copied through.
+        for name in ('engine.swf', 'login.swf', 'create.swf'):
+            target = args.output / name
+            if target.exists():
+                raise SystemExit(f'{name} already exists; refusing to overwrite')
+            target.write_bytes((client / name).read_bytes())
     with zipfile.ZipFile(args.output / 'companion.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
         files = list((ROOT / 'production/puffle').glob('*.py'))
         files += [p for p in (ROOT / 'experiments/puffle_sim').glob('*.py') if p.name != 'run_houdini_fixture.py']
