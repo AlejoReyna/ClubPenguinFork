@@ -969,6 +969,13 @@
           location.origin + '/media/play/v2/client/login.swf?v=' + encodeURIComponent(build['login.swf'])
         ]);
       }
+      // Continuar en la contraseña vuelve al login; el hash evita un create.swf viejo en caché.
+      if (build['create.swf']) {
+        window.RufflePlayer.config.urlRewriteRules.unshift([
+          /^(?:.*\/)?create\.swf(?:\?.*)?$/,
+          location.origin + '/media/play/v2/client/create.swf?v=' + encodeURIComponent(build['create.swf'])
+        ]);
+      }
       const player = window.RufflePlayer.newest().createPlayer();
       player.id = 'penguin-player';
       player.style.backgroundColor = '#00529b';
