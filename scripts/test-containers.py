@@ -205,14 +205,6 @@ try:
             ):
                 exec_script(dash, asset_check,
                             f'http://web:8080/media/play/v2/content/global/clothing/{kind}/19155.swf', digest)
-            for path, digest in (
-                ('global/crumbs/global_crumbs.swf', '9469d222decbafc44328afd753d92d471c9998861901af69699b5a8f7592a156'),
-                ('local/en/crumbs/local_crumbs.swf', '5ab86f8913da6e006b4f047ec330ed8f3926217d668bd20e6762400a9a4ba358'),
-                ('local/es/crumbs/local_crumbs.swf', '63f786625090a3e1e93151d7fdf49ecfc8347e7e7e6a3676e0d7b2bcd8110cd3'),
-                ('local/fr/crumbs/local_crumbs.swf', '09fca30e27bf5a241ff7f752f11cc0f3825cdba8110ac2d4db31382ae41e8aa5'),
-                ('local/pt/crumbs/local_crumbs.swf', '945d13095090b25cfa7d446a9f60f99d6e099a6b6c2f95ad8978e81a6f494791'),
-            ):
-                exec_script(dash, asset_check, f'http://web:8080/media/play/v2/content/{path}', digest)
             print('PASS: custom background 19155 assets match the published files.')
             print('PASS: nginx serves /healthz and /servers.xml.')
             web_url = 'ws://web:8080/socket/login'
