@@ -1,5 +1,6 @@
 /* Service worker de Glaciar: precache mínimo y cache-first para media pesada. */
 // v2: the infrastructure panel summary (/infra/) must never be served from a cache.
+// The public dialog feed (/dialog/) follows the same rule; no version bump: no cache changes.
 const VERSION = 'glaciar-puffle-v2';
 const ESTATICO = `pre-${VERSION}`;
 const MEDIA = `media-${VERSION}`;
@@ -26,7 +27,7 @@ self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
   if (url.pathname.startsWith('/socket/') || url.pathname === '/healthz' || url.pathname.startsWith('/create/') || url.pathname.startsWith('/puffle/')) return;
   // Monitoring summary: always live from the network, never cached, never a cached fallback.
-  if (url.pathname.startsWith('/infra/')) {
+  if (url.pathname.startsWith('/infra/') || url.pathname.startsWith('/dialog/')) {
     event.respondWith(fetch(event.request, {cache: 'no-store'}));
     return;
   }

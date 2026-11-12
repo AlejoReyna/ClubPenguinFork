@@ -370,6 +370,41 @@ def check_images(cfg, manifest):
     return f'{len(seen)} containers match the manifest tags and digests'
 
 
+# Public dialog feed contract (containers/runtime/dialog_feed.py, docs/dialogos-publicos.md).
+DIALOG_PUBLIC_FIELDS = {'ts', 'room_id', 'speaker', 'kind', 'target_kind', 'target', 'text', 'source',
+                        'scene_id', 'invite_id', 'reason', 'dest_room_id'}
+DIALOG_FORBIDDEN_FIELDS = {'human_text', 'player', 'player_id'}
+
+
+def _json_keys(node):
+    if isinstance(node, dict):
+        for key, value in node.items():
+            yield key
+            yield from _json_keys(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from _json_keys(value)
+
+
+def check_dialog_feed_document(document, switch_on):
+    """The live feed must match the switch and carry only allow-listed event keys. Never prints values."""
+    if not isinstance(document, dict) or not isinstance(document.get('enabled'), bool) \
+            or not isinstance(document.get('events'), list):
+        raise RuntimeError('dialog feed has an unexpected shape')
+    leaked = DIALOG_FORBIDDEN_FIELDS & set(_json_keys(document))
+    if leaked:
+        raise RuntimeError('dialog feed exposes forbidden keys: ' + ', '.join(sorted(leaked)))
+    for event in document['events']:
+        if not isinstance(event, dict) or set(event) != DIALOG_PUBLIC_FIELDS:
+            raise RuntimeError('dialog feed event keys differ from the public allow-list')
+    if document['enabled'] is not switch_on:
+        raise RuntimeError(f'dialog feed reports enabled={document["enabled"]}, the switch ConfigMap says {switch_on}')
+    if not switch_on and document['events']:
+        raise RuntimeError('dialog feed returns events while the switch is off')
+    state = 'on' if switch_on else 'off'
+    return f'/dialog/feed.json answers through web; switch {state}; {len(document["events"])} events, allow-listed keys only'
+
+
 def exec_in_dash(cfg, script, *argv, timeout=180):
     return run(['kubectl', '--kubeconfig', cfg['CP_KUBECONFIG'], '--context', 'default', '-n', NAMESPACE, 'exec', '-i',
                 'deploy/dash', '--', 'python', '-'] + list(argv), input_text=script, timeout=timeout, quiet=True)
@@ -461,6 +496,19 @@ def cmd_verify(args):
             raise RuntimeError('alerts firing: ' + ', '.join(names))
         return 'redis_up=1 and no alert firing'
 
+    def web_has_dialog_feed():
+        web = json.loads(kubectl(cfg, '-n', NAMESPACE, 'get', 'deployment', 'web', '-o', 'json').stdout)
+        return any(c['name'] == 'dialog-feed' for c in web['spec']['template']['spec']['containers'])
+
+    def dialog_feed():
+        switch = kubectl(cfg, '-n', NAMESPACE, 'get', 'configmap', 'bots-dialog-log',
+                         '-o', 'jsonpath={.data.enabled}').stdout.strip().lower() == 'true'
+        script = ('import sys,urllib.request\n'
+                  'r=urllib.request.urlopen("http://web:8080/dialog/feed.json",timeout=10)\n'
+                  'assert r.status==200 and r.headers.get("Cache-Control")=="no-store"\n'
+                  'sys.stdout.write(r.read().decode())\n')
+        return check_dialog_feed_document(json.loads(exec_in_dash(cfg, script).stdout), switch)
+
     def public_edge():
         import urllib.request
         request = urllib.request.Request(f'https://{host}/healthz', headers={'User-Agent': 'clubpenguin-lab-probe/1'})
@@ -478,6 +526,8 @@ def cmd_verify(args):
     checks.run('websocket-proxy', websocket)
     if manifest.get('features', {}).get('puffle') is True:
         checks.run('puffle-artifacts-and-service', puffle)
+    if web_has_dialog_feed():
+        checks.run('dialog-feed', dialog_feed)
     if not args.skip_game_journey:
         checks.run('game-journey', journey)
     checks.run('prometheus-signals', prometheus, blocking=args.require_prometheus)

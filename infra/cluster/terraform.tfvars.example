@@ -40,6 +40,7 @@ world_capacity = "60"
 # are created with bots_enabled. Create Secret bots-dialog-salt (key salt) by
 # hand before expecting player hashes. See docs/operations.md. The log is not
 # backed up. bots-budget keeps prevent_destroy; bots-dialog does not.
+# dialog_feed_enabled = true # navbar «Diálogos»: public allow-listed feed of the log (no player data)
 
 # State location of infra/cloud (required; deploy.py fills it from deploy.env).
 cloud_state = {

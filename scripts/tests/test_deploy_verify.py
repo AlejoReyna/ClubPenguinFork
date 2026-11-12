@@ -55,3 +55,37 @@ class CheckImagesTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+def feed_event(**extra):
+    base = dict.fromkeys(deploy.DIALOG_PUBLIC_FIELDS)
+    base.update(extra)
+    return base
+
+
+class DialogFeedCheckTests(unittest.TestCase):
+    def test_allow_listed_feed_matching_the_switch_passes(self):
+        doc = {'enabled': True, 'events': [feed_event(kind='reply')], 'count': 1, 'skipped': 0}
+        self.assertIn('1 events', deploy.check_dialog_feed_document(doc, True))
+        self.assertIn('switch off', deploy.check_dialog_feed_document({'enabled': False, 'events': []}, False))
+
+    def test_a_forbidden_key_anywhere_fails(self):
+        for doc in ({'enabled': True, 'events': [dict(feed_event(), human_text='x')]},
+                    {'enabled': True, 'events': [], 'player': 'hash'},
+                    {'enabled': True, 'events': [dict(feed_event(), target={'player_id': 1})]}):
+            with self.subTest(doc=doc), self.assertRaisesRegex(RuntimeError, 'forbidden keys'):
+                deploy.check_dialog_feed_document(doc, True)
+
+    def test_unknown_or_missing_event_keys_fail(self):
+        extra = dict(feed_event(), priority='P0')
+        missing = feed_event()
+        del missing['text']
+        for event in (extra, missing):
+            with self.subTest(event=sorted(event)), self.assertRaisesRegex(RuntimeError, 'allow-list'):
+                deploy.check_dialog_feed_document({'enabled': True, 'events': [event]}, True)
+
+    def test_the_feed_must_follow_the_switch(self):
+        with self.assertRaisesRegex(RuntimeError, 'enabled=True'):
+            deploy.check_dialog_feed_document({'enabled': True, 'events': []}, False)
+        with self.assertRaisesRegex(RuntimeError, 'unexpected shape'):
+            deploy.check_dialog_feed_document({'enabled': 'true', 'events': []}, True)

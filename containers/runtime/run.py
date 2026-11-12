@@ -12,6 +12,8 @@ elif mode == 'proxy':
     runpy.run_path('/app/socket_proxy.py', run_name='__main__')
 elif mode == 'panel':
     runpy.run_path('/app/panel_summary.py', run_name='__main__')
+elif mode == 'dialog':
+    runpy.run_path('/app/dialog_feed.py', run_name='__main__')
 elif mode == 'dash':
     os.chdir('/app/dash')
     sys.path.insert(0, '/app/dash')

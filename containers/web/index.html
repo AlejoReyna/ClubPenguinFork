@@ -111,8 +111,8 @@
        background:#0b0b0d;color:#ececf1;border-left:1px solid #2a2a31;font:14px/1.45 system-ui,sans-serif;
        padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) 0;
        transform:translateX(100%);visibility:hidden;transition:transform .28s cubic-bezier(.22,1,.36,1),visibility 0s linear .28s}
-  html.infra-abierto .infra{transform:none;visibility:visible;transition:transform .28s cubic-bezier(.22,1,.36,1),visibility 0s}
-  @media(min-width:1000px){html.infra-abierto{--infra-w:22rem}}
+  html.infra-abierto #infra-panel,html.dlg-abierto #dlg-panel{transform:none;visibility:visible;transition:transform .28s cubic-bezier(.22,1,.36,1),visibility 0s}
+  @media(min-width:1000px){html.infra-abierto,html.dlg-abierto{--infra-w:22rem}}
   @media(max-width:999.98px){.infra{width:min(26rem,100%)}}
   @media(max-width:480px){.infra{width:100%;border-left:0}}
   .infra-cab{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px 10px}
@@ -148,6 +148,22 @@
        border-radius:11px;background:#8b5cf629;color:#fff;font:700 14px system-ui,sans-serif;text-decoration:none;cursor:pointer}
   .infra .infra-accion:hover{background:#8b5cf647}.infra .infra-accion:disabled{opacity:.6;cursor:progress}
   .infra :focus-visible{outline:2px solid #8b5cf6;outline-offset:2px}
+  /* Panel «Diálogos»: misma hoja lateral; burbujas por línea y filtros Todo/Charlas/Eventos. */
+  .dlg-filtros{display:flex;gap:6px;padding:0 12px 10px}
+  .dlg-filtros button{flex:1;min-height:36px;padding:0 10px;border:1px solid #2a2a31;border-radius:999px;background:#151518;
+                      color:#c9c9d2;font:600 13px system-ui,sans-serif;cursor:pointer}
+  .dlg-filtros button[aria-pressed="true"]{background:#8b5cf629;border-color:#8b5cf673;color:#fff}
+  .dlg-aviso{margin:0;padding:10px 12px;border:1px solid #2a2a31;border-radius:12px;background:#151518;color:#9a9aa6}
+  .dlg-lista{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;list-style:none}
+  .dlg-item{display:flex;flex-direction:column;gap:4px;padding:10px 12px;border:1px solid #2a2a31;border-radius:14px 14px 14px 4px;background:#151518}
+  .dlg-item.evento{border-style:dashed;border-radius:12px;background:transparent}
+  .dlg-cab{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 8px;font-size:12.5px;color:#9a9aa6}
+  .dlg-cab b{color:#c4b5fd;font-size:13.5px}
+  .dlg-cab time{margin-inline-start:auto;font-variant-numeric:tabular-nums}
+  .dlg-texto{margin:0;color:#ececf1;overflow-wrap:anywhere}
+  .dlg-evento{margin:0;color:#c9c9d2;font-size:13px}
+  .dlg-pie{color:#9a9aa6;font-size:12px}
+  #dlg-estado{margin-inline-start:auto}#dlg-estado:empty{display:none}
 
   /* Vertical: el juego llena SIEMPRE el alto sobre los controles inferiores (760×480, sin deformar)
      y la cámara sigue a tu pingüino; el deslizador mira hacia los lados. «Ver el juego completo» es
@@ -169,7 +185,7 @@
     .bar-actions,.dock{display:contents}
     .bar button{flex:1;max-width:56px;width:44px;height:44px;padding:0;min-width:44px;border-radius:12px}
     .bar #inicio{order:0}
-    .bar #infra{order:1}.bar #spotify{order:2}.bar #puffle{order:3}
+    .bar #infra,.bar #dialogos{order:1}.bar #spotify{order:2}.bar #puffle{order:3}
     .bar #fullscreen{order:4}
     .bar #fullscreen svg,.bar #puffle svg{display:block}
     /* El idioma se cambia con el interruptor ES/EN de la barra (en el lugar de la lupa), no con el selector. */
@@ -242,7 +258,7 @@
   .login-fit .pan{display:none}
   .login-fit .bar #zoom:disabled{opacity:.45;cursor:default}
   @media(prefers-reduced-motion:reduce){
-    .infra,html.infra-abierto .infra,main,.bar{transition:none!important}
+    .infra,html.infra-abierto #infra-panel,html.dlg-abierto #dlg-panel,main,.bar{transition:none!important}
   }
 </style>
 </head>
@@ -281,6 +297,13 @@
             aria-expanded="false" aria-controls="infra-panel">
       <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="M7 7h.01M7 17h.01"/>
+      </svg>
+    </button>
+    <!-- Oculto hasta que /dialog/feed.json responda: sin el sidecar (dialog_feed_enabled=false) no aparece. -->
+    <button id="dialogos" class="bar-icon" data-lbl="Diálogos" type="button" aria-label="Diálogos" title="Diálogos"
+            aria-expanded="false" aria-controls="dlg-panel" hidden>
+      <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h7A2.5 2.5 0 0 1 16 5.5v4a2.5 2.5 0 0 1-2.5 2.5H9l-3.5 3v-3A2.5 2.5 0 0 1 4 9.5z"/><path d="M19 9.5a2.5 2.5 0 0 1 1 2v4a2.5 2.5 0 0 1-2.5 2.5V21l-3.5-3h-3a2.5 2.5 0 0 1-2-1"/>
       </svg>
     </button>
     <button id="spotify" class="bar-icon" data-lbl="Spotify" type="button" aria-label="Spotify" title="Spotify"
@@ -330,6 +353,22 @@
     </button>
   </nav>
   <div id="infra-cuerpo" class="infra-cuerpo" aria-live="polite"></div>
+</aside>
+
+<!-- Panel «Diálogos» (lateral, solo lectura): lo que dicen y deciden los pingüinos IA, desde un feed
+     filtrado del mismo origen. Nunca contiene mensajes de jugadores ni identificadores de jugador. -->
+<aside id="dlg-panel" class="infra" aria-labelledby="dlg-titulo" inert>
+  <header class="infra-cab">
+    <h2 id="dlg-titulo">Diálogos de los pingüinos</h2>
+    <span id="dlg-estado" class="infra-estado"></span>
+    <button id="dlg-cerrar" class="infra-x" type="button" aria-label="Cerrar panel de diálogos">×</button>
+  </header>
+  <div class="dlg-filtros" id="dlg-filtros" role="group" aria-label="Filtrar diálogos">
+    <button type="button" data-f="todo" aria-pressed="true">Todo</button>
+    <button type="button" data-f="charla" aria-pressed="false">Charlas</button>
+    <button type="button" data-f="evento" aria-pressed="false">Eventos</button>
+  </div>
+  <div id="dlg-cuerpo" class="infra-cuerpo"></div>
 </aside>
 
 <main aria-label="Club Penguin · Glaciar">
@@ -1119,7 +1158,7 @@
   };
   // Un clic del usuario en el puffle/Spotify cede el sitio al panel de infraestructura (no así
   // las aperturas automáticas del globo, que no deben quitarle el panel a quien lo está leyendo).
-  const alternar = () => { if (globo.hidden) { cerrarInfra(); abrir(); refrescar(); } else cerrar(); };
+  const alternar = () => { if (globo.hidden) { cerrarInfra(); cerrarDialogos(); abrir(); refrescar(); } else cerrar(); };
 
   async function accion(boton, fn) {
     boton.disabled = true;
@@ -1435,6 +1474,7 @@
   function abrirInfra() {
     if (infraAbierto) return;
     cerrar();                                   // el globo del puffle y el panel no comparten espacio
+    cerrarDialogos();
     infraAbierto = true;
     panelInfra.inert = false;
     raiz.classList.add('infra-abierto');
@@ -1469,6 +1509,185 @@
       else if (!e.shiftKey && (document.activeElement === ultimo || !panelInfra.contains(document.activeElement))) { e.preventDefault(); primero.focus(); }
     }
   }, true);
+
+  // ---- Panel «Diálogos»: feed público y filtrado de /dialog/feed.json (mismo origen) ----
+  // Solo lectura, como el de infraestructura. El sidecar ya quitó todo dato de jugadores (sin
+  // mensajes humanos ni hash); aquí todo se pinta con textContent. Se consulta cada 10 s y solo
+  // con el panel abierto y la pestaña visible.
+  const botonDlg = document.getElementById('dialogos');
+  const panelDlg = document.getElementById('dlg-panel');
+  const cuerpoDlg = document.getElementById('dlg-cuerpo');
+  const estadoDlg = document.getElementById('dlg-estado');
+  const TD = enIngles ? {
+    btn: 'Dialogues', panel: 'Penguin dialogues', close: 'Close dialogues panel', filters: 'Filter dialogues',
+    todo: 'All', charla: 'Chats', evento: 'Events', live: 'Live', off: 'Off', offline: 'Offline',
+    loading: 'Loading…', empty: 'The penguins have not said anything yet today.', emptyFilter: 'Nothing here with this filter.',
+    offText: 'The dialogue log is switched off right now.', offlineText: 'Dialogues could not be loaded. The game keeps running.',
+    player: 'a player', room: 'Room', greets: 'greets', greetsTo: 'greets', replies: 'replies to', says: 'to',
+    invite: 'invites', accept: 'accepts the invitation', decline: 'declines the invitation', travel: 'heads to',
+    note: 'Only what the AI penguins say and decide. Player messages are never shown.',
+  } : {
+    btn: 'Diálogos', panel: 'Diálogos de los pingüinos', close: 'Cerrar panel de diálogos', filters: 'Filtrar diálogos',
+    todo: 'Todo', charla: 'Charlas', evento: 'Eventos', live: 'En vivo', off: 'Apagado', offline: 'Sin conexión',
+    loading: 'Cargando…', empty: 'Los pingüinos aún no han dicho nada hoy.', emptyFilter: 'Nada con este filtro.',
+    offText: 'El registro de diálogos está apagado en este momento.', offlineText: 'No se pudieron cargar los diálogos. El juego sigue funcionando.',
+    player: 'un jugador', room: 'Sala', greets: 'saluda', greetsTo: 'saluda a', replies: 'responde a', says: 'a',
+    invite: 'invita a', accept: 'acepta la invitación', decline: 'rechaza la invitación', travel: 'va a',
+    note: 'Solo lo que dicen y deciden los pingüinos IA. Nunca se muestran mensajes de jugadores.',
+  };
+  // Salas del catálogo de los bots (containers/bots/bots/data/rooms.json). Una sala nueva sale como «Sala N».
+  const SALAS = enIngles ? {
+    100: 'Town Center', 110: 'Coffee Shop', 111: 'Book Room', 120: 'Night Club', 121: 'Lounge', 230: 'Ski Hill',
+    300: 'The Plaza', 310: 'Pet Shop', 320: 'The Dojo', 330: 'Pizza Parlor', 340: 'The Mall', 800: 'The Dock',
+    801: 'Snow Forts', 802: 'Ice Rink',
+  } : {
+    100: 'Centro', 110: 'Cafetería', 111: 'Sala de libros', 120: 'Discoteca', 121: 'Sala de juegos', 230: 'Montaña',
+    300: 'Plaza', 310: 'Tienda de mascotas', 320: 'Dojo', 330: 'Pizzería', 340: 'Centro comercial', 800: 'Muelle',
+    801: 'Fuertes de nieve', 802: 'Pista de hielo',
+  };
+  const MOTIVOS = enIngles ? {
+    relation_friend: 'they are friends', busy_with_human: 'busy chatting', recent_decline: 'said no recently',
+    low_energy: 'tired', off_schedule: 'off schedule', lease_expired: 'time ran out', room_min_guard: 'room would be empty',
+    restart: 'restart', p2_cutoff: 'too busy', seeded_roll: 'felt like it',
+  } : {
+    relation_friend: 'son amigos', busy_with_human: 'ocupado charlando', recent_decline: 'dijo que no hace poco',
+    low_energy: 'cansado', off_schedule: 'fuera de horario', lease_expired: 'se acabó el tiempo', room_min_guard: 'la sala quedaría vacía',
+    restart: 'reinicio', p2_cutoff: 'demasiado ocupado', seeded_roll: 'le dieron ganas',
+  };
+  const CHARLA = new Set(['reply', 'greeting', 'scene']);
+  const sala = id => SALAS[id] || `${TD.room} ${id}`;
+
+  botonDlg.setAttribute('aria-label', TD.btn);
+  botonDlg.title = TD.btn;
+  botonDlg.dataset.lbl = TD.btn;
+  document.getElementById('dlg-titulo').textContent = TD.panel;
+  document.getElementById('dlg-cerrar').setAttribute('aria-label', TD.close);
+  const filtrosDlg = document.getElementById('dlg-filtros');
+  filtrosDlg.setAttribute('aria-label', TD.filters);
+  filtrosDlg.querySelectorAll('button').forEach(b => { b.textContent = TD[b.dataset.f]; });
+
+  let dlgAbierto = false, dlgFiltro = 'todo', dlgDatos = null, dlgFallo = false, dlgCargando = false, relojDlg = null;
+
+  function lineaDlg(e) {
+    const charla = CHARLA.has(e.kind);
+    const li = nodo('li', 'dlg-item' + (charla ? '' : ' evento'));
+    const cab = nodo('div', 'dlg-cab');
+    cab.append(nodo('b', '', e.speaker));
+    const quien = e.target_kind === 'bot' && e.target ? e.target : e.target_kind === 'player' ? TD.player : null;
+    if (e.kind === 'scene' && quien) cab.append(nodo('span', '', `${TD.says} ${quien}`));
+    else if (e.kind === 'reply') cab.append(nodo('span', '', `${TD.replies} ${quien || TD.player}`));
+    else if (e.kind === 'greeting') cab.append(nodo('span', '', quien ? `${TD.greetsTo} ${quien}` : TD.greets));
+    cab.append(nodo('span', 'dlg-pie', '· ' + sala(e.room_id)));
+    const hora = new Date(e.ts);
+    const t = nodo('time', '', hora.toLocaleTimeString(idioma, {hour: '2-digit', minute: '2-digit', hour12: false}));
+    t.dateTime = hora.toISOString();
+    cab.append(t);
+    li.append(cab);
+    if (!charla) {
+      let frase = TD[e.kind] || e.kind;
+      if (e.kind === 'invite') frase += ' ' + (quien || TD.player) + (e.dest_room_id ? ` (${sala(e.dest_room_id)})` : '');
+      if (e.kind === 'travel') frase += ' ' + sala(e.dest_room_id || e.room_id);
+      if (e.reason && MOTIVOS[e.reason]) frase += ` — ${MOTIVOS[e.reason]}`;
+      li.append(nodo('p', 'dlg-evento', frase));
+    }
+    if (e.text) li.append(nodo('p', 'dlg-texto', e.text));
+    return li;
+  }
+
+  function pintarDlg() {
+    if (!dlgAbierto) return;
+    filtrosDlg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.f === dlgFiltro)));
+    if (dlgFallo) { estadoDlg.className = 'infra-estado mal'; estadoDlg.textContent = TD.offline; }
+    else if (dlgDatos && !dlgDatos.enabled) { estadoDlg.className = 'infra-estado'; estadoDlg.textContent = TD.off; }
+    else if (dlgDatos) { estadoDlg.className = 'infra-estado ok'; estadoDlg.textContent = TD.live; }
+    else { estadoDlg.className = 'infra-estado'; estadoDlg.textContent = ''; }
+
+    const hijos = [];
+    if (!dlgDatos) hijos.push(nodo('p', 'dlg-aviso', dlgFallo ? TD.offlineText : TD.loading));
+    else if (!dlgDatos.enabled) hijos.push(nodo('p', 'dlg-aviso', TD.offText));
+    else {
+      const eventos = (dlgDatos.events || []).filter(e => dlgFiltro === 'todo' || (dlgFiltro === 'charla') === CHARLA.has(e.kind));
+      if (dlgFallo) hijos.push(nodo('p', 'dlg-aviso', TD.offlineText));
+      if (!eventos.length) hijos.push(nodo('p', 'dlg-aviso', dlgDatos.events && dlgDatos.events.length ? TD.emptyFilter : TD.empty));
+      else {
+        const ul = nodo('ol', 'dlg-lista');
+        eventos.forEach(e => ul.append(lineaDlg(e)));
+        hijos.push(ul);
+      }
+    }
+    hijos.push(nodo('p', 'dlg-pie', TD.note));
+    // Si el lector estaba al final, sigue al final con las líneas nuevas; si subió a leer, no lo movemos.
+    const alFinal = cuerpoDlg.scrollHeight - cuerpoDlg.scrollTop - cuerpoDlg.clientHeight < 40;
+    cuerpoDlg.replaceChildren(...hijos);
+    if (alFinal) cuerpoDlg.scrollTop = cuerpoDlg.scrollHeight;
+  }
+
+  async function pedirDialogos(limite) {
+    const corte = new AbortController();
+    const temporizador = setTimeout(() => corte.abort(), 5000);
+    try {
+      return await fetch('/dialog/feed.json' + (limite === undefined ? '' : `?limit=${limite}`),
+                         {cache: 'no-store', credentials: 'omit', signal: corte.signal});
+    } finally { clearTimeout(temporizador); }
+  }
+
+  async function cargarDlg() {
+    if (dlgCargando || !dlgAbierto) return;
+    dlgCargando = true;
+    try {
+      const r = await pedirDialogos();
+      if (r.status === 404) { botonDlg.hidden = true; cerrarDialogos(); return; }  // feed retirado
+      if (!r.ok) throw new Error('http');
+      dlgDatos = await r.json();
+      dlgFallo = false;
+    } catch {
+      dlgFallo = true;   // se conservan las líneas ya mostradas, con el aviso de «Sin conexión»
+    } finally { dlgCargando = false; }
+    pintarDlg();
+  }
+
+  function abrirDialogos() {
+    if (dlgAbierto) return;
+    cerrar();
+    cerrarInfra();
+    dlgAbierto = true;
+    panelDlg.inert = false;
+    raiz.classList.add('dlg-abierto');
+    botonDlg.setAttribute('aria-expanded', 'true');
+    pintarDlg();
+    cargarDlg();
+    clearInterval(relojDlg);
+    relojDlg = setInterval(() => { if (document.visibilityState !== 'hidden') cargarDlg(); }, 10000);
+    document.getElementById('dlg-cerrar').focus({preventScroll: true});
+  }
+  function cerrarDialogos() {
+    if (!dlgAbierto) return;
+    dlgAbierto = false;
+    clearInterval(relojDlg);
+    raiz.classList.remove('dlg-abierto');
+    botonDlg.setAttribute('aria-expanded', 'false');
+    if (!botonDlg.hidden) botonDlg.focus({preventScroll: true});
+    panelDlg.inert = true;
+  }
+  botonDlg.addEventListener('click', () => (dlgAbierto ? cerrarDialogos() : abrirDialogos()));
+  document.getElementById('dlg-cerrar').addEventListener('click', cerrarDialogos);
+  filtrosDlg.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { dlgFiltro = b.dataset.f; pintarDlg(); }));
+  document.addEventListener('visibilitychange', () => { if (dlgAbierto && document.visibilityState === 'visible') cargarDlg(); });
+  document.addEventListener('keydown', e => {
+    if (!dlgAbierto) return;
+    if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); cerrarDialogos(); return; }
+    if (e.key === 'Tab' && enOverlay()) {
+      const items = [...panelDlg.querySelectorAll('button:not([disabled])')];
+      if (!items.length) return;
+      const primero = items[0], ultimo = items[items.length - 1];
+      if (e.shiftKey && (document.activeElement === primero || !panelDlg.contains(document.activeElement))) { e.preventDefault(); ultimo.focus(); }
+      else if (!e.shiftKey && (document.activeElement === ultimo || !panelDlg.contains(document.activeElement))) { e.preventDefault(); primero.focus(); }
+    }
+  }, true);
+  // Sondeo único y liviano (sin eventos) tras cargar: el botón solo aparece si el feed existe.
+  const sondearDialogos = () => pedirDialogos(0).then(r => { botonDlg.hidden = !r.ok; }).catch(() => {});
+  if (document.readyState === 'complete') setTimeout(sondearDialogos, 1500);
+  else addEventListener('load', () => setTimeout(sondearDialogos, 1500), {once: true});
 
   // Enganche heredado del captcha del registro.
   window.grecaptchaSubmit = () => {
