@@ -46,6 +46,29 @@ def transform_dash(name, data):
                                    color=int(color), coins=app.config.STARTING_COINS,
                                    approval_en=app.config.APPROVE_USERNAME,"""
         source = once(source, old, new)
+        source = once(
+            source,
+            """    username = username.strip()
+    if app.config.USERNAME_FORCE_CASE:
+        username = username.title()
+
+    penguin = await Penguin.create(username=username.lower(), nickname=username, password=password, email=email,
+                                   color=int(color), coins=app.config.STARTING_COINS,
+                                   approval_en=app.config.APPROVE_USERNAME,""",
+            """    username = username.strip()
+    if app.config.USERNAME_FORCE_CASE:
+        username = username.title()
+
+    display_name = request.form.get('nickname', '').strip() or username
+    if len(display_name) < 1 or len(display_name) > 30 or '|' in display_name or '%' in display_name:
+        return response.text(urlencode({
+            'error': i18n.t('create.name_not_allowed', locale=lang)
+        }))
+
+    penguin = await Penguin.create(username=username.lower(), nickname=display_name, password=password, email=email,
+                                   color=int(color), coins=app.config.STARTING_COINS,
+                                   approval_en=app.config.APPROVE_USERNAME,""",
+        )
     compile(source, name, 'exec')
     return source
 

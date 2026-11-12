@@ -620,6 +620,112 @@
   const avisoEstado = document.getElementById('estado');
   const preferenciaIdioma = 'glaciar-idioma';
   const pagina = new URL(location.href);
+  // Client login diagnostics: add ?diag=login (or localStorage glaciar-diag-login=1), then reproduce in Brave.
+  const loginDiagOn = (() => {
+    if (pagina.searchParams.get('diag') === 'login' || pagina.searchParams.get('diag') === '1') return true;
+    try { return localStorage.getItem('glaciar-diag-login') === '1'; } catch { return false; }
+  })();
+  const loginDiag = (...parts) => {
+    if (!loginDiagOn) return;
+    console.info('[glaciar-login]', new Date().toISOString(), ...parts);
+  };
+  const loginDiagSnapshot = label => {
+    if (!loginDiagOn) return;
+    const coarse = matchMedia('(pointer: coarse)').matches;
+    const portrait = matchMedia('(orientation: portrait) and (max-width: 900px)').matches;
+    let storage = 'ok';
+    try { localStorage.setItem('glaciar-diag-probe', '1'); localStorage.removeItem('glaciar-diag-probe'); }
+    catch (e) { storage = String(e); }
+    const sw = navigator.serviceWorker?.controller?.scriptURL ?? null;
+    loginDiag(label, {
+      origin: location.origin, hostname: location.hostname, href: location.href,
+      ua: navigator.userAgent, coarse, portrait, storage, serviceWorker: sw,
+    });
+  };
+  const loginDiagAttachPlayer = player => {
+    if (!loginDiagOn) return;
+    const escenario = document.getElementById('game');
+    const readFocus = () => {
+      const sr = player.shadowRoot;
+      if (!sr) return {shadow: false};
+      const active = sr.activeElement;
+      const kb = sr.getElementById('virtual-keyboard');
+      return {
+        shadow: true,
+        activeId: active?.id || active?.tagName || null,
+        kbLen: kb?.value?.length ?? null,
+        kbReadOnly: kb?.readOnly,
+      };
+    };
+    const tick = why => loginDiag('focus', why, readFocus());
+    ['focusin', 'focusout'].forEach(ev => player.addEventListener(ev, () => tick(ev), true));
+    escenario.addEventListener('pointerdown', () => tick('pointerdown'), true);
+    escenario.addEventListener('touchend', () => tick('touchend'), {capture: true, passive: true});
+    let tries = 0;
+    const poll = setInterval(() => {
+      tries += 1;
+      if (player.shadowRoot?.getElementById('virtual-keyboard')) {
+        loginDiag('virtual-keyboard present');
+        clearInterval(poll);
+      } else if (tries > 120) {
+        loginDiag('virtual-keyboard missing after 60s');
+        clearInterval(poll);
+      }
+    }, 500);
+  };
+  const loginDiagProbeSocket = (socketBase, path) => new Promise(resolve => {
+    const url = socketBase + path;
+    const VERCHK = '<msg t="sys"><body action="verChk" r="0"><ver v="153"/></body></msg>\0';
+    const started = Date.now();
+    let settled = false;
+    let ws;
+    try { ws = new WebSocket(url); } catch (e) { resolve({url, err: String(e)}); return; }
+    const finish = payload => {
+      if (settled) return;
+      settled = true;
+      try { ws.close(); } catch {}
+      resolve(payload);
+    };
+    ws.binaryType = 'arraybuffer';
+    ws.onopen = () => {
+      loginDiag('probe ws_open', url);
+      ws.send(new TextEncoder().encode(VERCHK));
+    };
+    ws.onmessage = e => finish({
+      url, ms: Date.now() - started, ok: true,
+      frame: typeof e.data === 'string' ? e.data.slice(0, 120) : 'binary',
+    });
+    ws.onerror = () => finish({url, ms: Date.now() - started, ok: false, err: 'error'});
+    ws.onclose = e => finish({
+      url, ms: Date.now() - started, ok: false,
+      close: e.code, reason: e.reason || 'n/a',
+    });
+    setTimeout(() => finish({url, ms: Date.now() - started, ok: false, err: 'timeout'}), 9000);
+  });
+  if (loginDiagOn) {
+    loginDiagSnapshot('boot');
+    (async () => {
+      try {
+        loginDiag('brave', typeof navigator.brave?.isBrave === 'function' ? await navigator.brave.isBrave() : 'n/a');
+      } catch (e) { loginDiag('brave', 'check_failed', String(e)); }
+    })();
+    const NativeWS = WebSocket;
+    globalThis.WebSocket = function(url, protocols) {
+      const ws = protocols === undefined ? new NativeWS(url) : new NativeWS(url, protocols);
+      if (String(url).includes('/socket/')) {
+        loginDiag('WebSocket ctor', url);
+        ws.addEventListener('open', () => loginDiag('ruffle ws_open', url));
+        ws.addEventListener('close', e => loginDiag('ruffle ws_close', url, {code: e.code, reason: e.reason}));
+        ws.addEventListener('error', () => loginDiag('ruffle ws_error', url));
+      }
+      return ws;
+    };
+    WebSocket.prototype = NativeWS.prototype;
+    WebSocket.CONNECTING = NativeWS.CONNECTING;
+    WebSocket.OPEN = NativeWS.OPEN;
+    WebSocket.CLOSING = NativeWS.CLOSING;
+    WebSocket.CLOSED = NativeWS.CLOSED;
+  }
   let idiomaGuardado;
   try {
     idiomaGuardado = localStorage.getItem(preferenciaIdioma);
@@ -777,6 +883,11 @@
 
   window.RufflePlayer = window.RufflePlayer || {};
   const socketBase = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}`;
+  loginDiagOn && loginDiag('socketProxy config', {socketBase, host: location.hostname, ports: [6112, 9876]});
+  if (loginDiagOn) {
+    loginDiagProbeSocket(socketBase, '/socket/login').then(r => loginDiag('probe login', r));
+    loginDiagProbeSocket(socketBase, '/socket/world').then(r => loginDiag('probe world', r));
+  }
   window.RufflePlayer.config = {
     autoplay: 'on', allowScriptAccess: true, unmuteOverlay: 'hidden',
     splashScreen: false, preloader: false,
@@ -790,7 +901,9 @@
   };
 
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    navigator.serviceWorker.register('/sw.js')
+      .then(reg => loginDiagOn && loginDiag('serviceWorker registered', reg.scope))
+      .catch(err => loginDiagOn && loginDiag('serviceWorker failed', String(err)));
   }
 
   const estado = texto => {
@@ -821,6 +934,7 @@
       player.id = 'penguin-player';
       player.style.backgroundColor = '#00529b';
       document.getElementById('game').appendChild(player);
+<<<<<<< HEAD
       player.ruffle().addFSCommandHandler((command, payload) => {
         if (typeof command === 'string' && command.toLowerCase() === 'glaciarlogin') {
           verLogin(GlaciarLoginFrame.parse(payload ?? '', idioma));
@@ -832,12 +946,17 @@
         pintarSeguimiento();
         return true;
       });
+=======
+      loginDiagAttachPlayer(player);
+>>>>>>> 12db37f (Add login diagnostics for Brave and WebSocket origin tracing.)
       await player.ruffle().load({
         url: new URL('/media/boots.swf', location.href).href,
         parameters: {lang: idioma, base: location.origin + '/'}
       });
       estado('');
+      loginDiagSnapshot('game_ready');
     } catch (error) {
+      loginDiagOn && loginDiag('game_load_error', error);
       console.error(error);
       estado(enIngles ? 'The game could not load. Use Home to try again.'
                       : 'No se pudo cargar el juego. Usa Inicio para volver a intentarlo.');

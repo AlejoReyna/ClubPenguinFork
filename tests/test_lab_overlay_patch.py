@@ -31,6 +31,8 @@ class LabOverlayPatchTest(unittest.TestCase):
 
         dash_out = patch.transform_dash('routes/create/legacy.py', legacy)
         self.assertIn('coins=app.config.STARTING_COINS', dash_out)
+        self.assertIn("request.form.get('nickname', '')", dash_out)
+        self.assertIn('nickname=display_name', dash_out)
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
