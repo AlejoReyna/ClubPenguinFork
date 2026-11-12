@@ -55,6 +55,7 @@ CONFIG_SPEC = {
     'CP_PUFFLE_ENABLED': (re.compile(r'^(true|false)$'), 'false', 'Explicit puffle production capability'),
     'CP_PUFFLE_BROKER_REPLICAS': (re.compile(r'^[01]$'), '1', 'Retain the broker PVC while stopping a legacy rollback'),
     'CP_PUFFLE_ALLOWED_PLAYERS': (re.compile(r'^(\d+(,\d+)*)?$'), '', 'Optional pilot player IDs; empty permits voluntary pairing'),
+    'CP_DIALOG_FEED_ENABLED': (re.compile(r'^(true|false)$'), 'false', 'Public «Diálogos» navbar panel (filtered bots dialog feed)'),
     'CP_RELEASE_PINS': (re.compile(r'^(?:(?:runtime|database|web|bots)=[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}(?:,(?:runtime|database|web|bots)=[A-Za-z0-9_][A-Za-z0-9_.-]{0,127})*)?$'), '', 'Explicit image tags retained across automatic releases'),
     'CP_KUBECONFIG': (None, '~/.kube/clubpenguin-pi.yaml', 'Dedicated kubeconfig for the Pi'),
     'CP_SSH_CONFIG': (None, '', 'Optional ssh_config used instead of ~/.ssh/config'),
