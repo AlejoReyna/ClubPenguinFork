@@ -13,5 +13,9 @@ COPY default.conf /etc/nginx/conf.d/default.conf
 COPY index.html register.html manifest.webmanifest sw.js /srv/play/
 COPY puffle.html /srv/play/puffle/index.html
 COPY icons/ /srv/play/icons/
+# legacy-media leaves global/clothing as root-only; unprivileged nginx must traverse it.
+USER 0
+RUN chmod -R a+rX /srv/media/play/v2/content/global/clothing
+USER 101
 EXPOSE 8080
 
