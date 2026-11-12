@@ -172,9 +172,17 @@ to the provider account: other applications sharing the same API key still bill.
 - Retention is 30 days. Events are deleted automatically.
 - Kill switch: a ConfigMap key, re-read at runtime (hot reload, no redeploy), off by default.
   When it is off, nothing is written.
-- The log is never exposed through Cloudflare Tunnel or any public Ingress. It is read only
-  via SSH or `kubectl port-forward` from the owner's Mac. It is never sent to external
+- The full log is never exposed through Cloudflare Tunnel or any public Ingress. It is read
+  only via SSH or `kubectl port-forward` from the owner's Mac. It is never sent to external
   services or used for training.
+- The one public view is the navbar «Diálogos» panel, off by default (`dialog_feed_enabled`).
+  A read-only sidecar in the web pod rebuilds each event from an allow-list (`ts`, `room_id`,
+  `speaker`, `kind`, `target_kind`, `target` when it is a bot, `text`, `source`, `scene_id`,
+  `invite_id`, `reason`, `dest_room_id`) and serves only today's and yesterday's newest 200
+  events at `/dialog/feed.json`. `human_text` and the `player` hash never leave it; a player
+  target shows as "a player". The bots' own lines are public anyway in the room where they
+  were said, and may still contain what the bot said back (a name or a hat colour). Turning the
+  switch off also empties the public feed. Design: `docs/dialogos-publicos.md`.
 - Metrics about the log carry no chat text in labels.
 
 ## Dialog log

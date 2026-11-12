@@ -175,9 +175,24 @@ kubectl --kubeconfig ~/.kube/clubpenguin-pi.yaml -n clubpenguin \
 
 ## Dialog log
 
-The AI-penguin dialog log is a directory of JSONL files on the PVC `bots-dialog`, mounted only
-in the bots pod at `/var/lib/bots-dialog`. Nothing proxies it. There is no Ingress, no
-Cloudflare route, and no read API on port 9102. NetworkPolicies did not need a change.
+The AI-penguin dialog log is a directory of JSONL files on the PVC `bots-dialog`, written only
+by the bots pod at `/var/lib/bots-dialog`. There is no Ingress, no Cloudflare route of its own,
+and no read API on port 9102. NetworkPolicies did not need a change.
+
+The single exception is the public «Diálogos» panel, off by default. With
+`dialog_feed_enabled = true` (Terraform, next to the `bots_*` variables; needs `web_enabled`
+and `bots_enabled`), the web pod gets a `dialog-feed` sidecar (`MODE=dialog`, loopback port
+8767, UID 10001) that mounts the PVC and the switch ConfigMap read-only, and nginx serves its
+allow-listed output at `GET /dialog/feed.json` (no player hash, no human text; newest 200
+events of today and yesterday, UTC; 5-second cache). Without the sidecar that path is a 404
+and the page hides the button. `deploy.py verify` runs a `dialog-feed` check whenever the
+sidecar is deployed: the feed must answer through web, follow the switch, and carry only the
+allow-listed keys. The PVC is ReadWriteOnce on `local-path`, which works because web and bots
+share the Pi's single node; a second node would need RWX storage or another reader.
+
+To hide the public feed at once without a deploy, turn the switch off (below): the feed
+answers `enabled: false` with no events, and the panel shows "Registro apagado". To remove
+the button, set `dialog_feed_enabled = false` and deploy.
 
 The switch defaults to off. It is the ConfigMap `bots-dialog-log` key `enabled`. The player
 hash salt is the env var `BOTS_DIALOG_LOG_SALT` from the hand-created Secret `bots-dialog-salt`

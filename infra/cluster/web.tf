@@ -39,6 +39,28 @@ variable "panel_show_players" {
   description = "Show the connected-player count in the panel. Only enable once that figure is approved for this audience."
 }
 
+# Navbar «Diálogos» panel (containers/runtime/dialog_feed.py, MODE=dialog; docs/dialogos-publicos.md).
+# A pod-local sidecar mounts the bots dialog-log PVC and its switch ConfigMap READ-ONLY and serves an
+# allow-listed feed (no player hash, no human message); nginx proxies /dialog/feed.json to it. Off by
+# default: without the sidecar nginx answers 404 and the page hides the button. The switch ConfigMap
+# (bots-dialog-log) also empties the public feed when it is off.
+# The PVC is ReadWriteOnce on local-path: it works because web and bots share the Pi's only node.
+# A multi-node cluster would need RWX storage or a different reader.
+variable "dialog_feed_enabled" {
+  type        = bool
+  default     = false
+  description = "Publish the filtered bots dialog feed behind the navbar «Diálogos» button."
+  validation {
+    condition     = !var.dialog_feed_enabled || (var.web_enabled && var.bots_enabled)
+    error_message = "The dialog feed reads the bots dialog log: enable web and bots first."
+  }
+}
+
+locals {
+  dialog_feed_pvc       = var.dialog_feed_enabled ? one(kubernetes_persistent_volume_claim_v1.bots_dialog[*].metadata[0].name) : null
+  dialog_feed_configmap = var.dialog_feed_enabled ? one(kubernetes_config_map_v1.bots_dialog_log[*].metadata[0].name) : null
+}
+
 # egress-internal-only keeps the web pod inside its own namespace (plus DNS). The panel sidecar
 # needs exactly one more destination: the Prometheus server in monitoring-lab, port 9090. Policies
 # are additive, so this opens nothing else (no Grafana, no node-exporter, no other namespace).
@@ -169,6 +191,58 @@ resource "kubernetes_deployment_v1" "web" {
           config_map {
             name     = "release-info"
             optional = true
+          }
+        }
+        dynamic "container" {
+          for_each = var.dialog_feed_enabled ? [1] : []
+          content {
+            name  = "dialog-feed"
+            image = local.runtime_image
+            env {
+              name  = "MODE"
+              value = "dialog"
+            }
+            volume_mount {
+              name       = "dialog-log"
+              mount_path = "/var/lib/bots-dialog"
+              read_only  = true
+            }
+            volume_mount {
+              name       = "dialog-switch"
+              mount_path = "/etc/bots-dialog"
+              read_only  = true
+            }
+            resources {
+              requests = { cpu = "10m", memory = "24Mi" }
+              limits   = { cpu = "100m", memory = "64Mi" }
+            }
+            security_context {
+              run_as_non_root            = true
+              run_as_user                = 10001 # owner of the 0600 day files written by the bots pod
+              run_as_group               = 10001
+              allow_privilege_escalation = false
+              read_only_root_filesystem  = true
+              capabilities { drop = ["ALL"] }
+            }
+          }
+        }
+        # Read-only at the volume too, and no pod fs_group: the kubelet never re-owns or widens the
+        # bots' private log files for this reader.
+        dynamic "volume" {
+          for_each = var.dialog_feed_enabled ? [1] : []
+          content {
+            name = "dialog-log"
+            persistent_volume_claim {
+              claim_name = local.dialog_feed_pvc
+              read_only  = true
+            }
+          }
+        }
+        dynamic "volume" {
+          for_each = var.dialog_feed_enabled ? [1] : []
+          content {
+            name = "dialog-switch"
+            config_map { name = local.dialog_feed_configmap }
           }
         }
         container {

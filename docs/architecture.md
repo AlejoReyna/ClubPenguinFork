@@ -49,6 +49,7 @@ flowchart TB
       Nginx["nginx :8080"]
       Proxy["socket-proxy :8765<br/>WebSocket to TCP"]
       Panel["panel-summary :8766<br/>loopback only"]
+      Feed["dialog-feed :8767<br/>loopback only, optional"]
     end
     Login["login :6112"]
     World["glaciar :9876 (world)"]
@@ -69,6 +70,8 @@ flowchart TB
   Nginx -->|/create/| Dash
   Nginx -->|/puffle/| Puffle
   Nginx -->|/infra/summary.json| Panel
+  Nginx -->|/dialog/feed.json| Feed
+  Feed -.->|reads PVC bots-dialog, read-only| Bots
   Proxy --> Login
   Proxy --> World
   Login --> PG
@@ -156,6 +159,10 @@ with `prometheus.io/scrape`: the game exporter (9101), bots (9102) and the puffl
   `GET /infra/summary.json` to the `panel-summary` sidecar on loopback, which runs a fixed set of
   PromQL queries (2-second timeout, 15-second cache). The browser never learns where Prometheus
   or Grafana live, and a Prometheus outage only greys out the panel.
+- **«Diálogos» panel.** Optional (`dialog_feed_enabled`). nginx forwards `GET /dialog/feed.json`
+  to the `dialog-feed` sidecar on loopback, which reads the bots' dialog-log PVC read-only and
+  publishes an allow-listed tail of it: what the AI penguins say and decide, never player data
+  (`docs/dialogos-publicos.md`).
 
 ## Capacity
 
