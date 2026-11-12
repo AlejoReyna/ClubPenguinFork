@@ -87,6 +87,8 @@ resource "kubernetes_persistent_volume_claim_v1" "bots_dialog" {
 
 # Kill switch. Default off. Do not hash this into a pod annotation: the
 # process re-reads the file, and a checksum would roll the pod on every toggle.
+# Terraform only sets the initial value: the operator flips it with kubectl
+# patch, and a deploy must not silently turn the log (and the public feed) off.
 resource "kubernetes_config_map_v1" "bots_dialog_log" {
   count = var.bots_enabled ? 1 : 0
   metadata {
@@ -96,6 +98,9 @@ resource "kubernetes_config_map_v1" "bots_dialog_log" {
   }
   data = {
     enabled = "false"
+  }
+  lifecycle {
+    ignore_changes = [data]
   }
 }
 

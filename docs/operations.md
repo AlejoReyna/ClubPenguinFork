@@ -194,7 +194,8 @@ To hide the public feed at once without a deploy, turn the switch off (below): t
 answers `enabled: false` with no events, and the panel shows "Registro apagado". To remove
 the button, set `dialog_feed_enabled = false` and deploy.
 
-The switch defaults to off. It is the ConfigMap `bots-dialog-log` key `enabled`. The player
+The switch defaults to off. It is the ConfigMap `bots-dialog-log` key `enabled`. Terraform
+creates it off and then ignores its data, so a deploy keeps whatever the operator last set. The player
 hash salt is the env var `BOTS_DIALOG_LOG_SALT` from the hand-created Secret `bots-dialog-salt`
 key `salt`. Create that Secret before the first pod start, and do not paste the value anywhere:
 
