@@ -237,7 +237,7 @@ class DirectorTests(unittest.IsolatedAsyncioTestCase):
         server = FakeKimi()
         await server.start()
         self.addAsyncCleanup(server.stop)
-        manager, _provider, director = await self.make()
+        manager, _provider, director = await self.make(conversation_cooldown=0)
         lines = {'lines': [{'bot': i, 'say': f'Escena {i}'} for i in range(3)]}
         server.responses = [(200, json.dumps({'choices': [{'message': {'content': json.dumps(lines)}}],
                                               'usage': {'prompt_tokens': 1000, 'completion_tokens': 40}}).encode())]
@@ -257,6 +257,19 @@ class DirectorTests(unittest.IsolatedAsyncioTestCase):
         await drain(director)
         self.assertEqual(len(server.requests), 1)
         self.assertEqual(len(sent(manager)), 6)
+
+    async def test_conversation_cooldown_blocks_a_second_bot_started_scene(self):
+        def scene(messages, priority):
+            cast = json.loads(messages[1]['content'].split(': ', 1)[1])
+            return json.dumps({'lines': [{'bot': row['bot'], 'say': 'Hola'} for row in cast]})
+        manager, _provider, director = await self.make(provider=FakeVoice([scene]))
+        self.assertTrue(director.scene(120))
+        await drain(director)
+        self.assertEqual(len(sent(manager)), 3)
+        self.assertFalse(director.scene(120))
+        now = director.clock()
+        director.clock = lambda: now + 601
+        self.assertTrue(director.scene(120))
 
     async def test_unknown_scene_speaker_falls_back_and_never_speaks_as_another_account(self):
         manager, provider, director = await self.make(provider=FakeVoice([
