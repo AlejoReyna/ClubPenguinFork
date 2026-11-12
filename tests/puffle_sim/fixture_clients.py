@@ -42,7 +42,7 @@ async def read_for(conn, duration):
 
 
 async def join_igloo(conn, owner):
-    await conn.send_line(f'%xt%s%j#jp%-1%{1000 + owner}%')
+    await conn.send_line(f'%xt%s%j#jp%-1%{owner}%igloo%')
     end = asyncio.get_running_loop().time() + 5
     while asyncio.get_running_loop().time() < end:
         frame = Frame.parse(await conn.read_line(5))

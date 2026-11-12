@@ -20,7 +20,7 @@ handlers under vendor/houdini):
   client's own dance/sit buttons send this one (see actions.py), Houdini keeps it;
 - presence: ``%xt%ap%-1%<player string>`` and ``%xt%rp%-1%<id>%``;
 - roster refresh: ``%xt%grs%-1%<room>%<strings...>%``;
-- igloo join (legacy): ``%xt%s%j#jp%-1%<player_id+1000>%``, answer ``jr`` with
+- igloo join (vanilla): ``%xt%s%j#jp%-1%<player_id>%igloo%``, answer ``jr`` with
   external id ``player_id+2000``. ``j#grs`` inside an igloo echoes the database
   row id, not that external id, so the join does not use the ``grs`` barrier;
 - igloo map: ``%xt%s%g#or%-1%`` opens, ``%xt%s%g#cr%-1%`` closes. Neither
@@ -345,13 +345,15 @@ class AS2Connection:
             raise FramingError('unexpected reply joining the room')
 
     async def join_player_igloo(self, player_id, timeout):
-        """Send ``j#jp`` and wait for ``jr`` with external id ``player_id+2000``.
+        """Send vanilla ``j#jp`` and wait for ``jr`` with external id ``player_id+2000``.
 
+        The server is in single-client vanilla mode, so the legacy form
+        (player id plus 1000, no room type) is rejected before any ``jr``.
         No ``j#grs`` after it: inside an igloo Houdini's refresh uses the
         ``penguin_igloo_room`` serial, which is not the external id.
         """
         external = igloo_external_id(player_id)
-        await self.send_line(f'%xt%s%j#jp%-1%{int(player_id) + IGLOO_JOIN_OFFSET}%')
+        await self.send_line(f'%xt%s%j#jp%-1%{int(player_id)}%igloo%')
         while True:
             raw = await self.read_line(timeout)
             if raw.startswith('%xt%jr%'):

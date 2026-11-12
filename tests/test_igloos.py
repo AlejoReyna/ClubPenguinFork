@@ -201,7 +201,7 @@ class PacketTests(unittest.IsolatedAsyncioTestCase):
         reader.feed_data(b'%xt%jr%-1%2105%5|Ada|1|1|1|0|0|0|0|0|0|0|380|320|1|0|0|0%\x00')
         frame = await conn.join_player_igloo(105, 1)
         self.assertEqual(frame.args[0], '2105')
-        self.assertIn(b'%xt%s%j#jp%-1%1105%\x00', bytes(written))
+        self.assertIn(b'%xt%s%j#jp%-1%105%igloo%\x00', bytes(written))
         written.clear()
         await conn.set_igloo_open(True)
         await conn.set_igloo_open(False)
