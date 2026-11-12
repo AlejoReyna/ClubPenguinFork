@@ -147,6 +147,9 @@ def cmd_plan(args):
     values.update({
         **puffle_settings(manifest, cfg),
         'puffle_allowed_players': [int(x) for x in cfg['CP_PUFFLE_ALLOWED_PLAYERS'].split(',') if x],
+        # The «Diálogos» panel switch (docs/operations.md). ci.yml sets the same TF_VAR, so a
+        # clean checkout never plans to retire the sidecar and its PVC.
+        'dialog_feed_enabled': cfg['CP_DIALOG_FEED_ENABLED'] == 'true',
         'proxy_extra_hosts': [x for x in cfg['CP_PROXY_EXTRA_HOSTS'].split(',') if x],
         'public_hostname': cfg['CP_PUBLIC_HOSTNAME'], 'kubeconfig_path': cfg['CP_KUBECONFIG'], 'lan_cidr': cfg['CP_LAN_CIDR'],
         'cloud_state': {'resource_group_name': cfg['CP_STATE_RESOURCE_GROUP'],
