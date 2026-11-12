@@ -103,6 +103,9 @@ class Director:
         # Host timing (seconds): settle before walking up, walk cap, idle time before going back, poll.
         self.host_settle, self.host_walk_cap, self.host_idle, self.host_poll = (0.8, 1.6), 4.0, 20.0, 10.0
         self.daily_day, self.daily = None, {}
+        # Monotonic time until which a room, or a penguin, may not start another
+        # bot-started conversation. Bounded: expired entries are dropped on write.
+        self._room_rest, self._bot_rest = {}, {}
         self._sequence = 0
         self._ambient = None
         self._closed = False
@@ -646,15 +649,20 @@ class Director:
             return
         if turn.kind == 'scene':
             brains = [self.brains[s.index] for s in turn.sessions]
-            lines = await brains[0].scene(brains[1:])
-            for index, (brain, answer) in enumerate(lines):
-                # Human turns queued during inference take precedence over an ambient scene.
-                if not self._valid(turn) or state.human_pending:
-                    break
-                await self._pause(brain.session, answer.say, index, started)
-                if self._valid(turn) and not state.human_pending and await brain.publish(answer, spend.P2):
-                    state.last_sent = self.clock()
-                    self._log_said(brain.session, 'scene', answer, spend.P2, scene_id=f's{turn.room}n{self._sequence}')
+            scene_id = f's{turn.room}n{self._sequence}'  # fixed now: a long chat sees other turns queue
+            try:
+                lines = await brains[0].scene(brains[1:], self.settings.scene_lines)
+                for index, (brain, answer) in enumerate(lines):
+                    # Human turns queued during inference take precedence over an ambient scene.
+                    if not self._valid(turn) or state.human_pending:
+                        break
+                    await self._pause(brain.session, answer.say, index, started)
+                    if self._valid(turn) and not state.human_pending and await brain.publish(answer, spend.P2):
+                        state.last_sent = self.clock()
+                        self._log_said(brain.session, 'scene', answer, spend.P2, scene_id=scene_id)
+            finally:
+                # Finished, interrupted or failed: the rest starts when it stops.
+                self.conversation_ended(turn.room, turn.sessions)
             return
         session = turn.sessions[0]
         brain = self.brains[session.index]
@@ -806,6 +814,34 @@ class Director:
              priority=priority if priority in spend.PRIORITIES else None,
              scene_id=scene_id)
 
+    # ------------------------------------------------- conversation rest (10 min)
+    def conversation_ready(self, room, sessions=()):
+        """May penguins start a conversation of their own here, with these speakers?
+
+        False while the room, or any of the speakers, is still resting after the
+        last bot-started conversation (``dialogue.conversation_cooldown``, 600 s
+        by default). Replies to a human never ask this.
+        """
+        if self.settings.conversation_cooldown <= 0:
+            return True
+        now = self.clock()
+        if now < self._room_rest.get(room, float('-inf')):
+            return False
+        return all(now >= self._bot_rest.get(s.index, float('-inf')) for s in sessions)
+
+    def conversation_ended(self, room, sessions=()):
+        """Start the rest for ``room`` and every speaker, from now."""
+        cooldown = self.settings.conversation_cooldown
+        if cooldown <= 0:
+            return
+        now = self.clock()
+        for rest in (self._room_rest, self._bot_rest):
+            for key in [key for key, until in rest.items() if until <= now]:
+                del rest[key]
+        self._room_rest[room] = now + cooldown
+        for session in sessions:
+            self._bot_rest[session.index] = now + cooldown
+
     def event(self, kind, room, key, speakers, minimum, maximum):
         if self.events is None or not speakers or not self.world.has_humans(room):
             return False
@@ -817,8 +853,10 @@ class Director:
 
     def scene(self, room):
         state = self.rooms.get(room)
-        candidates = self.active(room)
-        if (self._closed or not self.world.has_humans(room) or len(candidates) < 2
+        if self._closed or not self.conversation_ready(room):
+            return False
+        candidates = [s for s in self.active(room) if self.conversation_ready(room, (s,))]
+        if (not self.world.has_humans(room) or len(candidates) < 2
                 or (state is not None and not state.idle())):
             return False
         picked = tuple(self.rng.sample(candidates, min(3, len(candidates))))

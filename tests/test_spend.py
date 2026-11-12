@@ -124,6 +124,14 @@ class CapTests(unittest.TestCase):
             ledger.reserve(P0, 9000)
         self.assertEqual(caught.exception.reason, 'monthly')
 
+    def test_weekly_cap_and_tightest_ratio_for_priority(self):
+        ledger = make(daily_usd=10.0, weekly_usd=0.01)  # week is the tight cap
+        ledger.reserve(P2, 8000)
+        self.assertFalse(ledger.allows(P2))  # 80 % of the weekly cap
+        with self.assertRaises(SpendDenied) as caught:
+            ledger.reserve(P0, 3000)
+        self.assertEqual(caught.exception.reason, 'weekly')
+
     def test_per_minute_window_slides(self):
         now = [T0]
         ledger = make(clock=lambda: now[0], per_minute=2)

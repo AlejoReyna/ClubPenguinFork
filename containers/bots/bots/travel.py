@@ -469,14 +469,25 @@ class Travel:
             return False
         if not self.world.has_humans(session.room_id):
             return False  # no bot-bot loop in an empty room, and no paid line
+        room = session.room_id
+        if not self.director.conversation_ready(room, (session,)):
+            return False  # the 10-minute rest after the last bot-started conversation
         if life.rng.random() >= igloo_invite.HOST_CHANCE:
             return False
         guest = self._spare_guest(session)
-        if guest is not None:
-            await self.invite_bot(session, guest, now)
+        if guest is not None and self.director.conversation_ready(room, (guest,)):
+            try:
+                await self.invite_bot(session, guest, now)
+            finally:
+                self.director.conversation_ended(room, (session, guest))
             return True
-        humans = self.world.humans_in(session.room_id)
-        await self._host_departs(session, humans[0].id, now)
+        if guest is not None:
+            return False
+        humans = self.world.humans_in(room)
+        try:
+            await self._host_departs(session, humans[0].id, now)
+        finally:
+            self.director.conversation_ended(room, (session,))
         return True
 
     def _spare_guest(self, session):

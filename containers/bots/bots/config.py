@@ -54,7 +54,8 @@ class ProviderConfig:
     def __init__(self, mode, base_url, api_key, model, max_completion_tokens,
                  timeout, retries, retry_wait, thinking, max_concurrent,
                  fallback_replies, max_requests_per_day=100, budget_path='/var/lib/bots/budget.json',
-                 daily_usd=1.0, monthly_usd=30.0, max_requests_per_minute=6, prices=None):
+                 daily_usd=1.0, monthly_usd=30.0, max_requests_per_minute=6, prices=None,
+                 weekly_usd=1.0):
         self.mode = mode
         self.base_url = base_url
         self.api_key = api_key
@@ -71,6 +72,7 @@ class ProviderConfig:
         self.budget_path = budget_path
         self.daily_usd = float(daily_usd)
         self.monthly_usd = float(monthly_usd)
+        self.weekly_usd = float(weekly_usd)
         self.max_requests_per_minute = int(max_requests_per_minute)
         self.prices = prices if prices is not None else spend_mod.Prices()
 
@@ -137,6 +139,11 @@ class DialogueConfig:
         'greeting_chance': 0.5, 'greeting_model_share': 0.3,
         'greeting_delay_min': 3.0, 'greeting_delay_max': 8.0, 'greeting_ttl': 600.0,
         'scene_min_delay': 240.0, 'scene_max_delay': 360.0,
+        # A bot-started conversation (scene or igloo invitation) has 2-3 speakers and
+        # up to scene_lines lines, then the room and every speaker rest for
+        # conversation_cooldown seconds before penguins start another one (0 = no rest).
+        # Answering a human is never held back by this rest.
+        'scene_lines': 8, 'conversation_cooldown': 600.0,
         'line_delay_min': 1.0, 'line_delay_max': 2.5,
         'hello_chance': 0.6, 'question_chance': 0.5, 'other_chance': 0.25,
         'continuity_ttl': 120.0, 'player_daily_limit': 40, 'queue_size': 8,
@@ -291,12 +298,13 @@ def _parse_dialogue(raw, env):
         raise ConfigError('dialogue.enabled must be true or false')
     values = {}
     for key, default in DialogueConfig.DEFAULTS.items():
-        minimum = 1 if key in ('player_daily_limit', 'queue_size', 'group_max') else 0
+        minimum = (1 if key in ('player_daily_limit', 'queue_size', 'group_max')
+                   else 3 if key == 'scene_lines' else 0)
         value = _number(raw, key, default, minimum, 'dialogue')
         if key.endswith('chance') or key in ('greeting_model_share', 'chattiness_weight'):
             if value > 1:
                 raise ConfigError(f'dialogue.{key}: probability must be at most 1')
-        if key in ('player_daily_limit', 'queue_size', 'group_max'):
+        if key in ('player_daily_limit', 'queue_size', 'group_max', 'scene_lines'):
             if value != int(value):
                 raise ConfigError(f'dialogue.{key}: must be an integer')
             value = int(value)
@@ -305,6 +313,8 @@ def _parse_dialogue(raw, env):
                       ('scene_min_delay', 'scene_max_delay'), ('line_delay_min', 'line_delay_max')):
         if values[high] < values[low] or (low == 'scene_min_delay' and values[low] < 0.05):
             raise ConfigError(f'dialogue: invalid {low}/{high} interval')
+    if values['scene_lines'] > 12:
+        raise ConfigError('dialogue.scene_lines: at most 12 lines per conversation')
     return DialogueConfig(enabled, **values)
 
 
@@ -748,6 +758,7 @@ def build_config(document, env=None):
         budget_path=str(env.get('BOTS_BUDGET_PATH', provider_raw.get('budget_path', '/var/lib/bots/budget.json'))),
         daily_usd=_setting(env, 'BOTS_DAILY_SPEND_CAP_USD', provider_raw, 'daily_usd', 1.0, 0.0001, 'provider'),
         monthly_usd=_setting(env, 'BOTS_MONTHLY_SPEND_CAP_USD', provider_raw, 'monthly_usd', 30.0, 0.0001, 'provider'),
+        weekly_usd=_setting(env, 'BOTS_WEEKLY_SPEND_CAP_USD', provider_raw, 'weekly_usd', 1.0, 0.0001, 'provider'),
         max_requests_per_minute=_setting(env, 'BOTS_MAX_REQUESTS_PER_MINUTE', provider_raw,
                                          'max_requests_per_minute',
                                          _number(policy_raw, 'requests_per_minute', 6, 1, 'policy'), 1, 'provider'),

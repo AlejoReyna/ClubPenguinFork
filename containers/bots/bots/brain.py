@@ -218,37 +218,52 @@ class Brain:
         say, action = parse_reply(raw, allow_travel=self.session.travel is not None)
         return await self.safe(say, action, 'llm')
 
-    async def scene(self, others):
-        """One P2 completion for a strict, two/three-person scene."""
+    async def scene(self, others, maximum=None):
+        """One P2 completion for a short bot-to-bot conversation that ends on its own.
+
+        Two or three speakers take turns (never the same one twice in a row),
+        each one at least once, up to ``maximum`` lines, and the last line closes
+        the chat. Anything else falls back to one local line per speaker.
+        """
         brains = [self] + list(others)
+        maximum = max(len(brains), int(maximum or len(brains)))
         local = [(brain, await brain.safe(brain.local_line())) for brain in brains]
         payload = [
-            {'role': 'system', 'content': GLOBAL_RULES},
+            {'role': 'system', 'content': self.rules().replace('con una intervencion por personaje',
+                'con las intervenciones que pida la conversacion')},
             {'role': 'system', 'content': 'REPARTO (datos): ' + json.dumps([
                 {'bot': brain.bot.index, 'ficha': brain.profile()} for brain in brains], ensure_ascii=False, sort_keys=True)},
             {'role': 'system', 'content': 'SITUACION (datos): ' + json.dumps(self.situation(), ensure_ascii=False, sort_keys=True)},
-            {'role': 'user', 'content': 'Escribe una mini escena de una frase por personaje. '
-             'JSON {"lines":[{"bot":indice,"say":"frase"}]}. Usa cada indice del reparto '
-             'exactamente una vez, sin acciones. Maximo 54 caracteres por frase.'},
+            {'role': 'user', 'content': json.dumps({
+                'tarea': 'Una conversacion corta y natural entre el reparto: cada frase '
+                         'responde a la anterior y la ultima la cierra (despedida o remate).',
+                'min_lineas': min(maximum, max(4, len(brains))), 'max_lineas': maximum,
+                'formato': {'lines': [{'bot': 'indice', 'say': 'frase'}]},
+                'reglas': 'Usa cada indice del reparto al menos una vez; nadie habla dos veces '
+                          'seguidas. Sin acciones. Maximo 54 caracteres por frase.'}, ensure_ascii=False)},
         ]
         try:
-            raw, _usage = await self.session.provider.complete(payload, priority=spend.P2)
+            raw, _usage = await self.session.provider.complete(
+                payload, priority=spend.P2, max_completion_tokens=1024 if maximum > 6 else 512)
             if isinstance(self.session.provider, SimulatedProvider):
                 return local
             document = json.loads(raw)
             lines = document['lines']
-            if not isinstance(lines, list) or len(lines) != len(brains):
+            if not isinstance(lines, list) or not len(brains) <= len(lines) <= maximum:
                 return local
             by_id = {brain.bot.index: brain for brain in brains}
-            seen, output = set(), []
+            seen, output, previous = set(), [], None
             for entry in lines:
                 if (not isinstance(entry, dict) or type(entry.get('bot')) is not int
-                        or entry['bot'] not in by_id or entry['bot'] in seen
+                        or entry['bot'] not in by_id or entry['bot'] == previous
                         or not isinstance(entry.get('say'), str)):
                     return local
+                previous = entry['bot']
                 seen.add(entry['bot'])
                 brain = by_id[entry['bot']]
                 output.append((brain, await brain.safe(entry['say'], source='llm')))
+            if len(seen) != len(brains):
+                return local
             return output
         except (ProviderError, ValueError, KeyError, TypeError):
             await self.session.metrics.fallback_used(self.bot.index)

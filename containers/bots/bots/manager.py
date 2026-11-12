@@ -37,6 +37,7 @@ class BotManager:
                 config.provider.budget_path,
                 daily_usd=config.provider.daily_usd,
                 monthly_usd=config.provider.monthly_usd,
+                weekly_usd=config.provider.weekly_usd,
                 per_minute=config.provider.max_requests_per_minute,
                 max_requests_per_day=config.provider.max_requests_per_day,
                 prices=config.provider.prices)

@@ -6,12 +6,14 @@ replaces the estimate. A request that fails keeps its estimate: the provider
 may have processed it, so the ledger errs on the side of counting.
 
 Rules (docs/bots.md, Spend control):
-- daily and monthly caps in USD, plus a per-minute attempt window and an
-  optional legacy requests-per-day cap (kept so an existing deployment keeps
-  its old limits until its operator opts in to the USD ones);
-- priority classes: P2 (bot-to-bot chatter) switches off at 80 % of the daily
-  cap, P1 (model greetings) at 95 %, P0 (a human addressed the bot) only when
-  the cap would be exceeded. Denied callers fall back to local lines;
+- daily, weekly (ISO week, UTC) and monthly caps in USD, plus a per-minute
+  attempt window and an optional legacy requests-per-day cap (kept so an
+  existing deployment keeps its old limits until its operator opts in to the
+  USD ones);
+- priority classes: P2 (bot-to-bot chatter) switches off at 80 % of the
+  tightest of the daily and weekly caps, P1 (model greetings) at 95 %, P0 (a
+  human addressed the bot) only when a cap would be exceeded. Denied callers
+  fall back to local lines;
 - fail closed: if the ledger cannot be written, nothing is sent;
 - the file must be private (no group/other bits) and not a symlink.
 
@@ -50,7 +52,7 @@ _VERSION = 2
 class SpendDenied(Exception):
     """The ledger refuses a request. ``reason`` is a bounded metric label."""
 
-    REASONS = ('daily', 'monthly', 'priority', 'rate', 'requests', 'state')
+    REASONS = ('daily', 'weekly', 'monthly', 'priority', 'rate', 'requests', 'state')
 
     def __init__(self, reason, detail=''):
         super().__init__(f'{reason}: {detail}')
@@ -95,12 +97,13 @@ class Prices:
 class Reservation:
     """A cost held for one in-flight attempt; settle it once the reply is known."""
 
-    __slots__ = ('priority', 'micros', 'day', 'month', 'settled')
+    __slots__ = ('priority', 'micros', 'day', 'week', 'month', 'settled')
 
-    def __init__(self, priority, micros, day, month):
+    def __init__(self, priority, micros, day, month, week=''):
         self.priority = priority
         self.micros = micros
         self.day = day
+        self.week = week
         self.month = month
         self.settled = False
 
@@ -144,6 +147,26 @@ def _utc_day(now):
     return datetime.datetime.fromtimestamp(now, datetime.timezone.utc).strftime('%Y-%m-%d')
 
 
+def _utc_week(now):
+    """ISO week in UTC, ``YYYY-Www``: sorts as text and rolls on Monday 00:00 UTC."""
+    year, week, _weekday = datetime.datetime.fromtimestamp(now, datetime.timezone.utc).isocalendar()
+    return f'{year:04d}-W{week:02d}'
+
+
+def _week_of(day):
+    year, week, _weekday = datetime.date.fromisoformat(day).isocalendar()
+    return f'{year:04d}-W{week:02d}'
+
+
+def _valid_week(value):
+    if not isinstance(value, str) or len(value) != 8 or value[4:6] != '-W':
+        return False
+    try:
+        return 1 <= int(value[6:]) <= 53 and int(value[:4]) > 0
+    except ValueError:
+        return False
+
+
 def _valid_day(value):
     if value == '':  # an unused legacy counter
         return True
@@ -156,11 +179,13 @@ def _valid_day(value):
 class SpendLedger:
     """Reserve/settle ledger. Single event loop: no await between read and write."""
 
-    def __init__(self, path=None, *, daily_usd=1.0, monthly_usd=30.0,
+    def __init__(self, path=None, *, daily_usd=1.0, monthly_usd=30.0, weekly_usd=None,
                  per_minute=30, max_requests_per_day=0, prices=None,
                  clock=time.time):
         self.daily_cap = self._cap(daily_usd, 'daily_usd')
         self.monthly_cap = self._cap(monthly_usd, 'monthly_usd')
+        # None leaves the week unbounded (the monthly cap still applies).
+        self.weekly_cap = None if weekly_usd is None else self._cap(weekly_usd, 'weekly_usd')
         self.per_minute = int(per_minute)
         self.max_requests_per_day = int(max_requests_per_day or 0)
         if self.per_minute < 1 or self.max_requests_per_day < 0:
@@ -170,8 +195,10 @@ class SpendLedger:
         self.path = Path(path) if path else None
         self.state_ok = True
         self.day = ''
+        self.week = ''
         self.month = ''
         self.day_micros = 0
+        self.week_micros = 0
         self.month_micros = 0
         self.requests_day = 0
         self.by_priority = {name: 0 for name in PRIORITIES}  # today's settled micros
@@ -230,6 +257,7 @@ class SpendLedger:
             raise ValueError('invalid budget ledger')
         self.day, self.month = day, month
         self.day_micros, self.month_micros = day_micros, month_micros
+        self._load_week(data)
         self.requests_day, self.attempts, self.by_priority = requests, attempts, parsed
         players = data.get('players', {})
         if (not isinstance(players, dict) or len(players) > 4096
@@ -242,6 +270,25 @@ class SpendLedger:
                 or any(not isinstance(value, str) or len(value) > 32 for value in events.values())):
             raise ValueError('invalid event claim ledger')
         self.events = events
+
+    def _load_week(self, data):
+        """Read the week, or start it conservatively from a file without one.
+
+        A file written by an image without the weekly cap has no ``week``. Then
+        the whole month so far is charged to the current week: never less than
+        the real weekly spend, unless the week began in the previous month.
+        """
+        if 'week' in data or 'week_micros' in data:
+            week, micros = data.get('week'), data.get('week_micros')
+            if (not _valid_week(week) or type(micros) is not int or micros < 0):
+                raise ValueError('invalid budget ledger')
+            self.week, self.week_micros = week, micros
+            return
+        now = _utc_week(self.clock())
+        if self.day and _week_of(self.day) == now:
+            self.week = now
+            self.week_micros = max(self.day_micros, self.month_micros
+                                   if self.month == _utc_day(self.clock())[:7] else 0)
 
     def _load_legacy(self, data):
         """Old ``{day, used, attempts}`` counter: carry over today's request count.
@@ -264,6 +311,8 @@ class SpendLedger:
             self.month_micros = used * self._legacy_request_micros()
             if day == _utc_day(self.clock()):
                 self.day_micros = self.month_micros
+            if day and _week_of(day) == _utc_week(self.clock()):
+                self.week, self.week_micros = _utc_week(self.clock()), self.month_micros
         logger.info('budget ledger in the legacy format converted in memory '
                     '(%d requests today)', used)
 
@@ -275,6 +324,7 @@ class SpendLedger:
             'version': _VERSION,
             'day': self.day, 'month': self.month,
             'day_micros': self.day_micros, 'month_micros': self.month_micros,
+            'week': self.week, 'week_micros': self.week_micros,
             'by_priority': dict(self.by_priority),
             # Legacy keys, so the previous image can still read this file.
             'used': self.requests_day, 'attempts': list(self.attempts),
@@ -310,6 +360,10 @@ class SpendLedger:
             self.requests_day = 0
             self.by_priority = {name: 0 for name in PRIORITIES}
             self.players = {}
+        week = _utc_week(now)
+        if week > self.week:
+            self.week = week
+            self.week_micros = 0
         if today[:7] > self.month:
             self.month = today[:7]
             self.month_micros = 0
@@ -323,8 +377,11 @@ class SpendLedger:
 
     # ----------------------------------------------------------------- state
     def ratio(self):
-        """Fraction of today's cap already held (settled plus in flight)."""
-        return self.day_micros / self.daily_cap
+        """Fraction already held (settled plus in flight) of the tightest cap: day or week."""
+        day = self.day_micros / self.daily_cap
+        if self.weekly_cap is None:
+            return day
+        return max(day, self.week_micros / self.weekly_cap)
 
     def allows(self, priority):
         """Cheap pre-check: would this class be served now? (No reservation.)"""
@@ -338,6 +395,8 @@ class SpendLedger:
         self._roll(self.clock())
         return {'day': self.day, 'day_micros': self.day_micros,
                 'month_micros': self.month_micros, 'daily_cap_micros': self.daily_cap,
+                'week': self.week, 'week_micros': self.week_micros,
+                'weekly_cap_micros': self.weekly_cap,
                 'monthly_cap_micros': self.monthly_cap, 'ratio': self.ratio(),
                 'requests_today': self.requests_day, 'state_ok': self.state_ok,
                 'by_priority': dict(self.by_priority)}
@@ -416,12 +475,15 @@ class SpendLedger:
             raise SpendDenied('requests', 'daily request cap reached')
         if self.month_micros + micros > self.monthly_cap:
             raise SpendDenied('monthly', 'monthly cap would be exceeded')
+        if self.weekly_cap is not None and self.week_micros + micros > self.weekly_cap:
+            raise SpendDenied('weekly', 'weekly cap would be exceeded')
         if self.day_micros + micros > self.daily_cap:
             raise SpendDenied('daily', 'daily cap would be exceeded')
         if self.ratio() >= CUTOFF_RATIO[priority]:
             raise SpendDenied('priority', f'{priority} is switched off at this spend level')
-        before = (self.day_micros, self.month_micros, self.requests_day, self.attempts)
+        before = (self.day_micros, self.week_micros, self.month_micros, self.requests_day, self.attempts)
         self.day_micros += micros
+        self.week_micros += micros
         self.month_micros += micros
         self.requests_day += 1
         self.attempts = recent + [now]
@@ -429,11 +491,11 @@ class SpendLedger:
             self._persist()
         except (OSError, ValueError, TypeError) as error:
             # Fail closed: an unrecorded request must not be sent.
-            self.day_micros, self.month_micros, self.requests_day, self.attempts = before
+            self.day_micros, self.week_micros, self.month_micros, self.requests_day, self.attempts = before
             self.state_ok = False
             raise SpendDenied('state', f'ledger cannot be saved ({type(error).__name__})') from None
         self.state_ok = True
-        return Reservation(priority, micros, self.day, self.month)
+        return Reservation(priority, micros, self.day, self.month, self.week)
 
     def settle(self, reservation, usage):
         """Replace the estimate with the real cost; returns the micros charged."""
@@ -448,6 +510,8 @@ class SpendLedger:
             self.day_micros = max(0, self.day_micros + delta)
             self.by_priority[reservation.priority] = (
                 self.by_priority.get(reservation.priority, 0) + actual)
+        if reservation.week == self.week:
+            self.week_micros = max(0, self.week_micros + delta)
         if reservation.month == self.month:
             self.month_micros = max(0, self.month_micros + delta)
         reservation.micros = actual
