@@ -97,6 +97,9 @@ class BotSession:
 
         self.conn = None  # as2.AS2Connection once inside the world
         self.player_id = None
+        self._login_key = None
+        self._confirmation = None
+        self._raw_login = None
         self.roster = {}
         self.joined_room = False
         self.room_id = None  # the room the server has this bot in right now
@@ -209,13 +212,11 @@ class BotSession:
         password = as2.login_server_password(self.bot.password, rndk)
         fields = await conn.login_legacy(self.bot.username.lower(), password,
                                          self.server.auth_timeout)
-        if len(fields) < 2:
-            raise as2.FramingError('login reply without id and key')
-        player_id, login_key = fields[0], fields[1]
-        if not str(player_id).isdigit():
-            raise as2.FramingError(f'login reply has a malformed id {player_id!r}')
-        self.player_id = int(player_id)
-        self._login_key = login_key
+        logged = as2.parse_login(fields)
+        self.player_id = int(logged.player_id)
+        self._login_key = logged.login_key
+        self._confirmation = logged.confirmation
+        self._raw_login = logged.raw
         if self.world is not None:
             self.world.register_bot(self.player_id)
 
@@ -223,10 +224,9 @@ class BotSession:
         # A fresh login is never still inside an igloo. Home is j#jr, below.
         self.igloo_opened = False
         world_rndk = await conn.handshake(self.server.auth_timeout)
-        token = as2.world_login_password(self._login_key, world_rndk)
-        fields = await conn.login_legacy(self.bot.username.lower(), token,
-                                         self.server.auth_timeout)
-        del fields
+        logged = as2.Login(str(self.player_id), self._login_key, self._confirmation, self._raw_login)
+        await conn.login_world(self.bot.username.lower(), logged, world_rndk,
+                               self.server.auth_timeout)
         await conn.join_world(self.player_id, self._login_key,
                               self.server.auth_timeout)
         if self.bot.spawn is not None:

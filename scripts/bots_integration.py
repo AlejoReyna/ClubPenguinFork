@@ -123,11 +123,12 @@ async def observe():
         fields=await login.login_legacy(identity['username'],login_server_password(identity['password'],rndk),5)
     finally:
         await login.close()
-    pid,key=fields[:2]
+    logged=parse_login(fields)
+    pid,key=logged.player_id,logged.login_key
     conn=await AS2Connection.connect('glaciar',9876)
     try:
         rndk=await conn.handshake(5)
-        await conn.login_legacy(identity['username'],world_login_password(key,rndk),5)
+        await conn.login_world(identity['username'],logged,rndk,5)
         await conn.join_world(int(pid),key,5)
         all_ids=set(doc['expected_ids'].values())
         count=0
@@ -202,11 +203,12 @@ async def observe():
         rndk=await login.handshake(5)
         fields=await login.login_legacy(identity['username'],login_server_password(identity['password'],rndk),5)
     finally: await login.close()
-    pid,key=fields[:2]
+    logged=parse_login(fields)
+    pid,key=logged.player_id,logged.login_key
     conn=await AS2Connection.connect('glaciar',9876)
     try:
         rndk=await conn.handshake(5)
-        await conn.login_legacy(identity['username'],world_login_password(key,rndk),5)
+        await conn.login_world(identity['username'],logged,rndk,5)
         await conn.join_world(int(pid),key,5)
         all_ids=set(doc['expected_ids'].values())
         for name,room in [('baristaia',110),('djia',120),('pizzeroia',330)]:
@@ -311,11 +313,12 @@ async def observe():
         rndk=await login.handshake(5)
         fields=await login.login_legacy(identity['username'],login_server_password(identity['password'],rndk),5)
     finally: await login.close()
-    pid,key=fields[:2]
+    logged=parse_login(fields)
+    pid,key=logged.player_id,logged.login_key
     conn=await AS2Connection.connect('glaciar',9876)
     try:
         rndk=await conn.handshake(5)
-        await conn.login_legacy(identity['username'],world_login_password(key,rndk),5)
+        await conn.login_world(identity['username'],logged,rndk,5)
         await conn.join_world(int(pid),key,5)
         async def reply(sender,slow=False):
             moves=0

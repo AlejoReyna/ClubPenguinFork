@@ -52,7 +52,7 @@ class Client:
         raise RuntimeError('Expected game response was not received')
 
     def handshake(self):
-        self.send('<msg t="sys"><body action="verChk" r="0"><ver v="153"/></body></msg>')
+        self.send('<msg t="sys"><body action="verChk" r="0"><ver v="253"/></body></msg>')
         if 'apiOK' not in self.receive():
             raise RuntimeError('AS2 version handshake failed')
         self.send('<msg t="sys"><body action="rndK" r="-1"/></msg>')
@@ -105,13 +105,22 @@ def main():
                 key = login.handshake()
                 hashed = swap(digest(swap(digest(password).upper()) + key + 'Y(02.>\'H}t":E1'))
                 fields = login.login(name, hashed).strip('%').split('%')
-                player_id, login_key = fields[3:5]
+                head = fields[3]
+                if '|' in head:
+                    parts = head.split('|')
+                    player_id, login_key, confirmation = parts[0], parts[3], fields[4]
+                else:
+                    player_id, login_key, confirmation = head, fields[4], None
             finally:
                 login.close()
             world = Client(args.world_host, args.world_port)
             worlds.append(world)
             world_key = world.handshake()
-            world.login(name, swap(digest(login_key + world_key)) + login_key)
+            token = swap(digest(login_key + world_key)) + login_key
+            if confirmation:
+                world.login(head, token + '#' + confirmation)
+            else:
+                world.login(name, token)
             world.send(f'%xt%s%j#js%-1%{player_id}%{login_key}%0%')
             world.expect('%xt%js%')
             world.send('%xt%s%j#jr%-1%100%0%0%')

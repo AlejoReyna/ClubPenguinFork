@@ -102,10 +102,11 @@ async def main():
         rndk=await conn.handshake(10)
         fields=await conn.login_legacy(doc['human']['username'],login_server_password(doc['human']['password'],rndk),10)
     finally: await conn.close()
-    pid,key=fields[:2]
+    logged=parse_login(fields)
+    pid,key=logged.player_id,logged.login_key
     conn=await AS2Connection.connect('glaciar',9876)
     rndk=await conn.handshake(10)
-    await conn.login_legacy(doc['human']['username'],world_login_password(key,rndk),10)
+    await conn.login_world(doc['human']['username'],logged,rndk,10)
     await conn.join_world(int(pid),key,10)
     await conn.join_room(120,10,330,250)
     await asyncio.sleep(.7)
@@ -153,10 +154,11 @@ async def main():
         rndk=await conn.handshake(10)
         fields=await conn.login_legacy(doc['human']['username'],login_server_password(doc['human']['password'],rndk),10)
     finally: await conn.close()
-    pid,key=fields[:2]
+    logged=parse_login(fields)
+    pid,key=logged.player_id,logged.login_key
     conn=await AS2Connection.connect('glaciar',9876)
     rndk=await conn.handshake(10)
-    await conn.login_legacy(doc['human']['username'],world_login_password(key,rndk),10)
+    await conn.login_world(doc['human']['username'],logged,rndk,10)
     await conn.join_world(int(pid),key,10)
     await conn.join_room(120,10,330,250)
     await asyncio.sleep(.7)

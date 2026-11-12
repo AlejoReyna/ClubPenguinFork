@@ -26,7 +26,7 @@ def make_repo(temp):
     shutil.copy(ROOT / 'scripts/fetch-sources.py', repo / 'scripts/fetch-sources.py')
     (repo / 'sources.json').write_text(json.dumps({
         'houdini': {'url': 'u', 'revision': 'a' * 40}, 'dash': {'url': 'u', 'revision': 'b' * 40},
-        'legacy-media': {'url': 'u', 'revision': 'c' * 40}}))
+        'vanilla-media': {'url': 'u', 'revision': 'c' * 40}}))
     for command in (['init', '-q'], ['add', '-A'], ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'x']):
         subprocess.run(['git', '-C', str(repo)] + command, check=True, capture_output=True)
     return repo
@@ -96,7 +96,7 @@ class FingerprintTests(unittest.TestCase):
     def test_media_pin_only_affects_web(self):
         before = tags(self.repo)
         sources = json.loads((self.repo / 'sources.json').read_text())
-        sources['legacy-media']['revision'] = 'f' * 40
+        sources['vanilla-media']['revision'] = 'f' * 40
         (self.repo / 'sources.json').write_text(json.dumps(sources))
         self.commit()
         after = tags(self.repo)
@@ -174,7 +174,7 @@ class SourcesToFetchTests(unittest.TestCase):
         # Regression: web-only builds fetched just media/ruffle, and the bot tests then
         # failed on a clean workspace because vendor/houdini was missing.
         sources = release.sources_to_fetch(['web'])
-        self.assertTrue({'houdini', 'dash', 'legacy-media', 'ruffle'} <= set(sources))
+        self.assertTrue({'houdini', 'dash', 'vanilla-media', 'ruffle'} <= set(sources))
 
     def test_a_bots_only_release_fetches_the_runtime_sources_for_its_tests(self):
         self.assertEqual(release.sources_to_fetch(['bots']), ['dash', 'houdini'])

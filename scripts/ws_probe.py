@@ -22,7 +22,7 @@ import time
 from urllib.parse import urlparse
 
 GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
-VERCHK = b'<msg t="sys"><body action="verChk" r="0"><ver v="153"/></body></msg>\0'
+VERCHK = b'<msg t="sys"><body action="verChk" r="0"><ver v="253"/></body></msg>\0'
 
 
 class ProbeError(Exception):

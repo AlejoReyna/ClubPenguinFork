@@ -285,11 +285,12 @@ async def one(bot):
         fields = await login.login_legacy(bot['username'].lower(), login_server_password(bot['password'], key), 10)
     finally:
         await login.close()
-    pid, login_key = fields[0], fields[1]
+    logged = parse_login(fields)
+    pid, login_key = logged.player_id, logged.login_key
     world = await AS2Connection.connect('glaciar', 9876)
     try:
         rndk = await world.handshake(10)
-        await world.login_legacy(bot['username'].lower(), world_login_password(login_key, rndk), 10)
+        await world.login_world(bot['username'].lower(), logged, rndk, 10)
         await world.join_world(int(pid), login_key, 10)
         anchor = bot.get('anchor')
         if anchor:

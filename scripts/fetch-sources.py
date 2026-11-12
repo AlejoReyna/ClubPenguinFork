@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Download the pinned upstream sources and the verified Ruffle release.
 
---only limits the download (e.g. `--only houdini,dash,ruffle` skips the ~1.7 GiB of
-legacy media, which backend tests do not need).
+--only limits the download (e.g. `--only houdini,dash,ruffle` skips the vanilla
+media dump, which backend tests do not need).
 """
 import argparse
 import hashlib
@@ -14,7 +14,7 @@ import zipfile
 
 root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument('--only', help='comma-separated subset of: houdini,dash,legacy-media,ruffle')
+parser.add_argument('--only', help='comma-separated subset of: houdini,dash,vanilla-media,ruffle')
 args = parser.parse_args()
 wanted = set(args.only.split(',')) if args.only else None
 vendor = root / 'vendor'

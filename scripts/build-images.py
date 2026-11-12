@@ -8,7 +8,7 @@ Examples:
   build-images.py --component-tag web=web-abc123def456 --components web   # per-component tags
 
 `--web-media stub` builds the web image around a few placeholder files instead of
-`vendor/legacy-media`, so tests can exercise nginx and the WebSocket proxy route
+`vendor/vanilla-media`, so tests can exercise nginx and the WebSocket proxy route
 without downloading the media. A stub image is for tests only and must never be
 published; `release.py` refuses to publish anything that was not built with full media.
 """
