@@ -30,6 +30,11 @@ class AuthorityTests(unittest.TestCase):
         self.player.walking = 4
         self.assertEqual(select_owned_puffle(self.player, self.human), 8)
 
+    def test_vanilla_client_with_a_classic_puffle_is_accepted(self):
+        self.player.is_legacy_client = False
+        self.player.is_vanilla_client = True
+        self.assertEqual(select_owned_puffle(self.player, self.human), 4)
+
     def test_visitor_bot_and_mute_are_rejected(self):
         self.assertIsNone(select_owned_puffle(self.player, lambda _: False))
         self.player.muted = True

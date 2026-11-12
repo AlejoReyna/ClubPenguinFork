@@ -12,10 +12,11 @@ from experiments.puffle_sim.engine import select_puffle
 
 
 def select_owned_puffle(player, human_authorized, preferred=None):
-    """Return a visible legacy puffle id only when the server context qualifies."""
+    """Return a visible classic puffle id only when the server context qualifies."""
     room = player.room
+    client_ok = bool(getattr(player, 'is_legacy_client', False) or getattr(player, 'is_vanilla_client', False))
     if (human_authorized(player) is not True or not player.joined_world or player.muted
-            or not player.is_legacy_client or type(room) is not PenguinIglooRoom
+            or not client_ok or type(room) is not PenguinIglooRoom
             or room.penguin_id != player.id
             or room.penguins_by_id.get(player.id) is not player
             or player.server.penguins_by_id.get(player.id) is not player):
