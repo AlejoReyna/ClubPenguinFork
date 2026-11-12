@@ -100,7 +100,7 @@ class PublicEventTest(unittest.TestCase):
         self.assertIsNone(result['dest_room_id'])
 
     def test_text_loses_control_characters_and_is_bounded(self):
-        self.assertEqual(feed.public_event(event(text='hola\x00‮  mundo\n'))['text'], 'hola mundo')
+        self.assertEqual(feed.public_event(event(text='hola\x00\u202e  mundo\n'))['text'], 'hola mundo')
         self.assertEqual(len(feed.public_event(event(text='a' * 500))['text']), feed.TEXT_MAX)
         self.assertIsNone(feed.public_event(event(text=7))['text'])
 
