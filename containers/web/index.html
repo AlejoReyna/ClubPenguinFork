@@ -1017,9 +1017,17 @@
         pintarSeguimiento();
         return true;
       });
+      // The 2017 client boots through its own AS3 wrapper (club_penguin.swf): it reads
+      // /media/play/web_service/environment_data.xml, loads load.swf and hands the AS2 shell its
+      // paths, strings and game configs. The versions are the dump's own cache busters.
       await player.ruffle().load({
-        url: new URL('/media/boots.swf', location.href).href,
-        parameters: {lang: idioma, base: location.origin + '/'}
+        url: new URL('/media/play/v2/client/club_penguin.swf?clientVersion=21639', location.href).href,
+        parameters: {
+          lang: idioma, a: '0', p: '0', connectionID: 'cp68294', useStaticConnectionId: 'true',
+          play: location.origin + '/media/play/', cacheVersion: '', clientVersion: '21639',
+          configVersion: '1485906035', contentVersion: '84421', minigameVersion: '13162',
+          nau: '', nal: '', nad: ''
+        }
       });
       estado('');
       loginDiagSnapshot('game_ready');

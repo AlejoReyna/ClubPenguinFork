@@ -1,7 +1,9 @@
 /* Service worker de Glaciar: precache mínimo y cache-first para media pesada. */
 // v2: the infrastructure panel summary (/infra/) must never be served from a cache.
 // The public dialog feed (/dialog/) follows the same rule; no version bump: no cache changes.
-const VERSION = 'glaciar-puffle-v2';
+// v3: the 2017 client boots from club_penguin.swf; drop media caches that still hold the legacy
+// load.swf/shell.swf, which left the stage blank once the edge cache expired.
+const VERSION = 'glaciar-puffle-v3';
 const ESTATICO = `pre-${VERSION}`;
 const MEDIA = `media-${VERSION}`;
 const PRECACHE = ['/', '/register.html', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/apple-touch-icon.png'];
