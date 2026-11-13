@@ -2,11 +2,10 @@
 FROM nginxinc/nginx-unprivileged:stable-alpine
 COPY --from=media media /srv/media
 COPY --from=media play /srv/play
-# The 2017 dump has no boots.swf. This loader only points Ruffle at /play/v2/client/.
-COPY boots.swf /srv/media/boots.swf
-# load.swf from the legacy media, pinned: with the 2017 dump's load.swf this boots.swf never
-# loads shell.swf (blank stage). This is the copy the site has served since Nov 3.
-COPY load.swf /srv/media/play/v2/client/load.swf
+# The page loads the dump's own AS3 wrapper (club_penguin.swf), which reads this file for its
+# paths. The dump's copy points at media1.clubpenguin.com; ours points at this site through the
+# page's http://localhost rewrite rule, so the same image works on any hostname.
+COPY environment_data.xml /srv/media/play/web_service/environment_data.xml
 COPY custom-clothing/ /srv/media/play/v2/content/global/clothing/
 COPY --from=ruffle . /srv/ruffle
 # Cache-buster hashes only. The 2017 engine/login/create SWFs stay the media originals:
