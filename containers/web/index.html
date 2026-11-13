@@ -148,22 +148,49 @@
        border-radius:11px;background:#8b5cf629;color:#fff;font:700 14px system-ui,sans-serif;text-decoration:none;cursor:pointer}
   .infra .infra-accion:hover{background:#8b5cf647}.infra .infra-accion:disabled{opacity:.6;cursor:progress}
   .infra :focus-visible{outline:2px solid #8b5cf6;outline-offset:2px}
-  /* Panel «Diálogos»: misma hoja lateral; burbujas por línea y filtros Todo/Charlas/Eventos. */
+  /* Panel «Diálogos»: hoja lateral con azul del shell (#00529b / barra) y burbujas blancas
+     como el chat in-game (rectángulo redondeado + colita inferior izquierda). */
+  #dlg-panel{background:linear-gradient(180deg,#0b7ab9 0%,#00529b 62%,#004a8c 100%);color:#fff;border-left-color:#06447f}
+  #dlg-panel .infra-cab h2{color:#fff;font-weight:700;text-shadow:0 1px 0 #06447f}
+  #dlg-panel .infra-x{border-color:#ffffff59;background:#0758a5;color:#fff}
+  #dlg-panel .infra-x:hover{background:#06447f}
+  #dlg-panel :focus-visible{outline:2px solid #fff;outline-offset:2px}
+  #dlg-panel .infra-estado{border-color:#ffffff59;background:#ffffff1a;color:#e8f4fc}
+  #dlg-panel .infra-estado.ok{border-color:#bbf7d099;background:#14532d55;color:#ecfdf5}
+  #dlg-panel .infra-estado.mal{border-color:#fecaca99;background:#450a0a55;color:#fef2f2}
   .dlg-filtros{display:flex;gap:6px;padding:0 12px 10px}
-  .dlg-filtros button{flex:1;min-height:36px;padding:0 10px;border:1px solid #2a2a31;border-radius:999px;background:#151518;
-                      color:#c9c9d2;font:600 13px system-ui,sans-serif;cursor:pointer}
-  .dlg-filtros button[aria-pressed="true"]{background:#8b5cf629;border-color:#8b5cf673;color:#fff}
-  .dlg-aviso{margin:0;padding:10px 12px;border:1px solid #2a2a31;border-radius:12px;background:#151518;color:#9a9aa6}
-  .dlg-lista{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;list-style:none}
-  .dlg-item{display:flex;flex-direction:column;gap:4px;padding:10px 12px;border:1px solid #2a2a31;border-radius:14px 14px 14px 4px;background:#151518}
-  .dlg-item.evento{border-style:dashed;border-radius:12px;background:transparent}
-  .dlg-cab{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 8px;font-size:12.5px;color:#9a9aa6}
-  .dlg-cab b{color:#c4b5fd;font-size:13.5px}
-  .dlg-cab time{margin-inline-start:auto;font-variant-numeric:tabular-nums}
-  .dlg-texto{margin:0;color:#ececf1;overflow-wrap:anywhere}
-  .dlg-evento{margin:0;color:#c9c9d2;font-size:13px}
-  .dlg-pie{color:#9a9aa6;font-size:12px}
-  #dlg-estado{margin-inline-start:auto}#dlg-estado:empty{display:none}
+  .dlg-filtros button{flex:1;min-height:36px;padding:0 10px;border:1px solid #ffffff4d;border-radius:999px;background:#0758a599;
+                      color:#e8f4fc;font:700 13px system-ui,sans-serif;cursor:pointer}
+  .dlg-filtros button[aria-pressed="true"]{background:#fff;border-color:#fff;color:#0758a5;box-shadow:0 1px 0 #9ec5e0}
+  #dlg-panel .infra-cuerpo{align-items:stretch;width:100%;min-width:0}
+  .dlg-aviso{margin:0;width:100%;box-sizing:border-box;padding:10px 12px;border:2px solid #d4e8f5;border-radius:14px;background:#ffffffeb;color:#4c6375}
+  .dlg-lista{display:flex;flex-direction:column;align-items:stretch;gap:14px;margin:0;padding:0 0 4px;list-style:none;width:100%;min-width:0;box-sizing:border-box}
+  .dlg-item{display:flex;flex-direction:column;gap:4px;align-self:stretch;width:100%;min-width:0;box-sizing:border-box;
+            margin:0 0 10px;padding:9px 11px 11px;border:2px solid #d4e8f5;border-radius:15px;
+            background:#fff;box-shadow:0 2px 0 #9ec5e0,0 3px 10px #0000001f;position:relative}
+  .dlg-item::after{content:"";position:absolute;left:16px;bottom:-7px;width:12px;height:12px;background:#fff;border-right:2px solid #d4e8f5;
+                   border-bottom:2px solid #d4e8f5;transform:rotate(45deg);box-shadow:2px 2px 0 #9ec5e0}
+  .dlg-item.evento{margin-bottom:2px;padding:10px 12px;border:1px dashed #ffffff8c;border-radius:12px;background:#ffffff2e;
+                   box-shadow:none;color:#e8f4fc}
+  .dlg-item.evento::after{display:none}
+  #dlg-panel .dlg-item.evento .dlg-cab{color:#d4e8f5}
+  #dlg-panel .dlg-item.evento .dlg-cab b{color:#fff}
+  #dlg-panel .dlg-item.evento .dlg-cab time{color:#b8d4f0}
+  /* Events sit on translucent blue, not a white bubble: the grey .dlg-meta below is unreadable there. */
+  #dlg-panel .dlg-item.evento .dlg-meta{color:#e8f4fc}
+  .dlg-cab{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 8px;width:100%;min-width:0;font-size:11.5px;color:#4c6375}
+  .dlg-cab b{color:#0758a5;font-size:13px;font-weight:800}
+  .dlg-cab time{margin-inline-start:auto;flex-shrink:0;font-variant-numeric:tabular-nums;color:#6b8498}
+  .dlg-meta{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+  .dlg-texto{margin:0;width:100%;color:#123551;font-weight:600;font-size:14px;line-height:1.35;overflow-wrap:break-word}
+  .dlg-evento{margin:0;color:#e8f4fc;font-size:13px;font-weight:600}
+  .dlg-pie{color:#b8d4f0;font-size:12px}
+  #dlg-panel .dlg-pie{color:#d4e8f5}
+  .dlg-item.yo{border-color:#9ec5e0;background:#f2f8fc}
+  .dlg-item.yo::after{background:#f2f8fc;border-color:#9ec5e0}
+  .dlg-meta{color:#6b8498;font-size:12.5px;font-weight:400}
+  .dlg-meta b{color:#0758a5;font-weight:700}
+  #dlg-panel .dlg-pie{width:100%;box-sizing:border-box}
 
   /* Vertical: el juego llena SIEMPRE el alto sobre los controles inferiores (760×480, sin deformar)
      y la cámara sigue a tu pingüino; el deslizador mira hacia los lados. «Ver el juego completo» es
@@ -360,13 +387,11 @@
 <aside id="dlg-panel" class="infra" aria-labelledby="dlg-titulo" inert>
   <header class="infra-cab">
     <h2 id="dlg-titulo">Diálogos de los pingüinos</h2>
-    <span id="dlg-estado" class="infra-estado"></span>
     <button id="dlg-cerrar" class="infra-x" type="button" aria-label="Cerrar panel de diálogos">×</button>
   </header>
   <div class="dlg-filtros" id="dlg-filtros" role="group" aria-label="Filtrar diálogos">
-    <button type="button" data-f="todo" aria-pressed="true">Todo</button>
-    <button type="button" data-f="charla" aria-pressed="false">Charlas</button>
-    <button type="button" data-f="evento" aria-pressed="false">Eventos</button>
+    <button type="button" data-f="todos" aria-pressed="true">Todos</button>
+    <button type="button" data-f="yo" aria-pressed="false">Yo</button>
   </div>
   <div id="dlg-cuerpo" class="infra-cuerpo"></div>
 </aside>
@@ -1524,23 +1549,24 @@
   const botonDlg = document.getElementById('dialogos');
   const panelDlg = document.getElementById('dlg-panel');
   const cuerpoDlg = document.getElementById('dlg-cuerpo');
-  const estadoDlg = document.getElementById('dlg-estado');
   const TD = enIngles ? {
     btn: 'Dialogues', panel: 'Penguin dialogues', close: 'Close dialogues panel', filters: 'Filter dialogues',
-    todo: 'All', charla: 'Chats', evento: 'Events', live: 'Live', off: 'Off', offline: 'Offline',
-    loading: 'Loading…', empty: 'The penguins have not said anything yet today.', emptyFilter: 'Nothing here with this filter.',
+    todos: 'All', yo: 'Me', loading: 'Loading…', empty: 'The penguins have not said anything yet today.',
+    emptyYo: 'Nothing you sent in chat is recorded on this device yet.', emptyFilter: 'Nothing here with this filter.',
     offText: 'The dialogue log is switched off right now.', offlineText: 'Dialogues could not be loaded. The game keeps running.',
-    player: 'a player', room: 'Room', greets: 'greets', greetsTo: 'greets', replies: 'replies to', says: 'to',
+    player: 'a player', room: 'Room', greets: 'greets', greetsTo: 'greets to', replies: 'replies to', says: 'to',
     invite: 'invites', accept: 'accepts the invitation', decline: 'declines the invitation', travel: 'heads to',
-    note: 'Only what the AI penguins say and decide. Player messages are never shown.',
+    toPlayer: 'to a player', toNpc: 'to an NPC', toRoom: 'to the room', toNamed: 'to',
+    noteTodos: 'What the AI penguins say and decide (public feed).', noteYo: 'What you send in chat, only on this device.',
   } : {
     btn: 'Diálogos', panel: 'Diálogos de los pingüinos', close: 'Cerrar panel de diálogos', filters: 'Filtrar diálogos',
-    todo: 'Todo', charla: 'Charlas', evento: 'Eventos', live: 'En vivo', off: 'Apagado', offline: 'Sin conexión',
-    loading: 'Cargando…', empty: 'Los pingüinos aún no han dicho nada hoy.', emptyFilter: 'Nada con este filtro.',
+    todos: 'Todos', yo: 'Yo', loading: 'Cargando…', empty: 'Los pingüinos aún no han dicho nada hoy.',
+    emptyYo: 'Aún no hay mensajes tuyos guardados en este navegador.', emptyFilter: 'Nada con este filtro.',
     offText: 'El registro de diálogos está apagado en este momento.', offlineText: 'No se pudieron cargar los diálogos. El juego sigue funcionando.',
     player: 'un jugador', room: 'Sala', greets: 'saluda', greetsTo: 'saluda a', replies: 'responde a', says: 'a',
     invite: 'invita a', accept: 'acepta la invitación', decline: 'rechaza la invitación', travel: 'va a',
-    note: 'Solo lo que dicen y deciden los pingüinos IA. Nunca se muestran mensajes de jugadores.',
+    toPlayer: 'a un jugador', toNpc: 'a un NPC', toRoom: 'a la sala', toNamed: 'a',
+    noteTodos: 'Lo que dicen y deciden los pingüinos IA (feed público).', noteYo: 'Lo que envías en el chat, solo en este dispositivo.',
   };
   // Salas del catálogo de los bots (containers/bots/bots/data/rooms.json). Una sala nueva sale como «Sala N».
   const SALAS = enIngles ? {
@@ -1573,27 +1599,50 @@
   filtrosDlg.setAttribute('aria-label', TD.filters);
   filtrosDlg.querySelectorAll('button').forEach(b => { b.textContent = TD[b.dataset.f]; });
 
-  let dlgAbierto = false, dlgFiltro = 'todo', dlgDatos = null, dlgFallo = false, dlgCargando = false, relojDlg = null;
+  const YO_KEY = 'glaciar-dlg-yo', YO_MAX = 150;
+  let dlgAbierto = false, dlgFiltro = 'todos', dlgDatos = null, dlgFallo = false, dlgCargando = false, relojDlg = null;
+  let dlgMentions = null, dlgMentionsFallo = false;
+
+  function metaDestino(targetKind, target, named) {
+    if (targetKind === 'player') return TD.toPlayer;
+    if (targetKind === 'bot') return named ? `${TD.toNamed} ${named}` : TD.toNpc;
+    return TD.toRoom;
+  }
+
+  function accionBot(e) {
+    const quien = e.target_kind === 'bot' && e.target ? e.target : e.target_kind === 'player' ? TD.player : null;
+    if (e.kind === 'scene' && quien) return `${TD.says} ${quien}`;
+    if (e.kind === 'reply') return `${TD.replies} ${quien || TD.player}`;
+    if (e.kind === 'greeting') return quien ? `${TD.greetsTo} ${quien}` : TD.greets;
+    if (e.kind === 'invite') return `${TD.invite} ${quien || TD.player}`;
+    if (e.kind === 'accept') return TD.accept;
+    if (e.kind === 'decline') return TD.decline;
+    if (e.kind === 'travel') {
+      let frase = `${TD.travel} ${sala(e.dest_room_id || e.room_id)}`;
+      if (e.reason && MOTIVOS[e.reason]) frase += ` — ${MOTIVOS[e.reason]}`;
+      return frase;
+    }
+    return e.kind;
+  }
 
   function lineaDlg(e) {
     const charla = CHARLA.has(e.kind);
     const li = nodo('li', 'dlg-item' + (charla ? '' : ' evento'));
     const cab = nodo('div', 'dlg-cab');
-    cab.append(nodo('b', '', e.speaker));
-    const quien = e.target_kind === 'bot' && e.target ? e.target : e.target_kind === 'player' ? TD.player : null;
-    if (e.kind === 'scene' && quien) cab.append(nodo('span', '', `${TD.says} ${quien}`));
-    else if (e.kind === 'reply') cab.append(nodo('span', '', `${TD.replies} ${quien || TD.player}`));
-    else if (e.kind === 'greeting') cab.append(nodo('span', '', quien ? `${TD.greetsTo} ${quien}` : TD.greets));
-    cab.append(nodo('span', 'dlg-pie', '· ' + sala(e.room_id)));
+    const meta = nodo('span', 'dlg-meta');
+    const accion = accionBot(e);
+    if (e.kind === 'reply') meta.textContent = `${accion} · ${sala(e.room_id)}`;
+    else if (charla) meta.append(nodo('b', '', e.speaker), document.createTextNode(` ${accion} · ${sala(e.room_id)}`));
+    else meta.append(nodo('b', '', e.speaker), document.createTextNode(` ${accion} · ${sala(e.room_id)}`));
     const hora = new Date(e.ts);
     const t = nodo('time', '', hora.toLocaleTimeString(idioma, {hour: '2-digit', minute: '2-digit', hour12: false}));
     t.dateTime = hora.toISOString();
-    cab.append(t);
+    cab.append(meta, t);
     li.append(cab);
-    if (!charla) {
+    if (!charla && e.kind !== 'travel' && e.text == null) {
       let frase = TD[e.kind] || e.kind;
+      const quien = e.target_kind === 'bot' && e.target ? e.target : e.target_kind === 'player' ? TD.player : null;
       if (e.kind === 'invite') frase += ' ' + (quien || TD.player) + (e.dest_room_id ? ` (${sala(e.dest_room_id)})` : '');
-      if (e.kind === 'travel') frase += ' ' + sala(e.dest_room_id || e.room_id);
       if (e.reason && MOTIVOS[e.reason]) frase += ` — ${MOTIVOS[e.reason]}`;
       li.append(nodo('p', 'dlg-evento', frase));
     }
@@ -1601,28 +1650,112 @@
     return li;
   }
 
+  function leerYo() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(YO_KEY) || '[]');
+      return Array.isArray(raw) ? raw.filter(x => x && typeof x.text === 'string' && typeof x.ts === 'number').slice(-YO_MAX) : [];
+    } catch { return []; }
+  }
+  function guardarYo(lista) {
+    try { localStorage.setItem(YO_KEY, JSON.stringify(lista.slice(-YO_MAX))); } catch {}
+  }
+
+  function destinoDeTexto(text) {
+    const limpio = String(text || '').trim();
+    if (!limpio) return {target_kind: 'room'};
+    const lower = limpio.toLowerCase();
+    const menciones = (dlgMentions || []).map(b => ({...b, m: [...b.m].sort((a, c) => c.length - a.length)}));
+    for (const bot of menciones) {
+      for (const label of bot.m) {
+        const m = label.toLowerCase();
+        if (!lower.startsWith(m)) continue;
+        const sig = limpio[m.length];
+        if (sig != null && sig !== ',' && sig !== ' ' && sig !== ':') continue;
+        return {target_kind: 'bot', target: label, target_user: bot.u};
+      }
+    }
+    return {target_kind: 'room'};
+  }
+
+  function lineaYo(e) {
+    const li = nodo('li', 'dlg-item yo');
+    const cab = nodo('div', 'dlg-cab');
+    const donde = e.room_id ? ` · ${sala(e.room_id)}` : '';
+    const meta = nodo('span', 'dlg-meta', `${metaDestino(e.target_kind, e.target, e.target)}${donde}`);
+    const hora = new Date(e.ts);
+    const t = nodo('time', '', hora.toLocaleTimeString(idioma, {hour: '2-digit', minute: '2-digit', hour12: false}));
+    t.dateTime = hora.toISOString();
+    cab.append(meta, t);
+    li.append(cab, nodo('p', 'dlg-texto', e.text));
+    return li;
+  }
+
+  function registrarChatSaliente(text, roomId, targetKind, target) {
+    const limpio = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+    if (!limpio) return;
+    const dest = destinoDeTexto(limpio);
+    const fila = {ts: Date.now(), text: limpio, room_id: Number.isFinite(roomId) && roomId > 0 ? roomId : null,
+                  target_kind: targetKind || dest.target_kind, target: target || dest.target || null};
+    const lista = leerYo();
+    lista.push(fila);
+    guardarYo(lista);
+    if (dlgAbierto && dlgFiltro === 'yo') pintarDlg();
+  }
+  // El motor Flash puede llamar: glaciarChatSend("texto", roomId) o glaciarChatSend("texto,110").
+  window.glaciarChatSend = (text, roomId, targetKind, target) => {
+    if (text == null) return;
+    let cuerpo = text, salaId = roomId, kind = targetKind, nom = target;
+    if (arguments.length === 1 && typeof text === 'string' && text.includes(',')) {
+      const ultima = text.lastIndexOf(',');
+      const posible = Number(text.slice(ultima + 1));
+      if (Number.isFinite(posible) && posible > 0 && posible < 10000) {
+        salaId = posible;
+        cuerpo = text.slice(0, ultima);
+      }
+    }
+    registrarChatSaliente(cuerpo, salaId, kind, nom);
+  };
+
+  async function cargarMentionsDlg() {
+    if (dlgMentions || dlgMentionsFallo) return;
+    try {
+      const r = await fetch('/dialog-bots-mentions.json', {cache: 'no-store', credentials: 'omit'});
+      if (!r.ok) throw new Error('http');
+      const data = await r.json();
+      dlgMentions = Array.isArray(data) ? data : [];
+    } catch { dlgMentionsFallo = true; dlgMentions = []; }
+  }
+
   function pintarDlg() {
     if (!dlgAbierto) return;
     filtrosDlg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.f === dlgFiltro)));
-    if (dlgFallo) { estadoDlg.className = 'infra-estado mal'; estadoDlg.textContent = TD.offline; }
-    else if (dlgDatos && !dlgDatos.enabled) { estadoDlg.className = 'infra-estado'; estadoDlg.textContent = TD.off; }
-    else if (dlgDatos) { estadoDlg.className = 'infra-estado ok'; estadoDlg.textContent = TD.live; }
-    else { estadoDlg.className = 'infra-estado'; estadoDlg.textContent = ''; }
 
     const hijos = [];
-    if (!dlgDatos) hijos.push(nodo('p', 'dlg-aviso', dlgFallo ? TD.offlineText : TD.loading));
-    else if (!dlgDatos.enabled) hijos.push(nodo('p', 'dlg-aviso', TD.offText));
-    else {
-      const eventos = (dlgDatos.events || []).filter(e => dlgFiltro === 'todo' || (dlgFiltro === 'charla') === CHARLA.has(e.kind));
-      if (dlgFallo) hijos.push(nodo('p', 'dlg-aviso', TD.offlineText));
-      if (!eventos.length) hijos.push(nodo('p', 'dlg-aviso', dlgDatos.events && dlgDatos.events.length ? TD.emptyFilter : TD.empty));
+    if (dlgFiltro === 'yo') {
+      cargarMentionsDlg();
+      const propios = leerYo();
+      if (!propios.length) hijos.push(nodo('p', 'dlg-aviso', TD.emptyYo));
       else {
         const ul = nodo('ol', 'dlg-lista');
-        eventos.forEach(e => ul.append(lineaDlg(e)));
+        propios.forEach(e => ul.append(lineaYo({...e, room_id: e.room_id || 0})));
         hijos.push(ul);
       }
+      hijos.push(nodo('p', 'dlg-pie', TD.noteYo));
+    } else {
+      if (!dlgDatos) hijos.push(nodo('p', 'dlg-aviso', dlgFallo ? TD.offlineText : TD.loading));
+      else if (!dlgDatos.enabled) hijos.push(nodo('p', 'dlg-aviso', TD.offText));
+      else {
+        const eventos = dlgDatos.events || [];
+        if (dlgFallo) hijos.push(nodo('p', 'dlg-aviso', TD.offlineText));
+        if (!eventos.length) hijos.push(nodo('p', 'dlg-aviso', TD.empty));
+        else {
+          const ul = nodo('ol', 'dlg-lista');
+          eventos.forEach(e => ul.append(lineaDlg(e)));
+          hijos.push(ul);
+        }
+      }
+      hijos.push(nodo('p', 'dlg-pie', TD.noteTodos));
     }
-    hijos.push(nodo('p', 'dlg-pie', TD.note));
     // Si el lector estaba al final, sigue al final con las líneas nuevas; si subió a leer, no lo movemos.
     const alFinal = cuerpoDlg.scrollHeight - cuerpoDlg.scrollTop - cuerpoDlg.clientHeight < 40;
     cuerpoDlg.replaceChildren(...hijos);
@@ -1662,6 +1795,7 @@
     raiz.classList.add('dlg-abierto');
     botonDlg.setAttribute('aria-expanded', 'true');
     pintarDlg();
+    cargarMentionsDlg();
     cargarDlg();
     clearInterval(relojDlg);
     relojDlg = setInterval(() => { if (document.visibilityState !== 'hidden') cargarDlg(); }, 10000);

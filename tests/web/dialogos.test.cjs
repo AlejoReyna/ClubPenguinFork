@@ -28,8 +28,9 @@ test('the navbar button sits in the dock, starts hidden and controls the panel',
 
 test('the panel only talks to the same-origin feed, without credentials', () => {
   const urls = [...block.matchAll(/fetch\(([^,]+),/g)].map(m => m[1]);
-  assert.deepEqual(urls.length, 1);
+  assert.deepEqual(urls.length, 2, 'feed plus bot-mention index for the Yo tab');
   assert.match(block, /fetch\('\/dialog\/feed\.json'/);
+  assert.match(block, /fetch\('\/dialog-bots-mentions\.json'/);
   assert.match(block, /credentials: 'omit'/);
   assert.match(block, /cache: 'no-store'/);
   assert.match(block, /pedirDialogos\(0\)/, 'the page-load probe asks for zero events');
