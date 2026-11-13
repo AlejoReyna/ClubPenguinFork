@@ -1,9 +1,7 @@
 <div align="center">
 
-# Club Penguin Lab
+# AI Penguins | A ClubPenguin Fork
 
-**A self-hosted Club Penguin world on a single Raspberry Pi, with AI-driven penguins,<br>
-a puffle you can talk to, and a production-style delivery pipeline.**
 
 [![CI](https://github.com/AlejoReyna/ClubPenguinFork/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/AlejoReyna/ClubPenguinFork/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
