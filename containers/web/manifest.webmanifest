@@ -1,7 +1,7 @@
 {
-  "name": "Glaciar · Club Penguin",
-  "short_name": "Glaciar",
-  "description": "Mundo privado de Club Penguin (AS2) en un Raspberry Pi. Toca el suelo para caminar.",
+  "name": "AIPenguins | by Alexis Reyna",
+  "short_name": "AIPenguins",
+  "description": "AIPenguins | by Alexis Reyna. Mundo privado de Club Penguin jugable desde tu teléfono.",
   "lang": "es",
   "start_url": "/",
   "scope": "/",
@@ -9,10 +9,27 @@
   "orientation": "any",
   "background_color": "#082540",
   "theme_color": "#0a2f5c",
-  "categories": ["games"],
+  "categories": [
+    "games"
+  ],
   "icons": [
-    {"src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png"},
-    {"src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
-    {"src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+    {
+      "src": "/icons/aipenguins-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/aipenguins-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/linux.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
   ]
 }

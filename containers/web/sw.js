@@ -4,9 +4,10 @@
 // v3: the 2017 client boots from club_penguin.swf; drop media caches that still hold the legacy
 // load.swf/shell.swf, which left the stage blank once the edge cache expired.
 const VERSION = 'glaciar-puffle-v3';
-const ESTATICO = `pre-${VERSION}`;
+// Actualiza el shell y su identidad sin descartar la caché pesada del juego.
+const ESTATICO = 'pre-aipenguins-ui-v4';
 const MEDIA = `media-${VERSION}`;
-const PRECACHE = ['/', '/register.html', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/apple-touch-icon.png'];
+const PRECACHE = ['/', '/register.html', '/manifest.webmanifest', '/icons/linux.svg', '/icons/aipenguins-192.png', '/icons/aipenguins-180.png', '/icons/puffle-headphones.webp'];
 
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -17,7 +18,7 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
     for (const name of await caches.keys()) {
-      if (!name.endsWith(VERSION)) await caches.delete(name);
+      if (name !== ESTATICO && name !== MEDIA) await caches.delete(name);
     }
     await self.clients.claim();
   })());
