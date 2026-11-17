@@ -25,7 +25,8 @@ test('the magnifier is gone from the bar and an ES/EN switch takes its place', (
   assert.ok(sw, 'index.html must contain #idioma-switch');
   assert.match(sw[0], /role="switch"/);
   assert.match(sw[0], /aria-checked="(true|false)"/);
-  assert.match(sw[1], /ES[\s\S]*EN/);
+  assert.match(sw[1], /<span id="idioma-actual"[^>]*>ES<\/span>/, 'shows the current language instead of both options');
+  assert.match(html, /document\.getElementById\('idioma-actual'\)\.textContent = enIngles \? 'EN' : 'ES';/, 'restores the visible indicator from the selected language');
   // Same slot as the magnifier: inside .bar-actions, right after #zoom.
   assert.match(html, /id="zoom"[\s\S]*?<\/button>\s*<button id="idioma-switch"/);
 });
