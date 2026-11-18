@@ -11,6 +11,11 @@ opened the tunnel; `stop --state-file F` closes it only in that case, so a
 pipeline never tears down a tunnel an operator is using. Without --state-file,
 `stop` keeps its original behaviour.
 
+The Pi occasionally misses SSH for a moment (reboot, Wi-Fi blip, DHCP churn),
+which used to fail a whole deploy or backup on the first attempt. `start`
+therefore retries connection-level failures a few times with a short pause;
+authentication and host-key problems are never retried.
+
 Host and user come from --host/--user or private configuration (CP_PI_HOST,
 CP_PI_USER); the committed repository holds only anonymized examples.
 """
@@ -19,6 +24,7 @@ import hashlib
 import json
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -56,6 +62,39 @@ def ssh_base(control, ssh_config):
 def kubectl(kubeconfig, *args, timeout=8):
     return subprocess.run(['kubectl', '--kubeconfig', kubeconfig, '--context', 'default',
                            f'--request-timeout={timeout}s'] + list(args), capture_output=True, text=True)
+
+
+# ssh stderr fragments that describe a connection problem worth waiting out. A
+# misspelled host or a bad key is a configuration error and must fail on the
+# first attempt instead of burning the whole retry budget.
+TRANSIENT_MARKERS = (
+    'timed out', 'connection refused', 'no route to host',
+    'network is unreachable', 'connection reset', 'broken pipe',
+    'could not resolve hostname', 'name or service not known',
+    'software caused connection abort',
+)
+
+
+def open_tunnel(base, destination, tries=4, delay=20.0, sleep=time.sleep, run=subprocess.run):
+    """Open the tunnel, retrying transient connection failures up to `tries` times.
+
+    Returns the last attempt's result; callers decide how to report failure.
+    The `sleep`/`run` parameters exist so tests can simulate ssh without a network.
+    """
+    for attempt in range(1, tries + 1):
+        result = run(base + ['-fNT', '-o', 'ControlMaster=yes', '-o', 'ExitOnForwardFailure=yes',
+                             '-o', 'ServerAliveInterval=30', '-o', 'ServerAliveCountMax=3',
+                             '-L', f'127.0.0.1:{LOCAL_PORT}:127.0.0.1:6443', destination],
+                     capture_output=True, text=True)
+        if result.returncode == 0:
+            return result
+        message = result.stderr.strip().lower()
+        transient = any(marker in message for marker in TRANSIENT_MARKERS)
+        if attempt == tries or not transient:
+            return result
+        print(f'ssh attempt {attempt}/{tries} failed transiently; retrying in {delay:g}s', file=sys.stderr)
+        sleep(delay)
+    raise AssertionError('unreachable: the loop always returns')
 
 
 def verify_target(kubeconfig, node_name):
@@ -106,7 +145,14 @@ def main():
     parser.add_argument('--ssh-config', help='ssh_config to use instead of ~/.ssh/config')
     parser.add_argument('--kubeconfig')
     parser.add_argument('--state-file', help='records/consumes whether this call opened the tunnel')
+    parser.add_argument('--tries', type=int, default=4, help='start: attempts before giving up (default 4)')
+    parser.add_argument('--retry-delay', type=float, default=20.0,
+                        help='start: seconds between attempts (default 20)')
     args = parser.parse_args()
+    if args.tries < 1:
+        parser.error('--tries must be at least 1')
+    if args.retry_delay < 0:
+        parser.error('--retry-delay must not be negative')
 
     needs_host = args.action in ('start', 'stop', 'status')
     cfg = lablib.load_config('agent' if needs_host and not (args.host and args.user) else None)
@@ -158,10 +204,7 @@ def main():
         record(args.state_file, False)
         print('Existing authenticated connection to the Pi is available')
         return
-    result = subprocess.run(base + ['-fNT', '-o', 'ControlMaster=yes', '-o', 'ExitOnForwardFailure=yes',
-                                    '-o', 'ServerAliveInterval=30', '-o', 'ServerAliveCountMax=3',
-                                    '-L', f'127.0.0.1:{LOCAL_PORT}:127.0.0.1:6443', destination],
-                            capture_output=True, text=True)
+    result = open_tunnel(base, destination, tries=args.tries, delay=args.retry_delay)
     if result.returncode != 0:
         print('ERROR: could not open the SSH tunnel: ' + lablib.redact(result.stderr.strip()[-400:]), file=sys.stderr)
         raise SystemExit(1)

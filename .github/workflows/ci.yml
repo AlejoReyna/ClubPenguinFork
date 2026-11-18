@@ -131,6 +131,17 @@ jobs:
         run: |
           python3 scripts/deploy.py preflight
           python3 scripts/github_deploy_guard.py
+      # This job is the only one on the operator's Mac; Docker Desktop must be
+      # running there, but a reboot or an update can leave it off at run time.
+      - name: Ensure the Docker daemon is running
+        run: |
+          for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            docker info >/dev/null 2>&1 && exit 0
+            if [ "$attempt" -eq 1 ]; then open -a Docker; fi
+            sleep 5
+          done
+          echo "Docker Desktop did not come up on the Mac runner" >&2
+          exit 1
       - name: Resolve and test ARM64 release
         run: |
           python3 scripts/release.py resolve --out "$RELEASE_FILE"
