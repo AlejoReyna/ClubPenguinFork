@@ -144,8 +144,19 @@ jobs:
           exit 1
       - name: Resolve and test ARM64 release
         run: |
+          media_cache="$HOME/.clubpenguin-lab/source-cache"
+          media_revision="$(jq -er '."vanilla-media".revision | select(test("^[0-9a-f]{40}$"))' sources.json)"
+          mkdir -p -m 700 "$media_cache"
+          mkdir -p vendor
+          ln -s "$media_cache/vanilla-media-$media_revision" vendor/vanilla-media
           python3 scripts/release.py resolve --out "$RELEASE_FILE"
           python3 scripts/release.py build --release "$RELEASE_FILE" --platform linux/arm64
+      - name: Refresh Azure login for publication
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       - name: Publish images and save manifest
         run: |
           test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$GITHUB_SHA"
@@ -162,6 +173,12 @@ jobs:
           python3 scripts/deploy.py apply --expect-sha256 "$plan_sha" --backup auto --expect images-only
       - name: Verify without registering accounts
         run: python3 scripts/deploy.py verify --manifest "$MANIFEST_FILE" --skip-game-journey --require-public
+      - name: Refresh Azure login for release history
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       - name: Record verified release
         run: python3 scripts/deploy.py record --manifest "$MANIFEST_FILE"
       - name: Remove private run state

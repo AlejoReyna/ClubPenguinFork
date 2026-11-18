@@ -79,6 +79,8 @@ def main():
             if component == 'web' and args.web_media == 'stub':
                 stub_dir = stub_dir or stub_media(tempfile.mkdtemp(prefix='cp-stub-media-'))
                 contexts['media'] = stub_dir
+            if component == 'web':
+                contexts['media'] = (root / contexts['media']).resolve()
             command = ['docker', 'buildx', 'build', '--platform', args.platform, '--load',
                        '--provenance=false', '--sbom=false']
             if args.builder:
