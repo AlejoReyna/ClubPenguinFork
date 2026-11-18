@@ -70,7 +70,7 @@ def source_revisions(root=ROOT):
     revisions = {name: spec['revision'] for name, spec in sources.items()}
     # Ruffle is pinned by checksum inside fetch-sources.py rather than sources.json.
     fetch = (Path(root) / 'scripts/fetch-sources.py').read_text()
-    match = re.search(r"expected\s*=\s*'([0-9a-f]{64})'", fetch)
+    match = re.search(r"^RUFFLE_SHA256\s*=\s*'([0-9a-f]{64})'", fetch, re.MULTILINE)
     if not match:
         fail('Could not read the pinned Ruffle checksum from scripts/fetch-sources.py')
     revisions['ruffle'] = match.group(1)
