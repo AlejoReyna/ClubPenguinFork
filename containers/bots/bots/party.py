@@ -131,12 +131,12 @@ def circle_positions(center, rects, rng):
 class PartyScene:
     """Runs one party lifecycle for a single invoker."""
 
-    def __init__(self, manager, document, clock, rng):
+    def __init__(self, manager, signal, document, clock, rng):
         self.manager = manager
         self.document = dict(document)
         self.clock = clock
         self.rng = rng
-        self.signal = manager.party_signal
+        self.signal = signal
         self.catalog = manager.config.catalog or load_catalog()
         self.room = self.catalog.rooms.get(DISCO_ROOM)
         self.tasks = []
@@ -194,10 +194,7 @@ class PartyScene:
             spawn_tasks.append(self._bring_guest(session, spec, invoker, index))
         results = await asyncio.gather(*spawn_tasks, return_exceptions=True)
         self._guest_sessions = [session for (_, session) in guests]
-        if any(isinstance(r, Exception) or r is False for r in results):
-            await self._withdraw_arrived(results, guests)
-            return False
-        return True
+        return all(result is True for result in results)
 
     async def _bring_guest(self, session, spec, invoker, index):
         await self._pause_autonomy(session)
@@ -226,17 +223,6 @@ class PartyScene:
         if member and member.x is not None:
             return (member.x, member.y)
         return self.room.spawn if self.room else (330, 247)
-
-    async def _withdraw_arrived(self, results, guests):
-        for result, (_spec, session) in zip(results, guests):
-            if result is True:
-                try:
-                    await session.change_room(session.bot.room,
-                                              session.bot.anchor.get('x', session.bot.walk.get('min_x', 330)),
-                                              session.bot.anchor.get('y', session.bot.walk.get('min_y', 247)))
-                except BaseException:
-                    pass
-            await self._resume_autonomy(session)
 
     async def _flirt_phase(self):
         guests = self.guests()
@@ -332,13 +318,12 @@ class PartyScene:
         if session.behavior.life is not None:
             await session.behavior.life.resume_party()
         if session.room_id != session.bot.room and session.bot.room:
-            anchor = session.bot.anchor
-            if anchor:
-                x, y = anchor['x'], anchor['y']
+            if session.bot.spawn is not None:
+                x, y = session.bot.spawn
             else:
-                area = session.bot.area
-                x = (area['min_x'] + area['max_x']) // 2
-                y = (area['min_y'] + area['max_y']) // 2
+                min_x, max_x, min_y, max_y = session.bot.area
+                x = (min_x + max_x) // 2
+                y = (min_y + max_y) // 2
             try:
                 await session.change_room(session.bot.room, x, y)
             except BaseException:
@@ -390,7 +375,7 @@ class PartyCoordinator:
         while True:
             document = self.party_signal.fresh_request()
             if document is not None and self._task is None:
-                self._scene = PartyScene(self.manager, document, self.clock, self.rng)
+                self._scene = PartyScene(self.manager, self.party_signal, document, self.clock, self.rng)
                 self._task = asyncio.create_task(self._run_scene(), name='party-scene')
             await asyncio.sleep(0.35)
 

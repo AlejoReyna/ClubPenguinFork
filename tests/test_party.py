@@ -129,7 +129,7 @@ class EmoteScheduleTests(unittest.IsolatedAsyncioTestCase):
         manager.world = World(clock=clock)
         manager.world._frames[50] = {'frame': 26, 'dance_gen': 1}
         document = {'scene_id': 't', 'invoker_id': 50, 'x': 330, 'y': 247, 'room_id': 120}
-        scene = PartyScene(manager, document, clock, __import__('random').Random(0))
+        scene = PartyScene(manager, mock.Mock(), document, clock, __import__('random').Random(0))
         scene._guest_sessions = sessions
         scene._dancing = True
         task = asyncio.create_task(scene._emote_loop())
@@ -153,7 +153,7 @@ class EmoteScheduleTests(unittest.IsolatedAsyncioTestCase):
         manager = mock.Mock()
         manager.world = World(clock=clock)
         document = {'scene_id': 't', 'invoker_id': 50, 'x': 330, 'y': 247, 'room_id': 120}
-        scene = PartyScene(manager, document, clock, __import__('random').Random(1))
+        scene = PartyScene(manager, mock.Mock(), document, clock, __import__('random').Random(1))
         scene._guest_sessions = [session]
         scene._dancing = True
         task = asyncio.create_task(scene._emote_loop())
