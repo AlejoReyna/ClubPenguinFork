@@ -49,6 +49,8 @@ def parse_args():
     parser.add_argument('--life', action='store_true', help='also test Phase 3 invitations, following and returns with simulated providers')
     parser.add_argument('--recall', action='store_true', help='also test Phase 4 relationship notes on a writable PVC slice (simulated summaries)')
     parser.add_argument('--puffle', action='store_true', help='test the production world and two isolated companions')
+    parser.add_argument('--apply-welcome-puffle-migration', action='store_true',
+                        help='prepare the disposable database from a pinned image like an existing installation')
     parser.add_argument('--keep-logs', action='store_true', help='print container logs even when tests pass')
     args = parser.parse_args()
     if args.igloos and not args.bots_tag:
@@ -152,6 +154,11 @@ try:
             time.sleep(0.5)
         else:
             raise RuntimeError('Postgres did not start')
+        if args.apply_welcome_puffle_migration:
+            migration = (root / 'scripts/lab-welcome-puffle.sql').read_text()
+            docker(['exec', '-i', postgres, 'psql', '-X', '-U', 'houdini', '-d', 'houdini',
+                    '--set', 'ON_ERROR_STOP=1', '--single-transaction', '--file', '-'], input=migration)
+            print('PASS: welcome puffle migration applied to the disposable database.')
         for alias, mode in [('login', 'login'), ('glaciar', 'world'), ('dash', 'dash')]:
             extra = list(puffle_extra if mode == 'world' else [])
             if args.live_cast and mode in ('login', 'world'):
