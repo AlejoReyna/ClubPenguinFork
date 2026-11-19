@@ -1,6 +1,5 @@
 """Patch the 2017 engine.swf with glaciarCamera only (no puffle renderer)."""
 import argparse
-import hashlib
 from pathlib import Path
 import shutil
 import subprocess
