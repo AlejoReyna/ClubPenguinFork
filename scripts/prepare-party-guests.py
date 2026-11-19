@@ -2,13 +2,9 @@
 """Append five party guest bots to work-credentials.json (passwords preserved)."""
 import json
 import secrets
-import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'scripts'))
-import bot_accounts  # noqa: E402
-
 CREDENTIALS = ROOT / '.local/bots/work-credentials.json'
 
 

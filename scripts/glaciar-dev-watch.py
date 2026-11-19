@@ -16,7 +16,6 @@ Usage:
 import argparse
 import os
 import subprocess
-import sys
 import time
 from pathlib import Path
 
@@ -103,7 +102,7 @@ def main():
                 if now < deadline:
                     continue
                 del pending[label]
-                directory = next(d for d, l in WATCH_DIRS if l == label)
+                directory = next(d for d, name in WATCH_DIRS if name == label)
                 newest = max(directory.rglob('*'), key=lambda p: p.stat().st_mtime if p.is_file() else 0,
                              default=directory)
                 apply(args.prefix, label, newest)

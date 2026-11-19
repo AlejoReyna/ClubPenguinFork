@@ -1,6 +1,5 @@
 """Apply ``/party`` chat hook to the pinned Houdini message handler (after puffle patch)."""
 import argparse
-import hashlib
 from pathlib import Path
 
 # SHA-256 of handlers/play/message.py after the puffle overlay is applied.

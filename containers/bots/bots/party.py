@@ -6,7 +6,7 @@ import math
 import os
 from pathlib import Path
 
-from . import actions, as2, spacing
+from . import actions, spacing
 from .rooms import load_catalog
 
 logger = logging.getLogger('bots.party')
@@ -228,7 +228,7 @@ class PartyScene:
         return self.room.spawn if self.room else (330, 247)
 
     async def _withdraw_arrived(self, results, guests):
-        for result, (spec, session) in zip(results, guests):
+        for result, (_spec, session) in zip(results, guests):
             if result is True:
                 try:
                     await session.change_room(session.bot.room,

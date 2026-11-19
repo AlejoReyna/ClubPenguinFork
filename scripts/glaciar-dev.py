@@ -21,7 +21,6 @@ import argparse
 import json
 import os
 import secrets
-import shutil
 import subprocess
 import sys
 import tempfile

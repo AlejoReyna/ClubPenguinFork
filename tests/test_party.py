@@ -13,8 +13,7 @@ sys.path.insert(0, str(ROOT / 'containers/bots'))
 sys.path.insert(0, str(ROOT))
 
 from bots.party import (  # noqa: E402
-    AFFECTION_EMOTES, EMOTE_GAP, EMOTE_VISIBLE_SECONDS, GUEST_COUNT,
-    PartyCoordinator, PartyScene, PartySignal, circle_positions,
+    EMOTE_GAP, EMOTE_VISIBLE_SECONDS, GUEST_COUNT, PartyScene, circle_positions,
 )
 from bots.world import World  # noqa: E402
 from production.lab import party_bus, party_world  # noqa: E402

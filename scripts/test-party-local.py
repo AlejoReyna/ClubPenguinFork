@@ -74,7 +74,7 @@ async def main():
             raise SystemExit(f'FAIL: bus document: {bus!r}')
         if int(bus.get('invoker_id')) != int(pid):
             raise SystemExit(f'FAIL: invoker_id {bus.get("invoker_id")} != {pid}')
-        await world.send_line(f'%xt%s%u#sf%-1%26%')
+        await world.send_line('%xt%s%u#sf%-1%26%')
         for _ in range(40):
             await asyncio.sleep(0.5)
             try:
