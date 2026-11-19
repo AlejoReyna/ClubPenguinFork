@@ -66,6 +66,7 @@ def main():
     args, selected, tags = parse_args()
     commit = subprocess.run(['git', '-C', str(root), 'rev-parse', 'HEAD'], capture_output=True, text=True).stdout.strip()
     stub_dir = None
+    media_copy_dir = None
     try:
         for component in selected:
             spec = release.COMPONENTS[component]
@@ -80,7 +81,27 @@ def main():
                 stub_dir = stub_dir or stub_media(tempfile.mkdtemp(prefix='cp-stub-media-'))
                 contexts['media'] = stub_dir
             if component == 'web':
-                contexts['media'] = (root / contexts['media']).resolve()
+                media_path = (root / contexts['media']).resolve()
+                if args.web_media != 'stub':
+                    media_copy_dir = media_copy_dir or tempfile.mkdtemp(prefix='cp-web-media-')
+                    copy_root = Path(media_copy_dir) / 'vanilla'
+                    if not copy_root.is_dir():
+                        shutil.copytree(media_path, copy_root, symlinks=True)
+                        subprocess.run([sys.executable, str(root / 'scripts/patch_chat_restrict.py'), str(copy_root / 'media')],
+                                       check=True, cwd=root)
+                        engine = copy_root / 'media' / 'play' / 'v2' / 'client' / 'engine.swf'
+                        ffdec = root / '.local' / 'tools' / 'ffdec-26.4.0' / 'ffdec.jar'
+                        if engine.is_file() and ffdec.is_file():
+                            stage = Path(media_copy_dir) / 'engine-glaciar.swf'
+                            subprocess.run([
+                                sys.executable,
+                                str(root / 'experiments/puffle_sim/client/build_engine_glaciar.py'),
+                                '--ffdec', str(ffdec), '--engine', str(engine), '--output', str(stage),
+                            ], check=True, cwd=root)
+                            shutil.move(str(stage), engine)
+                    contexts['media'] = copy_root
+                else:
+                    contexts['media'] = media_path
             command = ['docker', 'buildx', 'build', '--platform', args.platform, '--load',
                        '--provenance=false', '--sbom=false']
             if args.builder:
@@ -109,6 +130,8 @@ def main():
     finally:
         if stub_dir:
             shutil.rmtree(stub_dir, ignore_errors=True)
+        if media_copy_dir:
+            shutil.rmtree(media_copy_dir, ignore_errors=True)
 
 
 if __name__ == '__main__':

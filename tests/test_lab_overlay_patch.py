@@ -85,11 +85,11 @@ class LabOverlayPatchTest(unittest.TestCase):
         self.assertIn("await puffle.update(name=name.title()).apply()", rename_fn)
         self.assertNotIn('is_protected_puffle_id', rename_fn)
 
-    def test_register_form_lets_you_edit_the_welcome_puffle_name(self):
+    def test_register_form_keeps_welcome_puffle_name_fixed(self):
         html = (ROOT / 'containers/web/register.html').read_text()
-        self.assertIn('id="puffle"', html)
-        self.assertIn('value="Dubstep"', html)
-        self.assertIn('puffle_name:puffle', html)
+        self.assertIn('Dubstep', html)
+        self.assertNotIn('id="puffle"', html)
+        self.assertNotIn('puffle_name:', html)
 
     def test_welcome_schema_is_identical_for_clean_and_existing_installs(self):
         init = _schema_text('containers/database/003-lab-welcome-puffle.sql')
