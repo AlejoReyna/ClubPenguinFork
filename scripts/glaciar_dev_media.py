@@ -2,24 +2,71 @@
 
 The published web image may ship an incomplete ``/srv/media/play/v2/client`` (no
 ``club_penguin.swf``). Vendor has the dump. Overlay only the login/create mobile
-patches; ``engine.swf`` must stay the full 2017 media build (the small puffle
-patch breaks walking and the map when booting through ``club_penguin.swf``).
+patches; ``engine.swf`` gets only the glaciarCamera hook (``build_engine_glaciar.py``),
+not the legacy puffle renderer patch that broke the 2017 map.
 """
 from __future__ import annotations
 
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 VENDOR_MEDIA = ROOT / 'vendor' / 'vanilla-media' / 'media'
 PATCH_DIR = ROOT / '.local' / 'glaciar-dev' / 'patched-swfs'
-PATCHED = ('login.swf', 'create.swf')
+PATCH_STRINGS = ROOT / '.local' / 'glaciar-dev' / 'patched-strings'
+PATCHED = ('login.swf', 'create.swf', 'engine.swf')
+LANGS = ('de', 'en', 'es', 'fr', 'pt')
+STRING_FILES = ('game_strings.json', 'game_strings.jsonp')
+
+
+def ensure_chat_restrict_strings() -> None:
+    """Overlay chat string configs so the in-game chat field accepts ``/``."""
+    vendor_root = ROOT / 'vendor' / 'vanilla-media' / 'media'
+    if not vendor_root.is_dir():
+        return
+    needs = []
+    for lang in LANGS:
+        for name in STRING_FILES:
+            src = vendor_root / 'play' / lang / 'web_service' / 'game_configs' / name
+            dest = PATCH_STRINGS / 'play' / lang / 'web_service' / 'game_configs' / name
+            if not src.is_file():
+                continue
+            if not dest.is_file() or dest.stat().st_mtime < src.stat().st_mtime:
+                needs.append((src, dest))
+    if not needs and (PATCH_STRINGS / 'play' / 'es' / 'web_service' / 'game_configs' / 'game_strings.json').is_file():
+        return
+    for src, dest in needs:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dest)
+    subprocess.run([sys.executable, str(ROOT / 'scripts/patch_chat_restrict.py'),
+                    str(PATCH_STRINGS)], check=True, cwd=ROOT)
+
+
+def ensure_glaciar_engine_patch() -> None:
+    """2017 engine with glaciarCamera only (navbar + mobile view bridge)."""
+    dest = PATCH_DIR / 'engine.swf'
+    vendor = VENDOR_MEDIA / 'play' / 'v2' / 'client' / 'engine.swf'
+    if not vendor.is_file():
+        return
+    if dest.is_file() and dest.stat().st_mtime >= vendor.stat().st_mtime:
+        return
+    PATCH_DIR.mkdir(parents=True, mode=0o700, exist_ok=True)
+    ffdec = ROOT / '.local' / 'tools' / 'ffdec-26.4.0' / 'ffdec.jar'
+    if not ffdec.is_file():
+        return
+    subprocess.run([
+        sys.executable, str(ROOT / 'experiments/puffle_sim/client/build_engine_glaciar.py'),
+        '--ffdec', str(ffdec), '--engine', str(vendor), '--output', str(dest),
+    ], check=True, cwd=ROOT)
 
 
 def ensure_patched_swfs(web_container: str = 'glaciar-dev-web') -> None:
     """Copy patched SWFs from a running web container if the cache dir is empty."""
     PATCH_DIR.mkdir(parents=True, mode=0o700, exist_ok=True)
-    missing = [name for name in PATCHED if not (PATCH_DIR / name).is_file()]
+    ensure_glaciar_engine_patch()
+    missing = [name for name in PATCHED if name != 'engine.swf' and not (PATCH_DIR / name).is_file()]
     if not missing:
         return
     inspect = subprocess.run(['docker', 'inspect', web_container], capture_output=True)
@@ -52,6 +99,7 @@ def dev_web_mounts(*, include_media: bool = True) -> list[str]:
     if not club.is_file():
         return mounts
     ensure_patched_swfs()
+    ensure_chat_restrict_strings()
     mounts.append(f'{VENDOR_MEDIA}:/srv/media:ro')
     mounts.append(
         f'{ROOT}/containers/web/environment_data.xml:/srv/media/play/web_service/environment_data.xml:ro')
@@ -63,6 +111,12 @@ def dev_web_mounts(*, include_media: bool = True) -> list[str]:
         path = PATCH_DIR / name
         if path.is_file():
             mounts.append(f'{path}:/srv/media/play/v2/client/{name}:ro')
+    for lang in LANGS:
+        for name in STRING_FILES:
+            path = PATCH_STRINGS / 'play' / lang / 'web_service' / 'game_configs' / name
+            if path.is_file():
+                mounts.append(
+                    f'{path}:/srv/media/play/{lang}/web_service/game_configs/{name}:ro')
     return mounts
 
 

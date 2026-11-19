@@ -16,15 +16,15 @@
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="AIPenguins | by Alexis Reyna">
 <link rel="manifest" href="/manifest.webmanifest">
-<link rel="icon" href="/icons/linux.svg" type="image/svg+xml">
+<link rel="icon" href="/icons/puffle-headphones.webp" type="image/webp">
 <link rel="icon" href="/icons/aipenguins-192.png" sizes="192x192" type="image/png">
-<link rel="apple-touch-icon" href="/icons/aipenguins-180.png">
+<link rel="apple-touch-icon" href="/icons/puffle-headphones.webp">
 <title>AIPenguins | by Alexis Reyna</title>
 <style>
   /* El fondo IMITA el borde del SWF: el contenedor desaparece y solo queda el juego. */
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   /* Altura de la barra superpuesta (una sola fila, sin medir con JS). */
-  :root{--bar-h:calc(52px + env(safe-area-inset-top))}
+  :root{--bar-h:calc(52px + env(safe-area-inset-top));--bar-peek:18px}
   html{touch-action:manipulation}
   .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
   html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#00529b;color:#fff;font:16px system-ui,sans-serif}
@@ -49,10 +49,24 @@
   body::before{content:"";position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top);z-index:50;
                background:#016bb6;pointer-events:none}
 
-  .bar{position:fixed;top:0;left:0;right:var(--infra-w,0px);z-index:30;transition:right .28s cubic-bezier(.22,1,.36,1);display:flex;align-items:center;justify-content:flex-start;flex-wrap:nowrap;gap:6px;
+  .bar{position:fixed;top:0;left:0;right:var(--infra-w,0px);z-index:30;transition:right .28s cubic-bezier(.22,1,.36,1),transform .32s cubic-bezier(.22,1,.36,1);display:flex;align-items:center;justify-content:flex-start;flex-wrap:nowrap;gap:6px;
        height:var(--bar-h);padding:env(safe-area-inset-top) 12px 0;background:rgb(6 32 52 / 35%);
        border-bottom:1px solid #ffffff26;box-shadow:0 4px 20px #001b351a;
        -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
+  /* Escritorio: con el juego en marcha la barra se retrae; reaparece al pasar el ratón por la franja superior. */
+  .bar-hover-zone{display:none}
+  @media(min-height:521px) and (orientation:landscape),(min-width:901px){
+    html.bar-revealable.bar-auto .bar-hover-zone{display:block;position:fixed;top:0;left:0;right:var(--infra-w,0px);z-index:29;
+        height:calc(var(--bar-peek) + env(safe-area-inset-top));transition:right .28s cubic-bezier(.22,1,.36,1)}
+    html.bar-revealable.bar-auto .bar{transform:translateY(calc(-100% + var(--bar-peek) + env(safe-area-inset-top)))}
+    html.bar-revealable.bar-auto.bar-hover .bar,
+    html.bar-revealable.bar-auto .bar:hover,
+    html.bar-revealable.bar-auto .bar:focus-within{transform:translateY(0)}
+    html.bar-revealable.bar-auto #estado{top:calc(var(--bar-peek) + env(safe-area-inset-top) + 12px)}
+    html.bar-revealable.bar-auto.bar-hover #estado,
+    html.bar-revealable.bar-auto:has(.bar:hover) #estado,
+    html.bar-revealable.bar-auto:has(.bar:focus-within) #estado{top:calc(var(--bar-h) + 12px)}
+  }
   .bar-actions{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;margin-inline-start:auto}
   .dock{display:flex;align-items:center;gap:6px}
   .bar [hidden]{display:none!important}
@@ -340,6 +354,7 @@
 </style>
 </head>
 <body>
+<div id="bar-hover-zone" class="bar-hover-zone" aria-hidden="true"></div>
 <nav class="bar" aria-label="Controles">
   <button id="inicio" type="button" aria-label="Inicio" title="Inicio">
     <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 9-8 9 8M5.5 9v11h5v-6h3v6h5V9"/></svg>
@@ -879,6 +894,35 @@
   const mqVertical = matchMedia('(orientation: portrait) and (max-width: 900px)');
   const mqRiel = matchMedia('(orientation: landscape) and (max-height: 520px)');
   const raizDoc = document.documentElement;
+  const zonaBarra = document.getElementById('bar-hover-zone');
+  let motorListo = false;
+  let avatarEnMundo = false;
+  const esEscritorioJuego = () => !mqVertical.matches && !mqRiel.matches;
+  const juegoEnMarcha = () => motorListo && vistaLogin === null && avatarEnMundo;
+  const notificarAvatarEnMundo = () => {
+    if (avatarEnMundo) return;
+    avatarEnMundo = true;
+    pintarBarraRetractil();
+  };
+  const notificarEscenaSinAvatar = () => {
+    if (!avatarEnMundo) return;
+    avatarEnMundo = false;
+    pintarBarraRetractil();
+  };
+  const pintarBarraRetractil = () => {
+    const activo = esEscritorioJuego() && juegoEnMarcha();
+    raizDoc.classList.toggle('bar-revealable', esEscritorioJuego());
+    raizDoc.classList.toggle('bar-auto', activo);
+    if (!activo) raizDoc.classList.remove('bar-hover');
+  };
+  zonaBarra?.addEventListener('mouseenter', () => { if (raizDoc.classList.contains('bar-auto')) raizDoc.classList.add('bar-hover'); });
+  zonaBarra?.addEventListener('mouseleave', () => raizDoc.classList.remove('bar-hover'));
+  barra.addEventListener('mouseleave', e => {
+    if (!raizDoc.classList.contains('bar-auto')) return;
+    const next = e.relatedTarget;
+    if (next && (barra.contains(next) || zonaBarra?.contains(next))) return;
+    raizDoc.classList.remove('bar-hover');
+  });
 
   // iPhone no ofrece Fullscreen API en páginas normales: no mostramos un botón que no hace nada.
   const fsApi = raizDoc.requestFullscreen || raizDoc.webkitRequestFullscreen;
@@ -942,7 +986,8 @@
   window.addEventListener('resize', actualizarCamara);
   window.visualViewport?.addEventListener('resize', actualizarCamara);
   document.addEventListener('visibilitychange', actualizarCamara);
-  mqVertical.addEventListener('change', actualizarCamara);
+  mqVertical.addEventListener('change', () => { actualizarCamara(); pintarBarraRetractil(); });
+  mqRiel.addEventListener('change', pintarBarraRetractil);
   movimientoReducido.addEventListener('change', actualizarCamara);
   pintarEncuadre();
 
@@ -971,6 +1016,7 @@
     const antes = vistaLogin;
     vistaLogin = estado;
     pintarLogin();
+    pintarBarraRetractil();
     // Al salir del login, la cámara vuelve a llenar el alto (centrada hasta ver al pingüino).
     if (antes && !vistaLogin) camara.refresh(true);
   };
@@ -1056,6 +1102,16 @@
           verLogin(GlaciarLoginFrame.parse(payload ?? '', idioma));
           return true;
         }
+        if (typeof command === 'string' && command.toLowerCase() === 'glaciarcamera') {
+          if (payload === 'clear') notificarEscenaSinAvatar();
+          else {
+            const partes = String(payload).split(',');
+            if (partes.length === 3 && partes[0].trim() && partes[1].trim() &&
+                Number.isFinite(Number(partes[0])) && Number.isFinite(Number(partes[1]))) {
+              notificarAvatarEnMundo();
+            }
+          }
+        }
         if (!camara.handleMessage(command, payload)) return false;
         // El motor ya informa de tu pingüino: el login terminó aunque su último aviso se perdiera.
         if (vistaLogin) verLogin(null);
@@ -1075,6 +1131,8 @@
         }
       });
       estado('');
+      motorListo = true;
+      pintarBarraRetractil();
       loginDiagSnapshot('game_ready');
     } catch (error) {
       loginDiagOn && loginDiag('game_load_error', error);
