@@ -21,6 +21,7 @@ CREDENTIALS = ROOT / '.local/bots/work-credentials.json'
 MAKEOVER_SQL = ROOT / 'scripts/bot-makeover.sql'
 CADENCE_LOCAL_SQL = ROOT / 'scripts/cadence-dj-local.sql'
 STARTING_COINS_SQL = ROOT / 'scripts/lab-starting-coins.sql'
+WELCOME_PUFFLE_SQL = ROOT / 'scripts/lab-welcome-puffle.sql'
 BOTS_IMAGE = os.environ.get('GLACIAR_DEV_BOTS_IMAGE', 'clubpenguin/bots:glaciar-dev')
 
 
@@ -72,6 +73,8 @@ def main():
         paths = [CADENCE_LOCAL_SQL]
         if STARTING_COINS_SQL.is_file():
             paths.append(STARTING_COINS_SQL)
+        if WELCOME_PUFFLE_SQL.is_file():
+            paths.append(WELCOME_PUFFLE_SQL)
         if full_makeover:
             paths.append(MAKEOVER_SQL)
         for sql_path in paths:

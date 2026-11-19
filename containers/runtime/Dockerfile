@@ -34,6 +34,8 @@ RUN python /tmp/lab_overlay_patch.py --houdini /app/houdini/houdini --dash /app/
     && chown -R 10001:10001 /app/houdini/houdini /app/dash/dash
 COPY --chown=10001:10001 run.py /app/run.py
 COPY --chown=10001:10001 lab_config.py /app/dash/lab_config.py
+COPY --chown=10001:10001 lab_welcome_puffle.py /app/houdini/houdini/lab_welcome_puffle.py
+COPY --chown=10001:10001 lab_welcome_puffle.py /app/dash/lab_welcome_puffle.py
 COPY --chown=10001:10001 exporter.py /app/exporter.py
 COPY --chown=10001:10001 socket_proxy.py /app/socket_proxy.py
 COPY --chown=10001:10001 panel_summary.py /app/panel_summary.py
