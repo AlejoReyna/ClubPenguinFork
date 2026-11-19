@@ -53,6 +53,8 @@ class World:
         self._bot_room = {}     # bot player id -> room id it is in now
         self._rooms = {}        # room id -> {player id: Member}
         self._conversations = {}  # own bot id -> <=64 numeric human ids / expiry
+        # Latest frame / dance generation for every observed player (idempotent merges).
+        self._frames = {}
 
     # ------------------------------------------------------------- bots
     def register_bot(self, player_id):
@@ -133,6 +135,36 @@ class World:
                 member.x, member.y, member.seen = int(x), int(y), self._clock()
             except (TypeError, ValueError):
                 pass
+        self._note_move(int(player_id))
+
+    def member_frame(self, room_id, player_id, frame):
+        """Record ``u#sf`` / ``%xt%sf`` once per identical transition."""
+        if int(room_id) not in self._rooms:
+            return
+        try:
+            frame = int(frame)
+            player_id = int(player_id)
+        except (TypeError, ValueError):
+            return
+        state = self._frames.setdefault(player_id, {'frame': 1, 'dance_gen': 0})
+        previous = state['frame']
+        if frame == previous:
+            return
+        if frame == 26 and previous != 26:
+            state['dance_gen'] += 1
+        state['frame'] = frame
+        state['seen'] = self._clock()
+
+    def _note_move(self, player_id):
+        state = self._frames.setdefault(player_id, {'frame': 1, 'dance_gen': 0})
+        if state.get('frame') != 1:
+            state['frame'] = 1
+
+    def human_dance_generation(self, player_id):
+        return int(self._frames.get(int(player_id), {}).get('dance_gen', 0))
+
+    def human_is_dancing(self, player_id, dance_frame=26):
+        return self._frames.get(int(player_id), {}).get('frame') == dance_frame
 
     # ---------------------------------------------------------- queries
     def members(self, room_id):

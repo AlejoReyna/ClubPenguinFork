@@ -21,9 +21,13 @@ COPY --from=houdini --chown=10001:10001 houdini /app/houdini/houdini
 COPY --from=houdini --chown=10001:10001 bootstrap.py /app/houdini/bootstrap.py
 COPY --from=puffle --chown=10001:10001 . /app/experiments/puffle_sim/
 COPY --from=production --chown=10001:10001 . /app/production/puffle/
+COPY --from=lab --chown=10001:10001 . /app/production/lab/
 RUN PYTHONPATH=/app python -m experiments.puffle_sim.houdini_patch \
     --houdini /app/houdini/houdini --output /tmp/puffle-overlay \
     && cp -R /tmp/puffle-overlay/. /app/houdini/houdini/ && rm -rf /tmp/puffle-overlay
+COPY lab_party_houdini_patch.py /tmp/lab_party_houdini_patch.py
+RUN python /tmp/lab_party_houdini_patch.py --houdini /app/houdini/houdini \
+    && rm /tmp/lab_party_houdini_patch.py
 COPY --from=dash --chown=10001:10001 dash /app/dash/dash
 COPY --from=dash --chown=10001:10001 locale /app/dash/locale
 COPY --from=dash --chown=10001:10001 autocomplete /app/dash/autocomplete

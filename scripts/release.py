@@ -37,7 +37,8 @@ FINGERPRINT_VERSION = 'clubpenguin-release-v1'
 COMPONENTS = {
     'runtime': {'prefix': 'rt', 'sources': ['houdini', 'dash'],
                 'contexts': {'houdini': 'vendor/houdini', 'dash': 'vendor/dash',
-                             'puffle': 'experiments/puffle_sim', 'production': 'production/puffle'}},
+                             'puffle': 'experiments/puffle_sim', 'production': 'production/puffle',
+                             'lab': 'production/lab'}},
     'database': {'prefix': 'db', 'sources': ['houdini'], 'contexts': {'houdini': 'vendor/houdini'}},
     'web': {'prefix': 'web', 'sources': ['vanilla-media', 'ruffle'],
             'contexts': {'media': 'vendor/vanilla-media', 'ruffle': 'vendor/ruffle'}},
@@ -57,7 +58,7 @@ def enabled_components(root=ROOT):
 
 def tracked_files(component, root=ROOT):
     """Return {relative path: absolute path} for the tracked files of a component."""
-    extra = {'runtime': ['experiments/puffle_sim', 'production/puffle'],
+    extra = {'runtime': ['experiments/puffle_sim', 'production/puffle', 'production/lab'],
              'web': ['experiments/puffle_sim', 'production/puffle', 'scripts/build-puffle-client.py']}
     out = run(['git', '-C', str(root), 'ls-files', '-z', '--', f'containers/{component}',
                *extra.get(component, [])],

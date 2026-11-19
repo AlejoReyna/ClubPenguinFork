@@ -20,10 +20,13 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'scripts'))
+import glaciar_dev_media  # noqa: E402
 CLIENT_ID_FILE = Path.home() / '.config/puffle-lab/spotify-client-id'
 
 
@@ -172,27 +175,34 @@ def main():
     env = env_of(world)
     world_ready = (env.get('PUFFLE_ENABLED') == 'true' and env.get('PUFFLE_ALLOWED_PLAYERS') == allowed
                    and any(m.get('Destination') == '/etc/puffle' for m in world.get('Mounts', [])))
-    env.update(PUFFLE_ENABLED='true', PUFFLE_SECRET_FILE='/etc/puffle/secret', PUFFLE_ALLOWED_PLAYERS=allowed)
+    env.update(PUFFLE_ENABLED='true', PUFFLE_SECRET_FILE='/etc/puffle/secret', PUFFLE_ALLOWED_PLAYERS=allowed,
+               WORLD_CAPACITY=os.environ.get('GLACIAR_DEV_WORLD_CAPACITY', '60'))
     restart_bots = not (world_ready and not args.force)
     if not restart_bots:
         print(f'{p}-glaciar ya tiene el puffle activado; no se recrea (los jugadores siguen conectados).')
     else:
+        glaciar_mounts = [f'{p}-puffle-secret:/etc/puffle:ro']
+        if args.dev_code:
+            glaciar_mounts.append(f'{ROOT}/containers/runtime/run.py:/app/run.py:ro')
         run(f'{p}-glaciar', image, network=net, alias=aliases(world, net) or ['glaciar'], env=env,
-            mounts=[f'{p}-puffle-secret:/etc/puffle:ro'], user=world['Config'].get('User') or None, dry=dry)
+            mounts=glaciar_mounts, user=world['Config'].get('User') or None, dry=dry)
 
-    web_mounts = [m for m in (web['HostConfig'].get('Binds') or [])
-                  if m.split(':')[1] not in ('/etc/nginx/conf.d/default.conf', '/srv/play/puffle/index.html',
-                                             '/srv/play/index.html')]
-    web_mounts += [f'{ROOT}/containers/web/index.html:/srv/play/index.html:ro',
-                   f'{ROOT}/containers/web/puffle.html:/srv/play/puffle/index.html:ro',
-                   f'{ROOT}/containers/web/default.conf:/etc/nginx/conf.d/default.conf:ro']
-    if sorted(web['HostConfig'].get('Binds') or []) == sorted(web_mounts) and not args.force:
+    web_mounts = (glaciar_dev_media.dev_web_mounts() if args.dev_code
+                  else [f'{ROOT}/containers/web/puffle.html:/srv/play/puffle/index.html:ro'])
+    if not glaciar_dev_media.web_mounts_differ(web['HostConfig'].get('Binds'), web_mounts) and not args.force:
         print(f'{p}-web ya monta la configuración del puffle; no se recrea.')
     else:
         run(f'{p}-web', web['Config']['Image'], network=net, alias=aliases(web, net) or ['web'], env=env_of(web),
             mounts=web_mounts, ports=ports_of(web), dry=dry)
         if webproxy:
-            run(f'{p}-webproxy', webproxy['Config']['Image'], network=f'container:{p}-web', env=env_of(webproxy),
+            proxy_mounts = []
+            if args.dev_code:
+                proxy_mounts += [
+                    f'{ROOT}/containers/runtime/run.py:/app/run.py:ro',
+                    f'{ROOT}/containers/runtime/socket_proxy.py:/app/socket_proxy.py:ro',
+                ]
+            run(f'{p}-webproxy', webproxy['Config']['Image'], network=f'container:{p}-web',
+                env=env_of(webproxy), mounts=proxy_mounts,
                 user=webproxy['Config'].get('User') or None, dry=dry)
     loopback = f'{p}-spotify-loopback'
     if args.spotify_redirect:

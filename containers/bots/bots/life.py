@@ -40,6 +40,7 @@ class Life:
         self._day = None
         self.afk = False   # away from the keyboard: no clicks, skipped by unnamed chat
         self._wake = None  # asyncio.Event while away; a direct mention sets it
+        self._party_pause = False
 
     def _settings(self):
         return getattr(getattr(self.session, 'behavior', None), 'behavior', None)
@@ -309,6 +310,12 @@ class Life:
         if self._wake is not None:
             self._wake.set()
 
+    async def pause_party(self):
+        self._party_pause = True
+
+    async def resume_party(self):
+        self._party_pause = False
+
     async def run(self):
         settings = self.session.behavior.behavior
         try:
@@ -322,6 +329,9 @@ class Life:
                     await asyncio.sleep(self.rng.uniform(settings.life_min_delay, settings.life_max_delay))
             burst_chance = float(getattr(settings, 'burst_chance', 0) or 0)
             while True:
+                if self._party_pause:
+                    await asyncio.sleep(0.5)
+                    continue
                 await asyncio.sleep(self._rest(settings))
                 if self._goes_afk(settings):
                     await self._away()
