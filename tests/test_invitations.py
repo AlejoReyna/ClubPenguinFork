@@ -406,7 +406,13 @@ class InvitationTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(row['player'], digest)
             else:
                 self.assertIsNone(row['player'])
-            self.assertNotIn(str(HUMAN), json.dumps({k: v for k, v in row.items() if k != 'player'}))
+            for key, value in row.items():
+                if key == 'player':
+                    continue
+                self.assertNotEqual(value, HUMAN,
+                                    f'{key} must not store raw player id')
+                self.assertNotEqual(value, str(HUMAN),
+                                    f'{key} must not store raw player id')
         self.assertEqual(log.errors['invalid'], 0)
         # A direct emit while the switch is off still does nothing. The file was
         # turned on for the trip above; put it back before re-reading.
