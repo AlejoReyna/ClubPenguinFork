@@ -95,6 +95,15 @@ class HostTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.sleep(0.01)
         self.fail('worker lease did not reach %r' % expected)
 
+    async def wait_host_online(self, cookie, attempts=200):
+        """Broker ``online`` can flip before the host worker records its first poll."""
+        for _ in range(attempts):
+            status = await self.host.status(cookie)
+            if status.get('online'):
+                return status
+            await asyncio.sleep(0.01)
+        self.fail('host status never showed online')
+
     async def paired(self, player=OWNER):
         cookie, pending = await self.host.pair('')
         self.igloo(player, pending['code'])
@@ -129,7 +138,7 @@ class HostTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.broker.dispatch('/internal/status', SECRET, {'player': OWNER})['paired'])
         await self.host.confirm(cookie)
         await self.online(OWNER)
-        status = await self.host.status(cookie)
+        status = await self.wait_host_online(cookie)
         self.assertEqual((status['state'], status['online'], status['spotify']), ('paired', True, 'desconectado'))
         self.assertEqual((await self.host.status('x' * 43))['state'], 'none')  # other browsers see nothing
 
