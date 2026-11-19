@@ -25,6 +25,9 @@ elif mode in ('login', 'world'):
     if mode == 'world':
         from production.puffle.world import install
         install()
+        sys.path.insert(0, '/app')
+        from production.lab.party_world import install as install_party
+        install_party()
     sys.argv = [
         'bootstrap.py', mode,
         '--address', '0.0.0.0',

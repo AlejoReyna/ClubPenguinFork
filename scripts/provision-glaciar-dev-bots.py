@@ -63,7 +63,8 @@ def main():
         parser.error('Credentials must live under .local/')
     if not cred_path.is_file():
         raise SystemExit('Missing %s — run: python3 scripts/prepare-work-bots.py' % cred_path)
-    sync_work_credentials(cred_path)
+    if not args.skip_register and cred_path.name == 'work-credentials.json':
+        sync_work_credentials(cred_path)
 
     postgres = f'{prefix}-postgres'
     dash = f'{prefix}-dash'
@@ -94,7 +95,8 @@ def main():
         auth = bot_accounts.authentication_program()
         out = docker(['exec', '-i', dash, 'python', '-c', auth],
                      input_text=cred_path.read_text())
-        if json.loads(out.stdout) != {'authenticated': 3}:
+        expected = len(json.loads(cred_path.read_text())['bots'])
+        if json.loads(out.stdout) != {'authenticated': expected}:
             raise RuntimeError('Bot authentication check failed')
     elif args.apply_sql:
         apply_sql(full_makeover=False)

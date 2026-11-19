@@ -312,7 +312,20 @@ class BotSession:
             # Other penguins walking (and our own echo). Positions go to the world model.
             if (self.world is not None and self.room_id is not None and len(frame.args) >= 3
                     and str(frame.args[0]).isdigit()):
-                self.world.member_moved(self.room_id, int(frame.args[0]), frame.args[1], frame.args[2])
+                player_id = int(frame.args[0])
+                self.world.member_moved(self.room_id, player_id, frame.args[1], frame.args[2])
+                manager = getattr(self, '_manager', None)
+                if manager is not None and manager.party is not None:
+                    manager.party.on_human_move(player_id)
+        elif op == 'sf':
+            if (self.world is not None and self.room_id is not None and len(frame.args) >= 2
+                    and str(frame.args[0]).isdigit() and str(frame.args[1]).lstrip('-').isdigit()):
+                player_id = int(frame.args[0])
+                frame_id = int(frame.args[1])
+                self.world.member_frame(self.room_id, player_id, frame_id)
+                manager = getattr(self, '_manager', None)
+                if manager is not None and manager.party is not None:
+                    manager.party.on_human_frame(player_id, frame_id)
         elif op == 'sb' and self.director is not None and len(frame.args) >= 3:
             try:
                 sender, x, y = map(int, frame.args[:3])

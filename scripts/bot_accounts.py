@@ -186,7 +186,7 @@ def registration_program():
     from pathlib import Path
     source = Path(__file__).read_text()
     return source + '''
-import sys
+import json, sys
 payload = json.load(sys.stdin)
 for bot in payload['bots']:
     register('http://web:8080', bot['username'], bot['password'])

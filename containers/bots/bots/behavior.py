@@ -47,6 +47,7 @@ class BotBehavior:
         # whether a speaker is another bot before any mention logic runs.
         self.peer_bot_names = frozenset()
         self._bot_exchange = {}  # peer_id -> consecutive bot-directed exchanges
+        self.party_hold = False
         self.system_prompt = self._build_prompt()
 
     # ----------------------------------------------------------------- prompt
@@ -260,6 +261,9 @@ class BotBehavior:
             await asyncio.sleep(random.uniform(self.behavior.first_move_delay_min,
                                                self.behavior.first_move_delay_max))
             while not self.stopped:
+                if self.party_hold:
+                    await asyncio.sleep(0.5)
+                    continue
                 min_x, max_x, min_y, max_y = self.bot.area
                 try:
                     await self.session.send_move(random.randint(min_x, max_x),
@@ -277,6 +281,9 @@ class BotBehavior:
             await asyncio.sleep(random.uniform(self.behavior.first_move_delay_min,
                                                self.behavior.first_move_delay_max))
             while not self.stopped:
+                if self.party_hold:
+                    await asyncio.sleep(0.5)
+                    continue
                 try:
                     if self.bot.repeat_action is not None:
                         await self.session.send_action(self.bot.repeat_action)

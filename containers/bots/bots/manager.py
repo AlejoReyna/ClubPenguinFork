@@ -4,6 +4,7 @@ import logging
 import math
 import os
 import random
+import time
 
 from .config import Config
 from .provider import MoonshotClient, SimulatedProvider
@@ -95,6 +96,7 @@ class BotManager:
             config.dialog_log.directory, config.dialog_log.switch_path, config.dialog_log.salt)
         dialog_log_mod.install(self.dialog_log)
         self._dialog_task = None
+        self.party = None
         self.director = None
         if config.dialogue.enabled:
             from .director import Director
@@ -102,6 +104,11 @@ class BotManager:
                                      recall=self.recall)
             for session in self.sessions:
                 session.director = self.director
+        if os.environ.get('LAB_PARTY_ENABLED', '').lower() in ('1', 'true', 'yes'):
+            from .party import PartyCoordinator
+            self.party = PartyCoordinator(self, clock=time.monotonic, rng=self.rng)
+        for session in self.sessions:
+            session._manager = self
         self._register_collectors()
 
     def metrics_facade(self):
@@ -167,6 +174,8 @@ class BotManager:
             return
         if self.director:
             self.director.start()
+        if self.party is not None:
+            self.party.start()
         tasks = []
         try:
             self._dialog_task = asyncio.create_task(self.dialog_log.run(), name='dialog-log')
@@ -233,5 +242,7 @@ class BotManager:
             await asyncio.gather(task, return_exceptions=True)
         if self.director:
             await self.director.close()
+        if self.party is not None:
+            await self.party.close()
         await asyncio.gather(*(session.close() for session in self.sessions),
                              return_exceptions=True)
