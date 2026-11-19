@@ -125,6 +125,11 @@ resource makes `apply` take and verify a backup first, and `--backup never` is t
 Changes beyond image updates (new resources, policies, settings) are planned and applied by the
 operator with the commands above, then later releases flow through CD again.
 
+Before deploying the welcome puffle runtime to an existing database, take a verified backup and
+apply [`scripts/lab-welcome-puffle.sql`](../scripts/lab-welcome-puffle.sql) in a single transaction.
+ARM64 release tests apply the same migration to the disposable database when its image is pinned.
+GitHub Actions checks for the table on the live database before deploying the new images.
+
 `azure-pipelines.yml` describes the same flow as five Azure DevOps stages (validate, test,
 release, apply behind an Azure DevOps environment, cleanup). CI checks it against a policy
 (`scripts/lint_pipeline.py`), but GitHub Actions is the active path.

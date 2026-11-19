@@ -184,10 +184,8 @@ def sources_to_fetch(to_build):
 def build(args):
     """Build what the release needs for linux/arm64 and test it in isolation.
 
-    runtime and database are always built locally when anything is missing from the
-    registry: they are small, BuildKit caches them, and the isolated tests need both.
-    Only components whose tag is absent from the registry are later published; the web
-    image (~1.7 GiB of media) is built only when its own tag is absent.
+    Build and publish only missing artifacts. Run the isolated tests against the exact
+    registry artifacts for reused tags, including pinned PostgreSQL images.
     """
     release = json.loads(Path(args.release).read_text())
     comps = release['components']
@@ -220,6 +218,8 @@ def build(args):
     require_arm64([f'clubpenguin/{n}:{comps[n]["tag"]}' for n in pending])
     test = [py, str(ROOT / 'scripts/test-containers.py'), '--tag', comps['runtime']['tag'],
             '--component-tag', f'database={comps["database"]["tag"]}', '--puffle']
+    if comps['database']['source'] == 'pinned':
+        test.append('--apply-welcome-puffle-migration')
     if 'web' in comps:
         test += ['--web-tag', comps['web']['tag']]
     if 'bots' in comps:

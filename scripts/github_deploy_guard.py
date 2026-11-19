@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail closed if automatic image deployment would alter bot operation."""
+"""Check the live bot configuration and database prerequisites for an image deploy."""
 import json
 import os
 
@@ -30,6 +30,14 @@ def main():
     except (ValueError, KeyError, TypeError) as exc:
         lablib.fail(str(exc))
     print('Live bot deployment and explicit provider mode match.')
+    schema = deploy.kubectl(
+        cfg, '-n', deploy.NAMESPACE, 'exec', 'postgres-0', '--',
+        'psql', '-X', '-U', 'houdini', '-d', 'houdini', '-At', '-v', 'ON_ERROR_STOP=1',
+        '-c', "SELECT to_regclass('public.penguin_welcome_puffle') IS NOT NULL",
+    ).stdout.strip()
+    if schema != 't':
+        lablib.fail('The live welcome puffle table is missing. Take a verified backup and apply scripts/lab-welcome-puffle.sql before deploying.')
+    print('Live welcome puffle table is present.')
 
 
 if __name__ == '__main__':
