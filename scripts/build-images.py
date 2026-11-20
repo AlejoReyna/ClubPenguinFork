@@ -53,6 +53,23 @@ def parse_args():
     return args, selected, tags
 
 
+def copy_media_tree(src, dest):
+    """Copy vanilla media so later patches do not touch the cache.
+
+    On APFS, clone the tree. A full copy is about 8 GiB and has filled the
+    deploy runner's disk while Docker exports the web image.
+    """
+    src = Path(src)
+    dest = Path(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if sys.platform == 'darwin':
+        cloned = subprocess.run(['cp', '-cR', str(src), str(dest)], capture_output=True, text=True)
+        if cloned.returncode == 0:
+            return
+        shutil.rmtree(dest, ignore_errors=True)
+    shutil.copytree(src, dest, symlinks=True)
+
+
 def stub_media(directory):
     """Placeholder content with the layout the web Dockerfile expects."""
     for relative in ('media/play/v2/stub.txt', 'play/stub.txt'):
@@ -86,7 +103,7 @@ def main():
                     media_copy_dir = media_copy_dir or tempfile.mkdtemp(prefix='cp-web-media-')
                     copy_root = Path(media_copy_dir) / 'vanilla'
                     if not copy_root.is_dir():
-                        shutil.copytree(media_path, copy_root, symlinks=True)
+                        copy_media_tree(media_path, copy_root)
                         subprocess.run([sys.executable, str(root / 'scripts/patch_chat_restrict.py'), str(copy_root / 'media')],
                                        check=True, cwd=root)
                         engine = copy_root / 'media' / 'play' / 'v2' / 'client' / 'engine.swf'
