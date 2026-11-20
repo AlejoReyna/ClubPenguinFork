@@ -66,9 +66,12 @@ def terraform_env(cfg, ws):
     info = azure_identity(cfg)
     cache = Path.home() / '.clubpenguin-lab/plugin-cache'
     cache.mkdir(parents=True, exist_ok=True, mode=0o700)
+    # CI sets ARM_USE_OIDC for the job, but Terraform would then re-exchange the GitHub job
+    # assertion on every backend/provider call. After a long publish or pre-apply backup that
+    # exchange fails with "job is already completed" even though azure/login refreshed `az`.
     return {'TF_DATA_DIR': str(ws.sub('tfdata')), 'TF_IN_AUTOMATION': '1', 'TF_INPUT': '0',
             'TF_PLUGIN_CACHE_DIR': str(cache), 'ARM_SUBSCRIPTION_ID': info['id'], 'ARM_TENANT_ID': info['tenant'],
-            'ARM_USE_AZUREAD': 'true'}
+            'ARM_USE_AZUREAD': 'true', 'ARM_USE_CLI': 'true', 'ARM_USE_OIDC': 'false'}
 
 
 def terraform(env, *args, check=True, timeout=1800):

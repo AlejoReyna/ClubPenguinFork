@@ -100,7 +100,6 @@ jobs:
       # Matches the operator's CP_DIALOG_FEED_ENABLED (deploy.env); the sidecar, its PVC and the
       # switch ConfigMap are applied by the operator plan, and CD keeps them from being retired.
       TF_VAR_dialog_feed_enabled: 'true'
-      ARM_USE_OIDC: 'true'
       ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
       ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
       ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
