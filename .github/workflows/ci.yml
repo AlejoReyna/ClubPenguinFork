@@ -164,6 +164,14 @@ jobs:
           python3 scripts/release.py manifest --release "$RELEASE_FILE" --out "$MANIFEST_FILE"
       - name: Plan and gate image updates
         run: python3 scripts/deploy.py plan --manifest "$MANIFEST_FILE" --expect images-only
+      # Publish of the web image can take most of an hour. The login from the
+      # publication step is then too old for `az storage` during the pre-apply backup.
+      - name: Refresh Azure login for apply
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       - name: Apply the exact gated plan
         run: |
           set -euo pipefail

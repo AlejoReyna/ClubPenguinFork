@@ -99,10 +99,15 @@ manifest = dump.with_suffix('.json')
 lablib.write_private(manifest, json.dumps(metadata, indent=2) + '\n')
 if not args.no_upload:
     for file in [dump, manifest]:
-        subprocess.run(['az', 'storage', 'blob', 'upload', '--account-name', account,
-                        '--container-name', container, '--auth-mode', 'login',
-                        '--name', 'postgres/' + file.name, '--file', str(file),
-                        '--overwrite', 'false', '--only-show-errors', '-o', 'none'], check=True, timeout=600)
+        uploaded = subprocess.run(
+            ['az', 'storage', 'blob', 'upload', '--account-name', account,
+             '--container-name', container, '--auth-mode', 'login',
+             '--name', 'postgres/' + file.name, '--file', str(file),
+             '--overwrite', 'false', '--only-show-errors', '-o', 'none'],
+            capture_output=True, text=True, timeout=600)
+        if uploaded.returncode != 0:
+            sys.stderr.write(uploaded.stderr or uploaded.stdout or 'az storage blob upload failed\n')
+            raise SystemExit(uploaded.returncode)
 if args.json_out:
     lablib.write_json(args.json_out, metadata)
 print(f'Backup and separate restore verified: {accounts} accounts, {metadata["bytes"]} bytes.')
