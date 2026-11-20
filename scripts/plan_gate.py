@@ -150,15 +150,10 @@ def classify(changes, live=None, allow_destructive=(), expect=None):
     if expect == 'images-only':
         for item in changes:
             paths = item['paths']
-
-            def allowed_image_only_path(path):
-                if path.endswith('.image'):
-                    return True
-                return (path.endswith('.progress_deadline_seconds')
-                        and item['address'] == 'kubernetes_deployment_v1.web[0]')
-
-            only_images = (item['kind'] == 'update' and paths
-                           and all(allowed_image_only_path(p) for p in paths))
+            web_deadline = item['address'] == 'kubernetes_deployment_v1.web[0]'
+            only_images = (item['kind'] == 'update' and paths and all(
+                p.endswith('.image') or (web_deadline and p.endswith('.progress_deadline_seconds'))
+                for p in paths))
             release_info = item['address'].startswith('kubernetes_config_map_v1.release')
             if not (only_images or release_info):
                 blocked.append(f'{item["address"]}: a rollback to recorded image tags must change images only')
