@@ -131,6 +131,14 @@ class RollbackScopeTests(unittest.TestCase):
         _, verdict = gate([change], expect='images-only')
         self.assertTrue(verdict['blocked'])
 
+    def test_images_only_allows_web_progress_deadline_with_tag_change(self):
+        item = {'address': 'kubernetes_deployment_v1.web[0]', 'kind': 'update',
+                'type': 'kubernetes_deployment_v1', 'namespace': 'clubpenguin', 'restarts': True,
+                'paths': ['spec[0].progress_deadline_seconds',
+                          'spec[0].template[0].spec[0].container[0].image'],
+                'images': {'spec[0].template[0].spec[0].container[0].image': ['a', 'b']}}
+        self.assertEqual(plan_gate.classify([item], expect='images-only')['blocked'], [])
+
 
 class NoSecretsTests(unittest.TestCase):
     def test_rendering_and_summary_never_include_attribute_values(self):

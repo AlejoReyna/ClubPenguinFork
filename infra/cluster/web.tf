@@ -98,7 +98,8 @@ resource "kubernetes_deployment_v1" "web" {
     namespace = local.game_namespace
   }
   spec {
-    replicas = 1
+    replicas                  = 1
+    progress_deadline_seconds = 1500 # 25m: match Terraform timeouts; default 10m loses on first Pi image pull
     selector { match_labels = { app = "web" } }
     template {
       metadata { labels = merge(local.game_labels, { app = "web" }) }
@@ -274,8 +275,8 @@ resource "kubernetes_deployment_v1" "web" {
       }
     }
   }
-  # The first pull of a new web image (media layers) took ~8.5 minutes on the Pi's link;
-  # the provider's 10-minute default would fail an otherwise healthy rollout.
+  # The first pull of a new web image (media layers) took ~8.5 minutes on the Pi's link.
+  # Terraform waits up to 25m; the Deployment progress deadline must match or apply fails first.
   timeouts {
     create = "25m"
     update = "25m"

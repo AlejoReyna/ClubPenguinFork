@@ -149,7 +149,11 @@ def classify(changes, live=None, allow_destructive=(), expect=None):
             notes.append(f'{address} will restart its pods')
     if expect == 'images-only':
         for item in changes:
-            only_images = item['kind'] == 'update' and item['paths'] and all(p.endswith('.image') for p in item['paths'])
+            paths = item['paths']
+            web_deadline = item['address'] == 'kubernetes_deployment_v1.web[0]'
+            only_images = (item['kind'] == 'update' and paths and all(
+                p.endswith('.image') or (web_deadline and p.endswith('.progress_deadline_seconds'))
+                for p in paths))
             release_info = item['address'].startswith('kubernetes_config_map_v1.release')
             if not (only_images or release_info):
                 blocked.append(f'{item["address"]}: a rollback to recorded image tags must change images only')
