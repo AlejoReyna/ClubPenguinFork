@@ -1,6 +1,6 @@
 <div align="center">
 
-# Club Penguin Lab
+# AI Penguins - A ClubPenguin Fork with mods
 
 **A self-hosted Club Penguin world on a single Raspberry Pi, with AI-driven penguins,<br>
 a puffle you can talk to, and a production-style delivery pipeline.**
