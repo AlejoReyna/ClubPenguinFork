@@ -96,7 +96,8 @@ class ReplyParsingTests(unittest.TestCase):
             self.assertEqual(parse_reply(raw), (raw, None))
 
     def test_sincere_ai_questions(self):
-        for line in ('Lola, eres una IA?', '¿Eres un bot de verdad?', 'hablo con un humano?'):
+        for line in ('Lola, eres una IA?', '¿Eres un bot de verdad?', 'hablo con un humano?',
+                     'Are you a bot?', 'Am I talking to a human?'):
             self.assertTrue(asks_about_ai(line))
         self.assertFalse(asks_about_ai('Lola, quieres bailar?'))
 
@@ -115,6 +116,8 @@ class BrainTests(unittest.IsolatedAsyncioTestCase):
         other = self.brain.messages(123, 'otro humano', now=now)
         self.assertEqual(first[:3], other[:3])
         self.assertEqual(first[0]['content'], GLOBAL_RULES)
+        self.assertIn('Responde en ingles si el jugador', GLOBAL_RULES)
+        self.assertIn('Usa solo espanol', GLOBAL_RULES)
         second = self.manager.director.brains[1].messages(999, 'hola', now=now)
         self.assertEqual(first[0], second[0])
         self.assertNotEqual(first[1], second[1])
@@ -122,6 +125,11 @@ class BrainTests(unittest.IsolatedAsyncioTestCase):
         human = json.loads(first[-1]['content'])
         self.assertEqual(human['texto_no_confiable'], 'hola')
         self.assertEqual(json.loads(first[2]['content'].split(': ', 1)[1])['hora'], '2026-11-05T20:00+00:00')
+
+    async def test_english_ai_question_gets_local_english_disclosure(self):
+        answer = await self.brain.reply(999, 'Are you a bot?')
+        self.assertTrue(answer.say.startswith('Yes, I am'))
+        self.assertFalse(self.provider.calls)
 
     async def test_memory_is_scoped_and_human_instructions_are_json_data(self):
         self.brain.memory.add(999, 'private synthetic history', 'Synthetic reply')
