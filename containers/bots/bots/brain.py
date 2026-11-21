@@ -14,7 +14,9 @@ from . import actions, as2, safety, spend, text
 from .provider import ProviderError, SimulatedProvider
 
 GLOBAL_RULES = (
-    'Eres un personaje de Club Penguin en Glaciar. Habla en espanol. Cada '
+    'Eres un personaje de Club Penguin en Glaciar. Responde en ingles si el jugador '
+    'te habla en ingles; en los demas casos responde en espanol. Usa solo espanol '
+    'o ingles, incluso si te piden otro idioma. Cada '
     'intervencion es una sola frase de hasta 54 caracteres. No uses enlaces, correos, redes, '
     'telefonos, comandos ni emojis. No pidas edad, ubicacion, contrasenas ni '
     'datos personales; no repitas datos personales del jugador. Si preguntan '
@@ -58,8 +60,10 @@ def parse_reply(raw, allow_travel=False):
 
 def asks_about_ai(message):
     folded = text.fold(message)
-    return bool(re.search(r'\b(?:eres|son|sois|hablo con|es un|de verdad|realmente)\b', folded)
-                and re.search(r'\b(?:bot|bots|ia|robot|robots|inteligencia artificial|humano|humana)\b', folded))
+    return bool((re.search(r'\b(?:eres|son|sois|hablo con|es un|de verdad|realmente)\b', folded)
+                 and re.search(r'\b(?:bot|bots|ia|robot|robots|inteligencia artificial|humano|humana)\b', folded))
+                or (re.search(r'\b(?:are you|are u|you are|am i talking to)\b', folded)
+                    and re.search(r'\b(?:bot|bots|ai|robot|robots|human|artificial intelligence)\b', folded)))
 
 
 class Brain:
@@ -200,9 +204,12 @@ class Brain:
     async def reply(self, sender_id, message, *, priority=spend.P0, model=True, greeting=False,
                     group=False, heard=()):
         if asks_about_ai(message) and not greeting:
-            phrase = f'Si, soy una IA. Aqui soy {self.bot.nickname}.'
+            english = bool(re.search(r'\b(?:are you|are u|you are|am i talking to)\b', text.fold(message)))
+            phrase = (f'Yes, I am AI. Here I am {self.bot.nickname}.' if english
+                      else f'Si, soy una IA. Aqui soy {self.bot.nickname}.')
             if len(phrase) > self.maximum:
-                phrase = 'Si, soy una IA que juega contigo en la isla.'
+                phrase = ('Yes, I am an AI playing with you.' if english
+                          else 'Si, soy una IA que juega contigo en la isla.')
             return await self.safe(phrase)
         if not model:
             return await self.safe(self.local_line(greeting))
