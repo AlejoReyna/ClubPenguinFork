@@ -171,15 +171,19 @@ def write_output(data, out):
 
 # --- build and test ----------------------------------------------------------------
 
-def sources_to_fetch(to_build):
+def sources_to_fetch(to_build, stub_web=False):
     """Pinned sources to download before building: those of the pending components, plus the ones the tests need.
 
     The isolated tests and the bot/puffle suites always run against the runtime image and read
     vendor/houdini and vendor/dash, even when only the web image is pending. A clean CI workspace has
     neither, so fetching only the pending components' sources made a web-only release fail its tests.
+    When a reused computed web image is absent locally, stub-media testing still needs Ruffle.
     """
     needed = set(to_build) | {'runtime', 'database'}
-    return sorted({s for n in needed for s in COMPONENTS[n]['sources']})
+    sources = {s for n in needed for s in COMPONENTS[n]['sources']}
+    if stub_web:
+        sources.add('ruffle')
+    return sorted(sources)
 
 
 def build(args):
@@ -195,21 +199,41 @@ def build(args):
         print('Every component already exists in the registry for these inputs: nothing to build or test.')
         return
     to_build = sorted(pending)
+    reused = [name for name in comps if name not in pending]
+    to_pull = []
+    stub_web_tag = None
+    for name in reused:
+        entry = comps[name]
+        local_ref = f'clubpenguin/{name}:{entry["tag"]}'
+        if local_image_matches(local_ref, entry.get('registry_digest'), args.platform):
+            print(f'Using local reused {name} image ({entry["tag"]})', flush=True)
+            continue
+        # Reused computed web images carry ~4 GiB of static media that is slow to pull
+        # and not read by test-containers.py; verify nginx/proxy routes with an ephemeral
+        # stub-media image built from the exact checked-out web files instead.
+        if name == 'web' and entry.get('source') != 'pinned':
+            stub_web_tag = f'{entry["tag"]}-test-stub'
+            print(
+                f'Reused web image {entry["tag"]} is not cached locally; '
+                f'testing nginx routes with ephemeral stub-media image {stub_web_tag}',
+                flush=True,
+            )
+            continue
+        to_pull.append(name)
     # Reuse the exact registry artifacts, especially a pinned PostgreSQL image.
     # Rebuilding a pinned tag locally could test different base layers than the
     # image actually deployed, even when its Dockerfile has not changed.
-    cfg = lablib.load_config('registry')
-    reused = [name for name in comps if name not in pending]
-    if reused:
+    if to_pull:
+        cfg = lablib.load_config('registry')
         server, token = acr_credentials(cfg['CP_ACR_NAME'])
         with tempfile.TemporaryDirectory(prefix='cp-release-pull-') as directory:
             isolated_docker_config(directory, server, token)
-            for name in reused:
+            for name in to_pull:
                 origin = f'{server}/clubpenguin/{name}@{comps[name]["registry_digest"]}'
                 print(f'Pulling reused {name} image', flush=True)
-                run_visible(['docker', '--config', directory, 'pull', '--platform', 'linux/arm64', origin], 1800)
+                run_visible(['docker', '--config', directory, 'pull', '--platform', args.platform, origin], 1800)
                 run(['docker', '--config', directory, 'tag', origin, f'clubpenguin/{name}:{comps[name]["tag"]}'], quiet=True)
-    sources = sources_to_fetch(to_build)
+    sources = sources_to_fetch(to_build, stub_web=bool(stub_web_tag))
     py = sys.executable
     run([py, str(ROOT / 'scripts/fetch-sources.py'), '--only', ','.join(sources)], timeout=3600)
     command = [py, str(ROOT / 'scripts/build-images.py'), '--platform', args.platform, '--components', ','.join(to_build)]
@@ -217,20 +241,32 @@ def build(args):
         command += ['--component-tag', f'{name}={comps[name]["tag"]}']
     run_visible(command, 7200)
     require_arm64([f'clubpenguin/{n}:{comps[n]["tag"]}' for n in pending])
-    test = [py, str(ROOT / 'scripts/test-containers.py'), '--tag', comps['runtime']['tag'],
-            '--component-tag', f'database={comps["database"]["tag"]}', '--puffle']
-    if comps['database']['source'] == 'pinned':
-        test.append('--apply-welcome-puffle-migration')
-    if 'web' in comps:
-        test += ['--web-tag', comps['web']['tag']]
-    if 'bots' in comps:
-        test += ['--bots-tag', comps['bots']['tag']]
-        run(['bash', str(ROOT / 'scripts/run-bot-tests.sh'),
+    stub_web_image = f'clubpenguin/web:{stub_web_tag}' if stub_web_tag else None
+    try:
+        if stub_web_image:
+            run_visible([py, str(ROOT / 'scripts/build-images.py'), '--platform', args.platform,
+                         '--components', 'web', '--web-media', 'stub',
+                         '--component-tag', f'web={stub_web_tag}'], 1800)
+            platform = local_platform(stub_web_image)
+            if platform != args.platform:
+                fail(f'{stub_web_image} is {platform}; expected {args.platform}')
+        test = [py, str(ROOT / 'scripts/test-containers.py'), '--tag', comps['runtime']['tag'],
+                '--component-tag', f'database={comps["database"]["tag"]}', '--puffle']
+        if comps['database']['source'] == 'pinned':
+            test.append('--apply-welcome-puffle-migration')
+        if 'web' in comps:
+            test += ['--web-tag', stub_web_tag or comps['web']['tag']]
+        if 'bots' in comps:
+            test += ['--bots-tag', comps['bots']['tag']]
+            run(['bash', str(ROOT / 'scripts/run-bot-tests.sh'),
+                 f'clubpenguin/runtime:{comps["runtime"]["tag"]}'], timeout=1800)
+        result = run(test, timeout=1800)
+        print(result.stdout.strip())
+        run(['bash', str(ROOT / 'scripts/run-puffle-tests.sh'),
              f'clubpenguin/runtime:{comps["runtime"]["tag"]}'], timeout=1800)
-    result = run(test, timeout=1800)
-    print(result.stdout.strip())
-    run(['bash', str(ROOT / 'scripts/run-puffle-tests.sh'),
-         f'clubpenguin/runtime:{comps["runtime"]["tag"]}'], timeout=1800)
+    finally:
+        if stub_web_image:
+            run(['docker', 'rmi', stub_web_image], check=False, quiet=True)
 
 
 # --- local image checks and publication ------------------------------------------
@@ -238,6 +274,28 @@ def build(args):
 def local_platform(image):
     result = run(['docker', 'image', 'inspect', '--format', '{{.Os}}/{{.Architecture}}', image], quiet=True)
     return result.stdout.strip()
+
+
+def local_image_matches(image, digest, platform='linux/arm64'):
+    """Return True if ``image`` is cached locally for ``platform`` with ``digest`` and full media."""
+    if not digest:
+        return False
+    result = run(['docker', 'image', 'inspect', '--format', '{{json .}}', image], check=False, quiet=True)
+    if result.returncode != 0 or not result.stdout.strip():
+        return False
+    try:
+        info = json.loads(result.stdout)
+    except ValueError:
+        return False
+    if not isinstance(info, dict):
+        return False
+    if f'{info.get("Os")}/{info.get("Architecture")}' != platform:
+        return False
+    if ((info.get('Config') or {}).get('Labels') or {}).get('clubpenguin.test-only'):
+        return False
+    return info.get('Id') == digest or any(
+        entry.endswith(f'@{digest}') for entry in (info.get('RepoDigests') or [])
+    )
 
 
 def require_arm64(images):
@@ -328,7 +386,8 @@ def publish(args):
             target = f'{server}/{source}'
             run(['docker', 'tag', source, target], env=env)
             try:
-                run(['docker', 'push', target], env=env, timeout=3600)
+                print(f'Pushing {source}', flush=True)
+                run_visible(['docker', '--config', str(config_dir), 'push', target], 3600)
             finally:
                 run(['docker', 'rmi', target], env=env, check=False, quiet=True)  # removes only the extra tag
             digest = registry_tag(cfg['CP_ACR_NAME'], name, entry['tag'])

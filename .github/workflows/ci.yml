@@ -149,7 +149,7 @@ jobs:
           mkdir -p vendor
           ln -s "$media_cache/vanilla-media-$media_revision" vendor/vanilla-media
           python3 scripts/release.py resolve --out "$RELEASE_FILE"
-          python3 scripts/release.py build --release "$RELEASE_FILE" --platform linux/arm64
+          caffeinate -is python3 scripts/release.py build --release "$RELEASE_FILE" --platform linux/arm64
       - name: Refresh Azure login for publication
         uses: azure/login@v2
         with:
@@ -159,7 +159,7 @@ jobs:
       - name: Publish images and save manifest
         run: |
           test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$GITHUB_SHA"
-          python3 scripts/release.py publish --release "$RELEASE_FILE"
+          caffeinate -is python3 scripts/release.py publish --release "$RELEASE_FILE"
           python3 scripts/release.py manifest --release "$RELEASE_FILE" --out "$MANIFEST_FILE"
       - name: Plan and gate image updates
         run: python3 scripts/deploy.py plan --manifest "$MANIFEST_FILE" --expect images-only
@@ -177,7 +177,7 @@ jobs:
           test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$GITHUB_SHA"
           python3 scripts/github_deploy_guard.py
           plan_sha="$(python3 -c 'import json,os,sys; sys.path.insert(0,"scripts"); import lablib; p=lablib.RunDir(run_id=os.environ["PLAN_RUN_ID"],create=False).sub("evidence")/"plan-summary.json"; print(json.loads(p.read_text())["plan_sha256"])')"
-          python3 scripts/deploy.py apply --expect-sha256 "$plan_sha" --backup auto --expect images-only
+          caffeinate -is python3 scripts/deploy.py apply --expect-sha256 "$plan_sha" --backup auto --expect images-only
       - name: Verify without registering accounts
         run: python3 scripts/deploy.py verify --manifest "$MANIFEST_FILE" --skip-game-journey --require-public
       - name: Refresh Azure login for release history
