@@ -90,35 +90,34 @@ def main():
             contexts = dict(spec['contexts'])
             if component == 'web':
                 client_dir = tempfile.mkdtemp(prefix='cp-puffle-client-')
-                subprocess.run([sys.executable, str(root / 'scripts/build-puffle-client.py'),
-                                '--output', client_dir, *(['--stub'] if args.web_media == 'stub' else [])],
-                               check=True, cwd=root)
-                contexts['puffle-client'] = client_dir
-            if component == 'web' and args.web_media == 'stub':
-                stub_dir = stub_dir or stub_media(tempfile.mkdtemp(prefix='cp-stub-media-'))
-                contexts['media'] = stub_dir
-            if component == 'web':
-                media_path = (root / contexts['media']).resolve()
-                if args.web_media != 'stub':
+                if args.web_media == 'stub':
+                    stub_dir = stub_dir or stub_media(tempfile.mkdtemp(prefix='cp-stub-media-'))
+                    contexts['media'] = (root / stub_dir).resolve()
+                    subprocess.run([sys.executable, str(root / 'scripts/build-puffle-client.py'),
+                                    '--output', client_dir, '--stub'],
+                                   check=True, cwd=root)
+                else:
+                    media_path = (root / contexts['media']).resolve()
                     media_copy_dir = media_copy_dir or tempfile.mkdtemp(prefix='cp-web-media-')
                     copy_root = Path(media_copy_dir) / 'vanilla'
                     if not copy_root.is_dir():
                         copy_media_tree(media_path, copy_root)
-                        subprocess.run([sys.executable, str(root / 'scripts/patch_chat_restrict.py'), str(copy_root / 'media')],
+                        subprocess.run([sys.executable, str(root / 'scripts/patch_chat_restrict.py'), str(copy_root)],
                                        check=True, cwd=root)
                         engine = copy_root / 'media' / 'play' / 'v2' / 'client' / 'engine.swf'
-                        ffdec = root / '.local' / 'tools' / 'ffdec-26.4.0' / 'ffdec.jar'
-                        if engine.is_file() and ffdec.is_file():
-                            stage = Path(media_copy_dir) / 'engine-glaciar.swf'
-                            subprocess.run([
-                                sys.executable,
-                                str(root / 'experiments/puffle_sim/client/build_engine_glaciar.py'),
-                                '--ffdec', str(ffdec), '--engine', str(engine), '--output', str(stage),
-                            ], check=True, cwd=root)
-                            shutil.move(str(stage), engine)
+                        if not engine.is_file():
+                            raise SystemExit(f'Missing 2017 engine.swf at {engine}')
+                        subprocess.run([sys.executable, str(root / 'scripts/build-puffle-client.py'),
+                                        '--output', client_dir],
+                                       check=True, cwd=root)
+                        shutil.copy2(Path(client_dir) / 'engine.swf', engine)
+                    else:
+                        subprocess.run([sys.executable, str(root / 'scripts/build-puffle-client.py'),
+                                        '--output', client_dir,
+                                        '--client-dir', str(copy_root / 'media' / 'play' / 'v2' / 'client')],
+                                       check=True, cwd=root)
                     contexts['media'] = copy_root
-                else:
-                    contexts['media'] = media_path
+                contexts['puffle-client'] = client_dir
             command = ['docker', 'buildx', 'build', '--platform', args.platform, '--load',
                        '--provenance=false', '--sbom=false']
             if args.builder:

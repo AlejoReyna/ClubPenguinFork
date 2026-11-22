@@ -3,9 +3,10 @@
 // The public dialog feed (/dialog/) follows the same rule; no version bump: no cache changes.
 // v3: the 2017 client boots from club_penguin.swf; drop media caches that still hold the legacy
 // load.swf/shell.swf, which left the stage blank once the edge cache expired.
-const VERSION = 'glaciar-puffle-v3';
+// v4: game_configs.bin now includes '/' in chat_restrict; drop cached unpatched bundles.
+const VERSION = 'glaciar-puffle-v4';
 // Actualiza el shell y su identidad sin descartar la caché pesada del juego.
-const ESTATICO = 'pre-aipenguins-ui-v4';
+const ESTATICO = 'pre-aipenguins-ui-v5';
 const MEDIA = `media-${VERSION}`;
 const PRECACHE = ['/', '/register.html', '/manifest.webmanifest', '/icons/linux.svg', '/icons/aipenguins-192.png', '/icons/aipenguins-180.png', '/icons/puffle-headphones.webp'];
 
