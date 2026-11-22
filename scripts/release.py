@@ -21,6 +21,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
@@ -200,13 +201,13 @@ def build(args):
     cfg = lablib.load_config('registry')
     reused = [name for name in comps if name not in pending]
     if reused:
-        auth = json.loads(run(['az', 'acr', 'login', '--name', cfg['CP_ACR_NAME'], '--expose-token', '-o', 'json'],
-                              quiet=True).stdout)
+        server, token = acr_credentials(cfg['CP_ACR_NAME'])
         with tempfile.TemporaryDirectory(prefix='cp-release-pull-') as directory:
-            isolated_docker_config(directory, auth['loginServer'], auth['accessToken'])
+            isolated_docker_config(directory, server, token)
             for name in reused:
-                origin = f'{auth["loginServer"]}/clubpenguin/{name}@{comps[name]["registry_digest"]}'
-                run(['docker', '--config', directory, 'pull', '--platform', 'linux/arm64', origin], timeout=1800, quiet=True)
+                origin = f'{server}/clubpenguin/{name}@{comps[name]["registry_digest"]}'
+                print(f'Pulling reused {name} image', flush=True)
+                run_visible(['docker', '--config', directory, 'pull', '--platform', 'linux/arm64', origin], 1800)
                 run(['docker', '--config', directory, 'tag', origin, f'clubpenguin/{name}:{comps[name]["tag"]}'], quiet=True)
     sources = sources_to_fetch(to_build)
     py = sys.executable
@@ -214,7 +215,7 @@ def build(args):
     command = [py, str(ROOT / 'scripts/build-images.py'), '--platform', args.platform, '--components', ','.join(to_build)]
     for name in to_build:
         command += ['--component-tag', f'{name}={comps[name]["tag"]}']
-    run(command, timeout=7200)
+    run_visible(command, 7200)
     require_arm64([f'clubpenguin/{n}:{comps[n]["tag"]}' for n in pending])
     test = [py, str(ROOT / 'scripts/test-containers.py'), '--tag', comps['runtime']['tag'],
             '--component-tag', f'database={comps["database"]["tag"]}', '--puffle']
@@ -287,9 +288,20 @@ def isolated_docker_config(directory, server, token):
 
 
 def acr_credentials(acr):
-    result = run(['az', 'acr', 'login', '--name', acr, '--expose-token', '--output', 'json'], quiet=True)
+    print('Obtaining registry credentials', flush=True)
+    result = run(['az', 'acr', 'login', '--name', acr, '--expose-token', '--output', 'json'], quiet=True, timeout=120)
     data = json.loads(result.stdout)
     return data['loginServer'], data['accessToken']
+
+
+def run_visible(command, timeout):
+    """Show non-secret image operation output without buffering its pipes."""
+    try:
+        subprocess.run(command, check=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        fail(f'Timed out after {timeout}s: {command[0]}')
+    except subprocess.CalledProcessError as exc:
+        fail(f'{command[0]} failed with exit code {exc.returncode}')
 
 
 def publish(args):
