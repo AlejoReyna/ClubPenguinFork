@@ -17,8 +17,9 @@ VENDOR_MEDIA = ROOT / 'vendor' / 'vanilla-media' / 'media'
 PATCH_DIR = ROOT / '.local' / 'glaciar-dev' / 'patched-swfs'
 PATCH_STRINGS = ROOT / '.local' / 'glaciar-dev' / 'patched-strings'
 PATCHED = ('login.swf', 'create.swf', 'engine.swf')
-LANGS = ('de', 'en', 'es', 'fr', 'pt')
+LANGS = ('de', 'en', 'es', 'fr', 'pt', 'ru')
 STRING_FILES = ('game_strings.json', 'game_strings.jsonp')
+BUNDLE_FILE = 'game_configs.bin'
 
 
 def ensure_chat_restrict_strings() -> None:
@@ -27,15 +28,25 @@ def ensure_chat_restrict_strings() -> None:
     if not vendor_root.is_dir():
         return
     needs = []
-    for lang in LANGS:
+    service_rel_paths = [Path('play') / lang / 'web_service' for lang in LANGS]
+    service_rel_paths.append(Path('play') / 'web_service')
+    for service_rel in service_rel_paths:
         for name in STRING_FILES:
-            src = vendor_root / 'play' / lang / 'web_service' / 'game_configs' / name
-            dest = PATCH_STRINGS / 'play' / lang / 'web_service' / 'game_configs' / name
+            rel = service_rel / 'game_configs' / name
+            src = vendor_root / rel
+            dest = PATCH_STRINGS / rel
             if not src.is_file():
                 continue
             if not dest.is_file() or dest.stat().st_mtime < src.stat().st_mtime:
                 needs.append((src, dest))
-    if not needs and (PATCH_STRINGS / 'play' / 'es' / 'web_service' / 'game_configs' / 'game_strings.json').is_file():
+        bundle_rel = service_rel / BUNDLE_FILE
+        src_bundle = vendor_root / bundle_rel
+        dest_bundle = PATCH_STRINGS / bundle_rel
+        if src_bundle.is_file() and (not dest_bundle.is_file() or dest_bundle.stat().st_mtime < src_bundle.stat().st_mtime):
+            needs.append((src_bundle, dest_bundle))
+    es_json = PATCH_STRINGS / 'play' / 'es' / 'web_service' / 'game_configs' / 'game_strings.json'
+    es_bundle = PATCH_STRINGS / 'play' / 'es' / 'web_service' / BUNDLE_FILE
+    if not needs and es_json.is_file() and es_bundle.is_file():
         return
     for src, dest in needs:
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -111,12 +122,18 @@ def dev_web_mounts(*, include_media: bool = True) -> list[str]:
         path = PATCH_DIR / name
         if path.is_file():
             mounts.append(f'{path}:/srv/media/play/v2/client/{name}:ro')
-    for lang in LANGS:
+    service_rel_paths = [Path('play') / lang / 'web_service' for lang in LANGS]
+    service_rel_paths.append(Path('play') / 'web_service')
+    for service_rel in service_rel_paths:
         for name in STRING_FILES:
-            path = PATCH_STRINGS / 'play' / lang / 'web_service' / 'game_configs' / name
+            rel = service_rel / 'game_configs' / name
+            path = PATCH_STRINGS / rel
             if path.is_file():
-                mounts.append(
-                    f'{path}:/srv/media/play/{lang}/web_service/game_configs/{name}:ro')
+                mounts.append(f'{path}:/srv/media/{rel.as_posix()}:ro')
+        bundle_rel = service_rel / BUNDLE_FILE
+        bundle_path = PATCH_STRINGS / bundle_rel
+        if bundle_path.is_file():
+            mounts.append(f'{bundle_path}:/srv/media/{bundle_rel.as_posix()}:ro')
     return mounts
 
 
