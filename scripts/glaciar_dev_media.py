@@ -2,14 +2,14 @@
 
 The published web image may ship an incomplete ``/srv/media/play/v2/client`` (no
 ``club_penguin.swf``). Vendor has the dump. Overlay only the login/create mobile
-patches; ``engine.swf`` gets only the glaciarCamera hook (``build_engine_glaciar.py``),
-not the legacy puffle renderer patch that broke the 2017 map.
+patches and the 2017 engine with the Glaciar camera and puffle chat renderer.
 """
 from __future__ import annotations
 
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -56,21 +56,27 @@ def ensure_chat_restrict_strings() -> None:
 
 
 def ensure_glaciar_engine_patch() -> None:
-    """2017 engine with glaciarCamera only (navbar + mobile view bridge)."""
+    """Refresh the patched 2017 engine when the source or patch inputs change."""
     dest = PATCH_DIR / 'engine.swf'
     vendor = VENDOR_MEDIA / 'play' / 'v2' / 'client' / 'engine.swf'
     if not vendor.is_file():
         return
-    if dest.is_file() and dest.stat().st_mtime >= vendor.stat().st_mtime:
+    patch_dir = ROOT / 'experiments/puffle_sim/client'
+    inputs = [vendor, *(patch_dir / name for name in (
+        'build_engine_glaciar.py', 'build_engine.py', 'mobile_camera_glaciar.as', 'renderer.as'))]
+    if dest.is_file() and dest.stat().st_mtime_ns >= max(path.stat().st_mtime_ns for path in inputs):
         return
     PATCH_DIR.mkdir(parents=True, mode=0o700, exist_ok=True)
     ffdec = ROOT / '.local' / 'tools' / 'ffdec-26.4.0' / 'ffdec.jar'
     if not ffdec.is_file():
         return
-    subprocess.run([
-        sys.executable, str(ROOT / 'experiments/puffle_sim/client/build_engine_glaciar.py'),
-        '--ffdec', str(ffdec), '--engine', str(vendor), '--output', str(dest),
-    ], check=True, cwd=ROOT)
+    with tempfile.TemporaryDirectory(dir=PATCH_DIR) as temporary:
+        patched = Path(temporary) / dest.name
+        subprocess.run([
+            sys.executable, str(patch_dir / 'build_engine_glaciar.py'),
+            '--ffdec', str(ffdec), '--engine', str(vendor), '--output', str(patched),
+        ], check=True, cwd=ROOT)
+        patched.replace(dest)
 
 
 def ensure_patched_swfs(web_container: str = 'glaciar-dev-web') -> None:

@@ -26,12 +26,13 @@ LAB_NAMESPACES = {'clubpenguin', 'monitoring-lab'}
 KNOWN_TYPES = {
     'kubernetes_namespace_v1', 'kubernetes_secret_v1', 'kubernetes_persistent_volume_claim_v1',
     'kubernetes_stateful_set_v1', 'kubernetes_service_v1', 'kubernetes_deployment_v1',
-    'kubernetes_network_policy_v1', 'kubernetes_config_map_v1', 'helm_release', 'random_password',
+    'kubernetes_network_policy_v1', 'kubernetes_config_map_v1', 'helm_release', 'random_password', 'random_id',
 }
 # Delete/replace of these needs an explicit --allow-destructive naming the address.
 PROTECTED = [
     r'^kubernetes_namespace_v1\.', r'^kubernetes_persistent_volume_claim_v1\.', r'^kubernetes_stateful_set_v1\.',
     r'^random_password\.', r'^kubernetes_secret_v1\.(postgres|grafana)\b', r'^helm_release\.',
+    r'^random_id\.puffle_host_key\b', r'^kubernetes_secret_v1\.puffle_host_key\b',
     r'^kubernetes_deployment_v1\.cloudflared\b', r'^kubernetes_network_policy_v1\.web_from_cloudflared\b',
 ]
 # Changes to these can alter or endanger stored data: take a verified backup first.

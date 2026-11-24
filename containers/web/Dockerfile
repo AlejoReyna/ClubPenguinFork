@@ -8,7 +8,7 @@ COPY --from=media play /srv/play
 COPY environment_data.xml /srv/media/play/web_service/environment_data.xml
 COPY custom-clothing/ /srv/media/play/v2/content/global/clothing/
 COPY --from=ruffle . /srv/ruffle
-# Cache-buster hashes only. login/create stay mobile-patched; engine ships with glaciarCamera only.
+# Cache-buster hashes for the client including the Glaciar camera and puffle chat renderer.
 COPY --from=puffle-client companion.zip /srv/play/puffle/companion.zip
 COPY --from=puffle-client build.json /srv/play/puffle/build.json
 COPY default.conf /etc/nginx/conf.d/default.conf

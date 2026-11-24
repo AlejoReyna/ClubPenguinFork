@@ -29,7 +29,16 @@ QUERIES = {
     'desired': f'sum(kube_deployment_spec_replicas{{namespace="{NAMESPACE}"}})',
     'players': 'sum(clubpenguin_players{world="Glaciar"})',
     'age': f'time() - max(timestamp(kube_deployment_spec_replicas{{namespace="{NAMESPACE}"}}))',
+    'bots': f'sum(bots_connected{{namespace="{NAMESPACE}"}} and on(job,instance) (up == 1))',
+    'replies': f'sum(bots_replies_total{{namespace="{NAMESPACE}"}})',
+    'spend': f'100 * max(bots_spend_cap_ratio{{namespace="{NAMESPACE}"}})',
 }
+
+BOT_METRICS = (
+    ('bots', 'Bots conectados', '.0f', ''),
+    ('replies', 'Respuestas de bots', '.0f', ''),
+    ('spend', 'Presupuesto usado o reservado', '.2f', ' %'),
+)
 
 _SAFE_LABEL = re.compile(r'^[A-Za-z0-9][A-Za-z0-9 ._/()+-]{0,63}$')
 _SHA = re.compile(r'^[0-9a-fA-F]{7,40}$')
@@ -134,7 +143,8 @@ class Summary:
         timeout = max(1, min(int(self._get('PANEL_TIMEOUT', '2') or 2), 10))
         stale_after = max(15, min(int(self._get('PANEL_STALE_AFTER', '120') or 120), 3600))
         show_players = self._get('PANEL_SHOW_PLAYERS').lower() == 'true'
-        wanted = ['available', 'desired', 'age'] + (['players'] if show_players else [])
+        show_bots = self._get('PANEL_SHOW_BOTS').lower() == 'true'
+        wanted = ('available', 'desired', 'age')
         deadline = self.now() + timeout
         values = {}
         try:
@@ -146,6 +156,17 @@ class Summary:
         except SourceUnavailable:
             # Never show an old value as current; keep only when the last good read happened.
             return {'state': 'offline', 'metrics': [], 'lastReading': self._last_good}
+
+        optional = (['players'] if show_players else []) + ([m[0] for m in BOT_METRICS] if show_bots else [])
+        for index, name in enumerate(optional):
+            remaining = deadline - self.now()
+            if remaining <= 0:
+                break
+            try:
+                # Share the remaining time so one slow optional query cannot starve the rest.
+                values[name] = self.fetch(base, QUERIES[name], remaining / (len(optional) - index))
+            except SourceUnavailable:
+                continue
 
         read_at = self.now()
         metrics = []
@@ -159,7 +180,12 @@ class Summary:
             if values.get('players') is None:
                 complete = False
             else:
-                metrics.append({'id': 'players', 'label': 'Jugadores', 'value': str(round(values['players']))})
+                metrics.append({'id': 'players', 'label': 'Sesiones conectadas', 'value': str(round(values['players']))})
+        if show_bots:
+            for name, label, precision, unit in BOT_METRICS:
+                value = values.get(name)
+                metrics.append({'id': name, 'label': label,
+                                'value': None if value is None else format(value, precision) + unit})
         age = values['age']
         fresh = age is not None and 0 <= age <= stale_after
         # Operational means every shown workload is available AND the reading is recent.
