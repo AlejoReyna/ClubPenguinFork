@@ -2,7 +2,7 @@
   "uid": "clubpenguin-lab",
   "title": "Raspberry Pi · Club Penguin Lab",
   "schemaVersion": 39,
-  "version": 2,
+  "version": 3,
   "editable": false,
   "tags": ["raspberry", "clubpenguin", "devops"],
   "timezone": "browser",
@@ -31,7 +31,7 @@
       "targets": [{"refId": "A", "expr": "node_filesystem_avail_bytes{mountpoint=\"/\",fstype!=\"rootfs\"}", "legendFormat": "Disponible"}]
     },
     {
-      "id": 4, "type": "timeseries", "title": "Pods disponibles por aplicación",
+      "id": 4, "type": "timeseries", "title": "Réplicas disponibles por Deployment",
       "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
       "datasource": {"type": "prometheus", "uid": "prometheus-lab"},
       "fieldConfig": {"defaults": {"min": 0, "decimals": 0}},
@@ -52,7 +52,7 @@
       "targets": [{"refId": "A", "expr": "sum by(pod) (container_memory_working_set_bytes{namespace=\"clubpenguin\",container!=\"\",container!=\"POD\"})", "legendFormat": "{{pod}}"}]
     },
     {
-      "id": 7, "type": "timeseries", "title": "Jugadores conectados",
+      "id": 7, "type": "timeseries", "title": "Sesiones conectadas",
       "gridPos": {"x": 0, "y": 24, "w": 12, "h": 8},
       "datasource": {"type": "prometheus", "uid": "prometheus-lab"},
       "fieldConfig": {"defaults": {"min": 0, "decimals": 0}},
@@ -64,6 +64,65 @@
       "datasource": {"type": "prometheus", "uid": "prometheus-lab"},
       "fieldConfig": {"defaults": {"min": 0, "max": 1, "decimals": 0}},
       "targets": [{"refId": "A", "expr": "clubpenguin_redis_up", "legendFormat": "Redis"}]
+    },
+    {
+      "id": 9, "type": "timeseries", "title": "Discoteca y pizzería · bots presentes y previstos",
+      "gridPos": {"x": 0, "y": 32, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus-lab"},
+      "fieldConfig": {"defaults": {"min": 0, "decimals": 0}},
+      "targets": [
+        {"refId": "A", "expr": "sum by(room)(bots_in_room{namespace=\"clubpenguin\",room=~\"120|330\"})", "legendFormat": "{{room}} presentes"},
+        {"refId": "B", "expr": "sum by(room)(bots_planned{namespace=\"clubpenguin\",room=~\"120|330\"})", "legendFormat": "{{room}} previstos"}
+      ]
+    },
+    {
+      "id": 10, "type": "timeseries", "title": "Presupuesto usado o reservado y gasto por prioridad",
+      "gridPos": {"x": 12, "y": 32, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus-lab"},
+      "fieldConfig": {
+        "defaults": {"unit": "currencyUSD", "min": 0, "decimals": 6, "custom": {"axisPlacement": "right"}},
+        "overrides": [{
+          "matcher": {"id": "byFrameRefID", "options": "A"},
+          "properties": [{"id": "unit", "value": "percent"}, {"id": "decimals", "value": 2}, {"id": "custom.axisPlacement", "value": "left"}]
+        }]
+      },
+      "targets": [
+        {"refId": "A", "expr": "100 * max(bots_spend_cap_ratio{namespace=\"clubpenguin\"})", "legendFormat": "Presupuesto (%)"},
+        {"refId": "B", "expr": "sum by(priority)(increase(bots_spend_usd_micros_total{namespace=\"clubpenguin\"}[15m])) / 1e6", "legendFormat": "{{priority}} · USD en 15 min"}
+      ]
+    },
+    {
+      "id": 11, "type": "timeseries", "title": "Latencia p95 de llamadas exitosas a Kimi",
+      "gridPos": {"x": 0, "y": 40, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus-lab"},
+      "fieldConfig": {"defaults": {"unit": "s", "min": 0}},
+      "targets": [
+        {"refId": "A", "expr": "histogram_quantile(0.95, sum by(le)(rate(bots_provider_latency_seconds_bucket{namespace=\"clubpenguin\"}[5m])))", "legendFormat": "p95"}
+      ]
+    },
+    {
+      "id": 12, "type": "timeseries", "title": "Respuestas locales y del modelo · últimos 5 min",
+      "gridPos": {"x": 12, "y": 40, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus-lab"},
+      "fieldConfig": {"defaults": {"min": 0}, "overrides": [{
+        "matcher": {"id": "byFrameRefID", "options": "B"},
+        "properties": [{"id": "custom.hideFrom", "value": {"legend": false, "tooltip": true, "viz": true}}]
+      }]},
+      "targets": [
+        {"refId": "A", "expr": "sum by(source)(increase(bots_replies_total{namespace=\"clubpenguin\"}[5m]))", "legendFormat": "Respuesta · {{source}}"},
+        {"refId": "B", "expr": "sum by(result)(increase(bots_travel_total{namespace=\"clubpenguin\"}[5m]))", "legendFormat": "Viaje · {{result}}"}
+      ]
+    },
+    {
+      "id": 13, "type": "stat", "title": "Puffle · actividad del broker",
+      "gridPos": {"x": 0, "y": 48, "w": 24, "h": 5},
+      "datasource": {"type": "prometheus", "uid": "prometheus-lab"},
+      "fieldConfig": {"defaults": {"min": 0, "decimals": 0}},
+      "targets": [
+        {"refId": "A", "expr": "sum(puffle_paired_total{namespace=\"clubpenguin\"})", "legendFormat": "Vinculaciones confirmadas", "instant": true, "range": false},
+        {"refId": "B", "expr": "sum(puffle_completed_total{namespace=\"clubpenguin\"})", "legendFormat": "Trabajos completados", "instant": true, "range": false},
+        {"refId": "C", "expr": "sum(puffle_jobs{namespace=\"clubpenguin\"})", "legendFormat": "Trabajos en memoria", "instant": true, "range": false}
+      ]
     }
   ]
 }

@@ -150,7 +150,7 @@ resource "kubernetes_deployment_v1" "web" {
           }
           env {
             name  = "PANEL_COMPONENTS"
-            value = "Web (nginx), Runtime Houdini, Puffle, PostgreSQL, Redis, Prometheus, Grafana"
+            value = join(", ", concat(["Web (nginx)", "Runtime Houdini", "Puffle", "PostgreSQL", "Redis", "Prometheus", "Grafana"], var.bots_enabled ? ["Bots IA"] : []))
           }
           env {
             name  = "PROMETHEUS_URL"
@@ -167,6 +167,10 @@ resource "kubernetes_deployment_v1" "web" {
           env {
             name  = "PANEL_SHOW_PLAYERS"
             value = tostring(var.panel_show_players)
+          }
+          env {
+            name  = "PANEL_SHOW_BOTS"
+            value = tostring(var.bots_enabled)
           }
           volume_mount {
             name       = "release-info"

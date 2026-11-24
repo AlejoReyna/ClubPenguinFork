@@ -146,10 +146,15 @@ def cmd_plan(args):
     ws = workspace()
     env = terraform_env(cfg, ws)
     manifest = json.loads(Path(args.manifest).read_text())
+    if bool(cfg['CP_PUFFLE_WEB_PLAYERS']) != bool(cfg['CP_PUFFLE_SPOTIFY_CLIENT_ID']):
+        lablib.fail('Set both CP_PUFFLE_WEB_PLAYERS and CP_PUFFLE_SPOTIFY_CLIENT_ID for the web pilot.')
     values = release.manifest_to_tfvars(manifest, cfg['CP_PUBLIC_HOSTNAME'])
     values.update({
         **puffle_settings(manifest, cfg),
         'puffle_allowed_players': [int(x) for x in cfg['CP_PUFFLE_ALLOWED_PLAYERS'].split(',') if x],
+        'puffle_web_players': [int(x) for x in cfg['CP_PUFFLE_WEB_PLAYERS'].split(',') if x],
+        'puffle_spotify_client_id': cfg['CP_PUFFLE_SPOTIFY_CLIENT_ID'],
+        'panel_show_players': cfg['CP_PANEL_SHOW_PLAYERS'] == 'true',
         # The «Diálogos» panel switch (docs/operations.md). ci.yml sets the same TF_VAR, so a
         # clean checkout never plans to retire the sidecar and its PVC.
         'dialog_feed_enabled': cfg['CP_DIALOG_FEED_ENABLED'] == 'true',

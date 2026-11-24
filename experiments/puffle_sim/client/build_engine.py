@@ -15,6 +15,13 @@ ENGINE_SHA256 = '4f98c5df71002c9ddcaaa9b5b26094d395f6ff94d7c04ac2741f2188f5d56b3
 FFDEC_SHA256 = '80f8ced0bfde98b434c28e9807e91fe5558255b2f712051a0e65221519bd392a'
 CLASS_PATH = 'scripts/__Packages/com/clubpenguin/engine/PuffleManager.as'
 CLASS_NAME = '/__Packages/com/clubpenguin/engine/PuffleManager'
+REGISTER_PUFFLE_CHAT = '''      if(this._shell.__puffleTalkHandler != undefined)
+      {
+         this._shell.AIRTOWER.removeListener("puffletalk",this._shell.__puffleTalkHandler);
+      }
+      this._shell.__puffleTalkHandler = this.handlePuffleChat;
+      this._shell.AIRTOWER.addListener("puffletalk",this.handlePuffleChat,this);
+'''
 
 
 def sha256(path):
@@ -34,15 +41,8 @@ def main():
 
     java = ['java', '-Djava.awt.headless=true', '-jar', str(args.ffdec.resolve())]
     constructor = '      this._puffles = [];\n      this._pathEngine'
-    registration = '''      this._puffles = [];
-      if(this._shell.__puffleTalkHandler != undefined)
-      {
-         this._shell.AIRTOWER.removeListener("puffletalk",this._shell.__puffleTalkHandler);
-      }
-      this._shell.__puffleTalkHandler = this.handlePuffleChat;
-      this._shell.AIRTOWER.addListener("puffletalk",this.handlePuffleChat,this);
-      this.setupMobileCamera();
-      this._pathEngine'''
+    registration = ('      this._puffles = [];\n' + REGISTER_PUFFLE_CHAT
+                    + '      this.setupMobileCamera();\n      this._pathEngine')
     insertion = '   function setupPathEngine()\n'
     renderer = Path(__file__).with_name('renderer.as').read_text(encoding='utf-8')
     camera = Path(__file__).with_name('mobile_camera.as').read_text(encoding='utf-8')

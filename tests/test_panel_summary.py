@@ -70,7 +70,25 @@ class PanelSummaryTest(unittest.TestCase):
         hidden, _ = summary()
         self.assertNotIn('players', [m['id'] for m in hidden.prometheus()['metrics']])
         shown, _ = summary({'PANEL_SHOW_PLAYERS': 'true'})
-        self.assertIn({'id': 'players', 'label': 'Jugadores', 'value': '3'}, shown.prometheus()['metrics'])
+        self.assertIn({'id': 'players', 'label': 'Sesiones conectadas', 'value': '3'}, shown.prometheus()['metrics'])
+
+    def test_optional_timeout_keeps_health_and_other_metrics(self):
+        core = fetcher()
+
+        def fetch(base, expression, timeout):
+            if expression == panel.QUERIES['bots']:
+                return 26
+            if expression == panel.QUERIES['replies']:
+                raise panel.SourceUnavailable('timeout')
+            if expression == panel.QUERIES['spend']:
+                return 0.013
+            return core(base, expression, timeout)
+
+        result, _ = summary({'PANEL_SHOW_BOTS': 'true'}, fetch=fetch)
+        reading = result.prometheus()
+        self.assertEqual(reading['state'], 'operational')
+        self.assertEqual({m['id']: m['value'] for m in reading['metrics']},
+                         {'workloads': '4 / 4', 'bots': '26', 'replies': None, 'spend': '0.01 %'})
 
     def test_unavailable_workloads_are_never_called_operational(self):
         result, _ = summary(fetch=fetcher(available=3, desired=4))

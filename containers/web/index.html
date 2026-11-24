@@ -1476,7 +1476,8 @@
     staleText: 'These readings are not recent; do not treat them as current status.',
     noMetrics: 'No readings available.', privText: 'The dashboard is only reachable through a tunnel or port-forward from an authorised machine.',
     noDash: 'No authorised dashboard for this environment.', open: 'Open Grafana', newTab: '(opens in a new tab)',
-    workloads: 'Workloads available', players: 'Players',
+    workloads: 'Workloads available', players: 'Connected sessions',
+    bots: 'Connected bots', replies: 'Bot replies', spend: 'Budget spent or reserved',
   } : {
     panel: 'Infraestructura y monitoreo', close: 'Cerrar panel de infraestructura', tabs: 'Secciones de infraestructura',
     infra: 'Infraestructura', prom: 'Prometheus', graf: 'Grafana', deploy: 'Despliegue', components: 'Componentes principales',
@@ -1489,13 +1490,14 @@
     staleText: 'Las lecturas no son recientes; no las tomes como estado actual.',
     noMetrics: 'Sin lecturas disponibles.', privText: 'El dashboard solo es accesible mediante túnel o port-forward desde un equipo autorizado.',
     noDash: 'No hay un dashboard autorizado para este entorno.', open: 'Abrir en Grafana', newTab: '(se abre en una pestaña nueva)',
-    workloads: 'Cargas disponibles', players: 'Jugadores',
+    workloads: 'Cargas disponibles', players: 'Sesiones conectadas',
+    bots: 'Bots conectados', replies: 'Respuestas de bots', spend: 'Presupuesto usado o reservado',
   };
   document.getElementById('infra-titulo').textContent = TI.panel;
   document.getElementById('infra-cerrar').setAttribute('aria-label', TI.close);
   document.getElementById('infra-tabs').setAttribute('aria-label', TI.tabs);
   panelInfra.querySelectorAll('.infra-tab').forEach(b => { b.querySelector('span').textContent = TI[b.dataset.sec]; });
-  const METRICA = {workloads: TI.workloads, players: TI.players};
+  const METRICA = {workloads: TI.workloads, players: TI.players, bots: TI.bots, replies: TI.replies, spend: TI.spend};
 
   let infraAbierto = false, infraSeccion = 'infra', resumen = null, resumenFallo = null, cargando = false, relojInfra = null;
 
@@ -1559,7 +1561,7 @@
         if (p.state === 'stale') c.append(nodo('p', 'mudo', TI.staleText));
         if (p.metrics && p.metrics.length) {
           const ul = nodo('ul', 'infra-metricas');
-          p.metrics.forEach(m => { const li = nodo('li'); li.append(nodo('span', '', METRICA[m.id] || m.label), nodo('b', '', m.value)); ul.append(li); });
+          p.metrics.forEach(m => { const li = nodo('li'); li.append(nodo('span', '', METRICA[m.id] || m.label), nodo('b', '', m.value ?? TI.na)); ul.append(li); });
           c.append(ul);
         } else c.append(nodo('p', 'mudo', TI.noMetrics));
       }

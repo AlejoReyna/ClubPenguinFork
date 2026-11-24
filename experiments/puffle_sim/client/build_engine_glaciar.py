@@ -1,4 +1,4 @@
-"""Patch the 2017 engine.swf with glaciarCamera only (no puffle renderer)."""
+"""Patch the 2017 engine.swf with the Glaciar camera and puffle chat renderer."""
 import argparse
 from pathlib import Path
 import shutil
@@ -7,7 +7,7 @@ import sys
 import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from build_engine import FFDEC_SHA256, sha256  # noqa: E402
+from build_engine import FFDEC_SHA256, REGISTER_PUFFLE_CHAT, sha256  # noqa: E402
 
 ENGINE_2017_SHA256 = 'c30d75048a7d3e49becef76dd81a683163df36dbabbcc1683e984cbd0ca5d23b'
 CLASS_PATH = 'scripts/__Packages/com/clubpenguin/engine/PuffleManager.as'
@@ -20,7 +20,8 @@ CONSTRUCTOR_TAIL = (
 CONSTRUCTOR_PATCH = (
     '      this._puffles = [];\n'
     '      this._pathEngine = new com.clubpenguin.engine.pathfinding.PathEngine();\n'
-    '      this.setupMobileCamera();\n'
+    + REGISTER_PUFFLE_CHAT
+    + '      this.setupMobileCamera();\n'
     '   }'
 )
 INSERTION = '   function setupPathEngine()\n'
@@ -38,6 +39,7 @@ def main():
         raise SystemExit('Output exists; refusing to overwrite')
 
     camera = Path(__file__).with_name('mobile_camera_glaciar.as').read_text(encoding='utf-8')
+    renderer = Path(__file__).with_name('renderer.as').read_text(encoding='utf-8')
     java = ['java', '-Djava.awt.headless=true', '-jar', str(args.ffdec.resolve())]
     with tempfile.TemporaryDirectory(prefix='glaciar-engine-') as tmp:
         tmp = Path(tmp)
@@ -47,7 +49,7 @@ def main():
         if source.count(CONSTRUCTOR_TAIL) != 1 or source.count(INSERTION) != 1:
             raise SystemExit('Unexpected PuffleManager layout; refusing to patch')
         source = source.replace(CONSTRUCTOR_TAIL, CONSTRUCTOR_PATCH, 1)
-        source = source.replace(INSERTION, camera + INSERTION, 1)
+        source = source.replace(INSERTION, renderer + camera + INSERTION, 1)
         modified = tmp / 'PuffleManager.as'
         modified.write_text(source, encoding='utf-8')
         output = tmp / 'engine.swf'
@@ -55,7 +57,7 @@ def main():
                        check=True, stdout=subprocess.DEVNULL, timeout=180)
         with args.output.open('xb') as dest, output.open('rb') as src:
             shutil.copyfileobj(src, dest)
-    print('Built 2017 engine.swf with glaciarCamera.')
+    print('Built 2017 engine.swf with glaciarCamera and puffletalk.')
 
 
 if __name__ == '__main__':
